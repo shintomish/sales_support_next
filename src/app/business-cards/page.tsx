@@ -1,21 +1,15 @@
 'use client';
 
-// 先頭のimportに追加
-import { useAuthStore } from '@/store/authStore';
-
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
+import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell,
+  TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 
 interface BusinessCard {
@@ -34,41 +28,54 @@ interface BusinessCard {
 export default function BusinessCardsPage() {
   const [cards, setCards] = useState<BusinessCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null); // ★ エラー状態を追加
   const router = useRouter();
-  const fetchUser = useAuthStore((state) => state.fetchUser); // ← 追加
+  const fetchUser = useAuthStore((state) => state.fetchUser);
 
-  useEffect(() => {
-    fetchUser().then(() => fetchCards()); // ← 修正
-  }, []);
-
-  const fetchCards = async () => {
+  const fetchCards = useCallback(async () => { // ★ useCallbackで安定化
     try {
+      setError(null);
       const res = await apiClient.get('/api/v1/cards');
       setCards(res.data.data);
-    } catch {
-      router.push('/login');
+    } catch (err: any) {
+      // ★ 401のみloginへ、それ以外はエラー表示
+      if (err.response?.status === 401) {
+        router.push('/login');
+      } else {
+        setError('名刺の取得に失敗しました');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    fetchUser().then(() => fetchCards());
+  }, [fetchCards]); // ★ 依存配列を明示
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'registered':
-        return <Badge className="bg-green-500">登録済み</Badge>;
-      case 'processed':
-        return <Badge className="bg-blue-500">処理済み</Badge>;
-      case 'pending':
-        return <Badge variant="secondary">保留中</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
+    const map: Record<string, JSX.Element> = {
+      registered: <Badge className="bg-green-500">登録済み</Badge>,
+      processed: <Badge className="bg-blue-500">処理済み</Badge>,
+      pending: <Badge variant="secondary">保留中</Badge>,
+    };
+    return map[status] ?? <Badge variant="outline">{status}</Badge>; // ★ switch→オブジェクトで簡潔に
   };
 
+  // ★ 各状態を個別に返す（loading/error/空を分離）
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray-500">読み込み中...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <p className="text-red-500">{error}</p>
+        <Button onClick={fetchCards}>再試行</Button>
       </div>
     );
   }
@@ -106,12 +113,13 @@ export default function BusinessCardsPage() {
                 </TableRow>
               ) : (
                 cards.map((card) => (
-                  <TableRow key={card.id}>
+                  <TableRow key={card.id} className="hover:bg-muted/50 cursor-pointer" // ★ ホバー追加
+                    onClick={() => router.push(`/business-cards/${card.id}`)}>
                     <TableCell>
                       {card.image_path ? (
                         <img
                           src={`${process.env.NEXT_PUBLIC_API_URL}/storage/${card.image_path}`}
-                          alt="名刺"
+                          alt={`${card.person_name ?? ''}の名刺`} // ★ alt改善
                           className="h-16 w-24 object-cover rounded"
                         />
                       ) : (
@@ -121,32 +129,22 @@ export default function BusinessCardsPage() {
                       )}
                     </TableCell>
                     <TableCell>{card.company_name ?? '-'}</TableCell>
-                    <TableCell>{card.person_name ?? '-'}</TableCell>
+                    <TableCell className="font-medium">{card.person_name ?? '-'}</TableCell>
                     <TableCell>{card.position ?? '-'}</TableCell>
                     <TableCell>
                       <div>{card.email}</div>
-                      <div className="text-sm text-gray-500">
-                        {card.mobile ?? card.phone}
-                      </div>
+                      <div className="text-sm text-gray-500">{card.mobile ?? card.phone}</div>
                     </TableCell>
                     <TableCell>{getStatusBadge(card.status)}</TableCell>
-                    <TableCell>
-                      {new Date(card.created_at).toLocaleDateString('ja-JP')}
-                    </TableCell>
-                    <TableCell>
+                    <TableCell>{new Date(card.created_at).toLocaleDateString('ja-JP')}</TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => router.push(`/business-cards/${card.id}`)}
-                        >
+                        <Button size="sm" variant="outline"
+                          onClick={() => router.push(`/business-cards/${card.id}`)}>
                           詳細
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => router.push(`/business-cards/${card.id}/edit`)}
-                        >
+                        <Button size="sm" variant="outline"
+                          onClick={() => router.push(`/business-cards/${card.id}/edit`)}>
                           編集
                         </Button>
                       </div>
