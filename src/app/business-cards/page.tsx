@@ -1,5 +1,8 @@
 'use client';
 
+// 先頭のimportに追加
+import { useAuthStore } from '@/store/authStore';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
@@ -32,9 +35,10 @@ export default function BusinessCardsPage() {
   const [cards, setCards] = useState<BusinessCard[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const fetchUser = useAuthStore((state) => state.fetchUser); // ← 追加
 
   useEffect(() => {
-    fetchCards();
+    fetchUser().then(() => fetchCards()); // ← 修正
   }, []);
 
   const fetchCards = async () => {

@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
-  const session = request.cookies.get('sales_support_session');
+export async function middleware(request: NextRequest) {
   const isLoginPage = request.nextUrl.pathname === '/login';
+  const token = request.cookies.get('auth_token')?.value;
 
-  if (!session && !isLoginPage) {
+  if (!token && !isLoginPage) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
-
-  if (session && isLoginPage) {
+  if (token && isLoginPage) {
     return NextResponse.redirect(new URL('/business-cards', request.url));
   }
 

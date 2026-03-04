@@ -1,50 +1,64 @@
 import { create } from 'zustand';
-import apiClient, { getCsrfToken } from '@/lib/axios';
+import apiClient from '@/lib/axios';
 
-	interface User {
-	  id: number;
-	  name: string;
-	  email: string;
-	}
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
 
-	interface AuthStore {
-	  user: User | null;
-	  loading: boolean;
-	  login: (email: string, password: string) => Promise<void>;
-	  logout: () => Promise<void>;
-	  fetchUser: () => Promise<void>;
-	}
+interface AuthStore {
+  user: User | null;
+  token: string | null;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  fetchUser: () => Promise<void>;
+}
 
-	export const useAuthStore = create<AuthStore>((set) => ({
-	  user: null,
-	  loading: true,
+// Cookieからトークンを取得するヘルパー
+const getTokenFromCookie = (): string | null => {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/auth_token=([^;]+)/);
+  return match ? match[1] : null;
+};
 
-	login: async (email, password) => {
-	    await getCsrfToken();
-	    try {
-	        await apiClient.post('/login', { email, password }, {
-	            maxRedirects: 0,
-	            validateStatus: (status) => status === 302 || status === 200,
-	        });
-	    } catch {
-	        // 302リダイレクトは無視
-	    }
-	    const res = await apiClient.get('/api/v1/me');
-	    set({ user: res.data });
-	},
+export const useAuthStore = create<AuthStore>((set) => ({
+  user: null,
+  token: null,
+  loading: true,
 
-	logout: async () => {
-	    await apiClient.post('/logout');
-	    set({ user: null });
-	},
+  login: async (email, password) => {
+    const res = await apiClient.post('/api/v1/login', { email, password });
+    const { token, user } = res.data;
 
-	fetchUser: async () => {
-	    try {
-	        const res = await apiClient.get('/api/v1/me');
-	        set({ user: res.data, loading: false });
-	    } catch {
-	        set({ user: null, loading: false });
-	    }
-	},
+    // Cookieとaxiosヘッダーにトークンをセット
+    document.cookie = `auth_token=${token}; path=/`;
+    apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+    set({ user, token });
+  },
+
+  logout: async () => {
+    await apiClient.post('/api/v1/logout');
+    document.cookie = 'auth_token=; path=/; max-age=0'; // Cookie削除
+    delete apiClient.defaults.headers.common['Authorization'];
+    set({ user: null, token: null });
+  },
+
+  fetchUser: async () => {
+    try {
+      // CookieからトークンをリストアしてAPIを叩く
+      const token = getTokenFromCookie();
+      if (!token) {
+        set({ user: null, loading: false });
+        return;
+      }
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      const res = await apiClient.get('/api/v1/me');
+      set({ user: res.data, token, loading: false });
+    } catch {
+      set({ user: null, loading: false });
+    }
+  },
 }));
-
