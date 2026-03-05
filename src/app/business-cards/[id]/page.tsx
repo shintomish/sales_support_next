@@ -92,8 +92,7 @@ export default function BusinessCardDetailPage() {
     <div className="container mx-auto py-8 px-4 max-w-3xl">
       {/* ヘッダー */}
       <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" onClick={() => router.back()}> {/* ★ push固定→back()で柔軟に */}
-          ← 戻る
+        <Button variant="outline" onClick={() => router.push('/business-cards')}>← 一覧に戻る
         </Button>
         <h1 className="text-2xl font-bold">名刺詳細</h1>
         <div className="ml-auto flex gap-2">
