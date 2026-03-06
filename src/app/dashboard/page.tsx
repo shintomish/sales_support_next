@@ -140,16 +140,16 @@ export default function DashboardPage() {
   const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
+    <div className="container mx-auto py-4 px-4 max-w-7xl">
 
       {/* ヘッダー */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">ダッシュボード</h1>
         <span className="text-sm text-gray-500">📅 {today}</span>
       </div>
 
       {/* ── KPIカード ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         {[
           { label: '総顧客数',     value: kpi.customers.toLocaleString(),                      unit: '社',  bg: '#EFF6FF', color: '#2563EB', icon: '🏢' },
           { label: '進行中の商談', value: kpi.deals_active.toLocaleString(),                   unit: '件',  bg: '#FFF3E0', color: '#FF8C00', icon: '💼' },
@@ -157,14 +157,14 @@ export default function DashboardPage() {
           { label: '今月の売上',   value: formatManEn(kpi.revenue_this_month),                 unit: '万円', bg: '#FDF2F8', color: '#DB2777', icon: '¥'  },
         ].map(({ label, value, unit, bg, color, icon }) => (
           <Card key={label}>
-            <CardContent className="p-5">
+            <CardContent className="p-4">
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{label}</p>
-                  <p className="text-3xl font-bold text-gray-800 leading-none">{value}</p>
+                  <p className="text-2xl font-bold text-gray-800 leading-none">{value}</p>
                   <p className="text-xs text-gray-400 mt-1">{unit}</p>
                 </div>
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
                      style={{ backgroundColor: bg, color }}>
                   {icon}
                 </div>
@@ -175,10 +175,10 @@ export default function DashboardPage() {
       </div>
 
       {/* ── 商談パイプライン & 期限タスク ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-start">
-        {/* max-h-80 = 320px で統一されます。高さを調整したい場合は max-h-72（288px）や max-h-96（384px）で変更 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 items-start">
+        {/* max-h-60（240px）で統一 */}
         {/* 商談パイプライン（2/3幅） */}
-        <Card className="md:col-span-2 flex flex-col max-h-72">
+        <Card className="md:col-span-2 flex flex-col max-h-60">
           <CardHeader className="pb-2 flex-shrink-0">
             <CardTitle className="text-base flex items-center gap-2">
               <span>📊</span> 商談パイプライン
@@ -213,7 +213,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* 期限が近いタスク（1/3幅） */}
-        <Card className="flex flex-col max-h-72">
+        <Card className="flex flex-col max-h-60">
           <CardHeader className="pb-2 flex-shrink-0">
             <CardTitle className="text-base flex items-center gap-2">
               <span>☑️</span> 期限が近いタスク
@@ -263,7 +263,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
 
         {/* 活動履歴（3/5幅） */}
-        <Card className="md:col-span-3 flex flex-col max-h-72">
+        <Card className="md:col-span-3 flex flex-col max-h-60">
           <CardHeader className="pb-2 flex-shrink-0">
             <CardTitle className="text-base flex items-center gap-2">
               <span>🕐</span> 直近の活動履歴
@@ -301,7 +301,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* 今月の成約（2/5幅） */}
-        <Card className="md:col-span-2 flex flex-col max-h-72">
+        <Card className="md:col-span-2 flex flex-col max-h-60">
           <CardHeader className="pb-2 flex-shrink-0">
             <CardTitle className="text-base flex items-center gap-2">
               <span>🏆</span> 今月の成約商談
