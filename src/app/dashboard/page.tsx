@@ -75,7 +75,7 @@ const PRIORITY_STYLE: Record<string, { bg: string; color: string }> = {
 };
 
 // ───────── ユーティリティ ─────────
-const formatManEn = (yen: number) => (yen / 10000).toFixed(1);
+const formatManEn = (yen: number) => Math.floor(yen / 10000).toLocaleString();
 const formatDate  = (dateStr: string) =>
   new Date(dateStr).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' }).replace('/', '/');
 const isPast = (dateStr: string | null) => !!dateStr && new Date(dateStr) < new Date();
@@ -323,7 +323,7 @@ export default function DashboardPage() {
                       🏢 {deal.customer?.company_name ?? '-'}
                     </span>
                     <span className="text-sm font-bold text-emerald-500">
-                      ¥{deal.amount.toLocaleString()}
+                      ¥{Number(deal.amount).toLocaleString()}
                     </span>
                   </div>
                 </div>

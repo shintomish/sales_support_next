@@ -14,7 +14,7 @@ import {
 interface Task {
   id: number;
   title: string;
-  priority: '高' | '中' | '低';
+  priority: string;
   status: string;
   due_date: string | null;
   description: string | null;
@@ -57,6 +57,7 @@ export default function TasksPage() {
   const [page, setPage]             = useState(1);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const router = useRouter();
 
   const fetchTasks = useCallback(async () => {
@@ -82,88 +83,93 @@ export default function TasksPage() {
 
   const handleDelete = async (id: number) => {
     if (!confirm('削除してもよろしいですか？')) return;
+    setDeletingId(id);
     try {
       await apiClient.delete(`/api/v1/tasks/${id}`);
       fetchTasks();
     } catch { alert('削除に失敗しました'); }
+    finally { setDeletingId(null); }
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-500">読み込み中...</p>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3">
+      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <p className="text-sm text-gray-400">読み込み中...</p>
     </div>
   );
 
   if (error) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <p className="text-red-500">{error}</p>
+      <div className="text-5xl">⚠️</div>
+      <p className="text-gray-600 font-medium">{error}</p>
       <Button onClick={fetchTasks}>再試行</Button>
     </div>
   );
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      {/* ヘッダー */}
+    <div className="max-w-7xl mx-auto py-8 px-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">タスク一覧</h1>
-          {meta && <p className="text-sm text-gray-400 mt-1">全 {meta.total} 件</p>}
+          <h1 className="text-2xl font-bold text-gray-800">タスク一覧</h1>
+          {meta && <p className="text-sm text-gray-400 mt-0.5">全 {meta.total} 件</p>}
         </div>
-        <Button onClick={() => router.push('/tasks/create')}>+ 新規登録</Button>
+        <Button onClick={() => router.push('/tasks/create')} className="gap-1">
+          <span className="text-base">＋</span> 新規登録
+        </Button>
       </div>
 
-      {/* 検索 */}
-      <Card className="mb-4">
-        <CardContent className="py-3">
+      <Card className="mb-4 shadow-sm">
+        <CardContent className="py-3 px-4">
           <div className="flex gap-2 items-center flex-wrap">
             <div className="relative flex-1 min-w-40">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-              <Input className="pl-8" placeholder="タイトル・会社名で検索"
+              <Input className="pl-8 bg-white" placeholder="タイトル・会社名で検索"
                 value={searchInput}
                 onChange={e => setSearchInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()} />
             </div>
             <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-              className="border rounded-md px-3 py-2 text-sm min-w-32">
+              className="border rounded-md px-3 py-2 text-sm bg-white min-w-32">
               <option value="">全ステータス</option>
               {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <select value={priorityFilter} onChange={e => { setPriorityFilter(e.target.value); setPage(1); }}
-              className="border rounded-md px-3 py-2 text-sm min-w-28">
+              className="border rounded-md px-3 py-2 text-sm bg-white min-w-28">
               <option value="">全優先度</option>
               {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
             <Button onClick={handleSearch}>検索</Button>
             {(search || statusFilter || priorityFilter) && (
-              <Button variant="outline" onClick={handleClear}>✕ クリア</Button>
+              <Button variant="ghost" size="sm" onClick={handleClear} className="text-gray-400 hover:text-gray-600">
+                ✕ クリア
+              </Button>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* テーブル */}
-      <Card>
+      <Card className="shadow-sm overflow-hidden">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>優先度</TableHead>
-                <TableHead>タイトル</TableHead>
-                <TableHead>ステータス</TableHead>
-                <TableHead>顧客</TableHead>
-                <TableHead>期限日</TableHead>
-                <TableHead>担当者</TableHead>
-                <TableHead className="text-center">操作</TableHead>
+              <TableRow className="bg-gray-50 hover:bg-gray-50">
+                <TableHead className="font-semibold text-gray-600 py-3">優先度</TableHead>
+                <TableHead className="font-semibold text-gray-600">タイトル</TableHead>
+                <TableHead className="font-semibold text-gray-600">ステータス</TableHead>
+                <TableHead className="font-semibold text-gray-600">顧客</TableHead>
+                <TableHead className="font-semibold text-gray-600">期限日</TableHead>
+                <TableHead className="font-semibold text-gray-600">担当者</TableHead>
+                <TableHead className="font-semibold text-gray-600 text-center">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {tasks.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-gray-400 py-12">
-                    <p className="text-3xl mb-2">☑️</p>
-                    タスクが登録されていません
-                    <div className="mt-3">
-                      <Button size="sm" onClick={() => router.push('/tasks/create')}>
+                  <TableCell colSpan={7} className="py-16">
+                    <div className="flex flex-col items-center gap-3 text-gray-400">
+                      <span className="text-5xl">☑️</span>
+                      <p className="font-medium text-gray-500">タスクが登録されていません</p>
+                      <Button size="sm" variant="outline" onClick={() => router.push('/tasks/create')}>
                         最初のタスクを登録する
                       </Button>
                     </div>
@@ -171,15 +177,15 @@ export default function TasksPage() {
                 </TableRow>
               ) : (
                 tasks.map(t => {
-                  const pStyle = PRIORITY_STYLE[t.priority] ?? PRIORITY_STYLE['低'];
-                  const sStyle = STATUS_STYLE[t.status]     ?? STATUS_STYLE['未着手'];
+                  const pStyle  = PRIORITY_STYLE[t.priority] ?? PRIORITY_STYLE['低'];
+                  const sStyle  = STATUS_STYLE[t.status]     ?? STATUS_STYLE['未着手'];
                   const overdue = isOverdue(t.due_date, t.status);
                   const today   = isToday(t.due_date);
                   return (
                     <TableRow key={t.id}
-                      className={`hover:bg-muted/50 cursor-pointer ${t.status === '完了' ? 'opacity-60' : ''}`}
+                      className={`hover:bg-blue-50/40 cursor-pointer transition-colors border-b last:border-0 ${t.status === '完了' ? 'opacity-60' : ''}`}
                       onClick={() => router.push(`/tasks/${t.id}`)}>
-                      <TableCell>
+                      <TableCell className="py-3">
                         <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
                               style={{ backgroundColor: pStyle.bg, color: pStyle.color }}>
                           {t.priority}
@@ -202,36 +208,30 @@ export default function TasksPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-sm text-gray-500">
-                        {t.customer?.company_name ?? '-'}
+                        {t.customer?.company_name ?? <span className="text-gray-300">—</span>}
                       </TableCell>
                       <TableCell>
                         {t.due_date ? (
-                          <span className={`text-sm font-${overdue || today ? 'semibold' : 'normal'}`}
-                                style={{ color: overdue ? '#EF4444' : today ? '#FF8C00' : '#6B7280' }}>
+                          <span className="text-sm"
+                                style={{ color: overdue ? '#EF4444' : today ? '#FF8C00' : '#9CA3AF',
+                                         fontWeight: overdue || today ? 600 : 400 }}>
                             {new Date(t.due_date).toLocaleDateString('ja-JP')}
-                            {today && (
-                              <span className="ml-1 text-xs px-1 py-0.5 rounded"
-                                    style={{ backgroundColor: '#FFF3E0', color: '#E67E00' }}>今日</span>
-                            )}
-                            {overdue && !today && (
-                              <span className="ml-1 text-xs px-1 py-0.5 rounded"
-                                    style={{ backgroundColor: '#FEF2F2', color: '#991B1B' }}>期限超過</span>
-                            )}
+                            {today && <span className="ml-1 text-xs px-1 rounded" style={{ backgroundColor: '#FFF3E0', color: '#E67E00' }}>今日</span>}
+                            {overdue && !today && <span className="ml-1 text-xs px-1 rounded" style={{ backgroundColor: '#FEF2F2', color: '#991B1B' }}>超過</span>}
                           </span>
-                        ) : <span className="text-gray-400">-</span>}
+                        ) : <span className="text-gray-300">—</span>}
                       </TableCell>
                       <TableCell className="text-sm text-gray-500">
-                        {t.user?.name ?? '-'}
+                        {t.user?.name ?? <span className="text-gray-300">—</span>}
                       </TableCell>
-                      <TableCell className="text-center" onClick={e => e.stopPropagation()}>
+                      <TableCell onClick={e => e.stopPropagation()}>
                         <div className="flex gap-1 justify-center">
-                          <Button size="sm" variant="outline"
-                            onClick={() => router.push(`/tasks/${t.id}`)}>詳細</Button>
-                          <Button size="sm" variant="outline"
-                            onClick={() => router.push(`/tasks/${t.id}/edit`)}>編集</Button>
-                          <Button size="sm" variant="outline"
-                            className="text-red-500 border-red-200 hover:bg-red-50"
-                            onClick={() => handleDelete(t.id)}>削除</Button>
+                          <button title="詳細" onClick={() => router.push(`/tasks/${t.id}`)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-colors">👁</button>
+                          <button title="編集" onClick={() => router.push(`/tasks/${t.id}/edit`)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-amber-100 hover:text-amber-600 transition-colors">✏️</button>
+                          <button title="削除" disabled={deletingId === t.id} onClick={() => handleDelete(t.id)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors disabled:opacity-40">🗑</button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -243,12 +243,11 @@ export default function TasksPage() {
         </CardContent>
       </Card>
 
-      {/* ページネーション */}
       {meta && meta.last_page > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
-          <Button variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← 前へ</Button>
-          <span className="flex items-center text-sm text-gray-500">{page} / {meta.last_page}</span>
-          <Button variant="outline" disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}>次へ →</Button>
+        <div className="flex justify-center items-center gap-3 mt-5">
+          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← 前へ</Button>
+          <span className="text-sm text-gray-500">{page} / {meta.last_page} ページ</span>
+          <Button variant="outline" size="sm" disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}>次へ →</Button>
         </div>
       )}
     </div>

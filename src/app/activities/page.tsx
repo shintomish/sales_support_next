@@ -46,6 +46,7 @@ export default function ActivitiesPage() {
   const [page, setPage]             = useState(1);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const router = useRouter();
 
   const fetchActivities = useCallback(async () => {
@@ -78,93 +79,94 @@ export default function ActivitiesPage() {
 
   const handleDelete = async (id: number) => {
     if (!confirm('削除してもよろしいですか？')) return;
+    setDeletingId(id);
     try {
       await apiClient.delete(`/api/v1/activities/${id}`);
       fetchActivities();
     } catch { alert('削除に失敗しました'); }
+    finally { setDeletingId(null); }
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-500">読み込み中...</p>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3">
+      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <p className="text-sm text-gray-400">読み込み中...</p>
     </div>
   );
 
   if (error) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <p className="text-red-500">{error}</p>
+      <div className="text-5xl">⚠️</div>
+      <p className="text-gray-600 font-medium">{error}</p>
       <Button onClick={fetchActivities}>再試行</Button>
     </div>
   );
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      {/* ヘッダー */}
+    <div className="max-w-7xl mx-auto py-8 px-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">活動履歴</h1>
-          {meta && <p className="text-sm text-gray-400 mt-1">全 {meta.total} 件</p>}
+          <h1 className="text-2xl font-bold text-gray-800">活動履歴</h1>
+          {meta && <p className="text-sm text-gray-400 mt-0.5">全 {meta.total} 件</p>}
         </div>
-        <Button onClick={() => router.push('/activities/create')}>+ 新規登録</Button>
+        <Button onClick={() => router.push('/activities/create')} className="gap-1">
+          <span className="text-base">＋</span> 新規登録
+        </Button>
       </div>
 
-      {/* 検索 */}
-      <Card className="mb-4">
-        <CardContent className="py-3">
+      <Card className="mb-4 shadow-sm">
+        <CardContent className="py-3 px-4">
           <div className="flex gap-2 items-center flex-wrap">
             <div className="relative flex-1 min-w-40">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-              <Input className="pl-8" placeholder="件名・内容・会社名で検索"
+              <Input className="pl-8 bg-white" placeholder="件名・内容・会社名で検索"
                 value={searchInput}
                 onChange={e => setSearchInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()} />
             </div>
             <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(1); }}
-              className="border rounded-md px-3 py-2 text-sm min-w-28">
+              className="border rounded-md px-3 py-2 text-sm bg-white min-w-28">
               <option value="">全種別</option>
               {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
             <select value={customerFilter} onChange={e => { setCustomerFilter(e.target.value); setPage(1); }}
-              className="border rounded-md px-3 py-2 text-sm min-w-36">
+              className="border rounded-md px-3 py-2 text-sm bg-white min-w-36">
               <option value="">全顧客</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
             </select>
-            <Input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-              className="w-36" />
+            <Input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }} className="w-36 bg-white" />
             <span className="text-gray-400 text-sm">〜</span>
-            <Input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }}
-              className="w-36" />
+            <Input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }} className="w-36 bg-white" />
             <Button onClick={handleSearch}>検索</Button>
             {(search || typeFilter || customerFilter || dateFrom || dateTo) && (
-              <Button variant="outline" onClick={handleClear}>✕</Button>
+              <Button variant="ghost" size="sm" onClick={handleClear} className="text-gray-400 hover:text-gray-600">✕</Button>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* テーブル */}
-      <Card>
+      <Card className="shadow-sm overflow-hidden">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>活動日</TableHead>
-                <TableHead>種別</TableHead>
-                <TableHead>件名</TableHead>
-                <TableHead>顧客</TableHead>
-                <TableHead>担当者</TableHead>
-                <TableHead>関連商談</TableHead>
-                <TableHead className="text-center">操作</TableHead>
+              <TableRow className="bg-gray-50 hover:bg-gray-50">
+                <TableHead className="font-semibold text-gray-600 py-3">活動日</TableHead>
+                <TableHead className="font-semibold text-gray-600">種別</TableHead>
+                <TableHead className="font-semibold text-gray-600">件名</TableHead>
+                <TableHead className="font-semibold text-gray-600">顧客</TableHead>
+                <TableHead className="font-semibold text-gray-600">担当者</TableHead>
+                <TableHead className="font-semibold text-gray-600">関連商談</TableHead>
+                <TableHead className="font-semibold text-gray-600 text-center">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {activities.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-gray-400 py-12">
-                    <p className="text-3xl mb-2">🕐</p>
-                    活動履歴が登録されていません
-                    <div className="mt-3">
-                      <Button size="sm" onClick={() => router.push('/activities/create')}>
+                  <TableCell colSpan={7} className="py-16">
+                    <div className="flex flex-col items-center gap-3 text-gray-400">
+                      <span className="text-5xl">🕐</span>
+                      <p className="font-medium text-gray-500">活動履歴が登録されていません</p>
+                      <Button size="sm" variant="outline" onClick={() => router.push('/activities/create')}>
                         最初の活動を登録する
                       </Button>
                     </div>
@@ -174,9 +176,10 @@ export default function ActivitiesPage() {
                 activities.map(a => {
                   const style = TYPE_STYLE[a.type] ?? TYPE_STYLE['その他'];
                   return (
-                    <TableRow key={a.id} className="hover:bg-muted/50 cursor-pointer"
+                    <TableRow key={a.id}
+                      className="hover:bg-blue-50/40 cursor-pointer transition-colors border-b last:border-0"
                       onClick={() => router.push(`/activities/${a.id}`)}>
-                      <TableCell className="text-sm text-gray-500 whitespace-nowrap">
+                      <TableCell className="text-sm text-gray-500 whitespace-nowrap py-3">
                         {new Date(a.activity_date).toLocaleDateString('ja-JP')}
                       </TableCell>
                       <TableCell>
@@ -186,24 +189,17 @@ export default function ActivitiesPage() {
                         </span>
                       </TableCell>
                       <TableCell className="font-semibold text-blue-600">{a.subject}</TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {a.customer?.company_name ?? '-'}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {a.contact?.name ?? '-'}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {a.deal?.title ?? '-'}
-                      </TableCell>
-                      <TableCell className="text-center" onClick={e => e.stopPropagation()}>
+                      <TableCell className="text-sm text-gray-500">{a.customer?.company_name ?? <span className="text-gray-300">—</span>}</TableCell>
+                      <TableCell className="text-sm text-gray-500">{a.contact?.name ?? <span className="text-gray-300">—</span>}</TableCell>
+                      <TableCell className="text-sm text-gray-500">{a.deal?.title ?? <span className="text-gray-300">—</span>}</TableCell>
+                      <TableCell onClick={e => e.stopPropagation()}>
                         <div className="flex gap-1 justify-center">
-                          <Button size="sm" variant="outline"
-                            onClick={() => router.push(`/activities/${a.id}`)}>詳細</Button>
-                          <Button size="sm" variant="outline"
-                            onClick={() => router.push(`/activities/${a.id}/edit`)}>編集</Button>
-                          <Button size="sm" variant="outline"
-                            className="text-red-500 border-red-200 hover:bg-red-50"
-                            onClick={() => handleDelete(a.id)}>削除</Button>
+                          <button title="詳細" onClick={() => router.push(`/activities/${a.id}`)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-colors">👁</button>
+                          <button title="編集" onClick={() => router.push(`/activities/${a.id}/edit`)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-amber-100 hover:text-amber-600 transition-colors">✏️</button>
+                          <button title="削除" disabled={deletingId === a.id} onClick={() => handleDelete(a.id)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors disabled:opacity-40">🗑</button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -215,12 +211,11 @@ export default function ActivitiesPage() {
         </CardContent>
       </Card>
 
-      {/* ページネーション */}
       {meta && meta.last_page > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
-          <Button variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← 前へ</Button>
-          <span className="flex items-center text-sm text-gray-500">{page} / {meta.last_page}</span>
-          <Button variant="outline" disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}>次へ →</Button>
+        <div className="flex justify-center items-center gap-3 mt-5">
+          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← 前へ</Button>
+          <span className="text-sm text-gray-500">{page} / {meta.last_page} ページ</span>
+          <Button variant="outline" size="sm" disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}>次へ →</Button>
         </div>
       )}
     </div>
