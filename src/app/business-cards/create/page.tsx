@@ -6,29 +6,24 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-type SelectedFile = {
-  file: File;
-  preview: string;
-};
+type SelectedFile = { file: File; preview: string; };
 
 const ACCEPT_TYPES = ['image/jpeg', 'image/png', 'image/jpg'];
 const MAX_SIZE_MB = 10;
 
 export default function BusinessCardCreatePage() {
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
-  const [dragOver, setDragOver] = useState(false);
+  const [dragOver, setDragOver]   = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress]   = useState(0);
   const [progressLabel, setProgressLabel] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]         = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  // ★ ファイルバリデーション＋プレビューURL生成
   const processFiles = useCallback((files: FileList | File[]) => {
     const arr = Array.from(files);
     const valid: SelectedFile[] = [];
-
     arr.forEach(file => {
       if (!ACCEPT_TYPES.includes(file.type)) {
         setError(`${file.name} は対応していない形式です（JPEG/PNG のみ）`);
@@ -40,9 +35,8 @@ export default function BusinessCardCreatePage() {
       }
       valid.push({ file, preview: URL.createObjectURL(file) });
     });
-
     setSelectedFiles(prev => [...prev, ...valid]);
-    setError(null);
+    if (valid.length > 0) setError(null);
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -53,12 +47,12 @@ export default function BusinessCardCreatePage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) processFiles(e.target.files);
-    e.target.value = ''; // ★ 同じファイルを再選択できるようリセット
+    e.target.value = '';
   };
 
   const removeFile = (index: number) => {
     setSelectedFiles(prev => {
-      URL.revokeObjectURL(prev[index].preview); // ★ メモリリーク防止
+      URL.revokeObjectURL(prev[index].preview);
       return prev.filter((_, i) => i !== index);
     });
   };
@@ -70,21 +64,11 @@ export default function BusinessCardCreatePage() {
   };
 
   const handleSubmit = async () => {
-    if (selectedFiles.length === 0) {
-      setError('ファイルを選択してください');
-      return;
-    }
-
-    setUploading(true);
-    setProgress(0);
-    setProgressLabel('アップロード中...');
-    setError(null);
-
+    if (selectedFiles.length === 0) { setError('ファイルを選択してください'); return; }
+    setUploading(true); setProgress(0); setProgressLabel('アップロード中...'); setError(null);
     const formData = new FormData();
     selectedFiles.forEach(({ file }) => formData.append('images[]', file));
-
     try {
-      // ★ XHRでプログレス取得（axiosのonUploadProgressを使用）
       await apiClient.post('/api/v1/cards', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (e) => {
@@ -95,10 +79,8 @@ export default function BusinessCardCreatePage() {
           }
         },
       });
-
       selectedFiles.forEach(f => URL.revokeObjectURL(f.preview));
       router.push('/business-cards');
-
     } catch (err: any) {
       const messages: string[] = err.response?.data?.errors
         ? Object.values(err.response.data.errors).flat() as string[]
@@ -110,42 +92,42 @@ export default function BusinessCardCreatePage() {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-2xl">
-      {/* ヘッダー */}
+    <div className="max-w-3xl mx-auto py-8 px-6">
       <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" onClick={() => router.back()}>
-          ← 戻る
-        </Button>
-        <h1 className="text-2xl font-bold">名刺アップロード</h1>
+        <Button variant="outline" size="sm" onClick={() => router.back()}>← 戻る</Button>
+        <h1 className="text-2xl font-bold text-gray-800">名刺アップロード</h1>
       </div>
 
-      {/* エラー表示 */}
       {error && (
-        <div className="bg-red-50 text-red-600 border border-red-200 p-3 rounded-md text-sm mb-4">
-          {error}
+        <div className="flex items-start gap-2 bg-red-50 text-red-600 border border-red-200 p-3 rounded-md text-sm mb-4">
+          <span className="text-base">⚠️</span><span>{error}</span>
         </div>
       )}
 
-      <Card className="mb-4">
-        <CardHeader><CardTitle className="text-base">名刺画像を選択</CardTitle></CardHeader>
+      <Card className="mb-4 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base text-gray-700">🪪 名刺画像を選択</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
 
-          {/* ★ D&Dエリア */}
+          {/* D&Dエリア */}
           <div
             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors
-              ${dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'}`}
+            className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all
+              ${dragOver
+                ? 'border-blue-400 bg-blue-50 scale-[1.01]'
+                : 'border-gray-200 bg-gray-50 hover:bg-gray-100 hover:border-gray-300'}`}
           >
-            <div className="text-4xl mb-3">☁️</div>
-            <p className="font-semibold mb-1">ここに名刺画像をドラッグ＆ドロップ</p>
-            <p className="text-sm text-gray-500 mb-3">または</p>
-            <span className="inline-block bg-blue-500 text-white text-sm px-4 py-2 rounded-md pointer-events-none">
+            <div className="text-5xl mb-3">☁️</div>
+            <p className="font-semibold text-gray-700 mb-1">ここに名刺画像をドラッグ＆ドロップ</p>
+            <p className="text-sm text-gray-400 mb-4">または</p>
+            <span className="inline-block bg-blue-500 hover:bg-blue-600 text-white text-sm px-5 py-2 rounded-md pointer-events-none transition-colors">
               ファイルを選択
             </span>
-            <p className="text-xs text-gray-400 mt-3">
+            <p className="text-xs text-gray-400 mt-4">
               対応形式: JPEG, PNG, JPG（最大{MAX_SIZE_MB}MB・複数選択可）
             </p>
             <input
@@ -158,64 +140,75 @@ export default function BusinessCardCreatePage() {
             />
           </div>
 
-          {/* ★ プレビュー */}
+          {/* プレビュー */}
           {selectedFiles.length > 0 && (
-            <div className="grid grid-cols-3 gap-3">
-              {selectedFiles.map(({ file, preview }, i) => (
-                <div key={i} className="border rounded-lg overflow-hidden">
-                  <img src={preview} alt={file.name} className="w-full h-28 object-cover" />
-                  <div className="p-2">
-                    <p className="text-xs text-gray-500 truncate">{file.name}</p>
-                    <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(1)} KB</p>
-                    <button
-                      type="button"
-                      onClick={() => removeFile(i)}
-                      disabled={uploading}
-                      className="mt-1 w-full text-xs text-red-500 border border-red-200 rounded py-0.5 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      削除
-                    </button>
+            <>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-gray-600">{selectedFiles.length}件 選択中</p>
+                <button onClick={clearAll} disabled={uploading}
+                  className="text-xs text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50">
+                  すべて削除
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {selectedFiles.map(({ file, preview }, i) => (
+                  <div key={i} className="border border-gray-100 rounded-lg overflow-hidden shadow-sm">
+                    <img src={preview} alt={file.name} className="w-full h-28 object-cover" />
+                    <div className="p-2 bg-white">
+                      <p className="text-xs text-gray-600 truncate font-medium">{file.name}</p>
+                      <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(1)} KB</p>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(i)}
+                        disabled={uploading}
+                        className="mt-1.5 w-full text-xs text-red-500 border border-red-100 rounded py-0.5 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                      >
+                        削除
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </>
           )}
 
-          {/* ★ プログレスバー */}
+          {/* プログレスバー */}
           {uploading && (
-            <div className="space-y-1">
-              <p className="text-sm text-center text-gray-600">{progressLabel}</p>
-              <div className="w-full bg-gray-200 rounded-full h-5 overflow-hidden">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                <p className="text-sm text-gray-600">{progressLabel}</p>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
                 <div
-                  className="h-full bg-blue-500 rounded-full transition-all duration-300 flex items-center justify-center text-xs text-white"
+                  className="h-full bg-blue-500 rounded-full transition-all duration-300 flex items-center justify-center text-xs text-white font-medium"
                   style={{ width: `${progress}%` }}
                 >
-                  {progress > 10 && `${progress}%`}
+                  {progress > 15 && `${progress}%`}
                 </div>
               </div>
             </div>
           )}
 
-          {/* ★ ボタン */}
+          {/* ボタン */}
           {selectedFiles.length > 0 && !uploading && (
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={clearAll} className="flex-1">
-                クリア
-              </Button>
+            <div className="flex gap-2 pt-1 border-t border-gray-100">
+              <Button variant="outline" onClick={clearAll} className="flex-1">クリア</Button>
               <Button onClick={handleSubmit} className="flex-1">
-                {selectedFiles.length}件の名刺をアップロード
+                📤 {selectedFiles.length}件の名刺をアップロード
               </Button>
             </div>
           )}
-
         </CardContent>
       </Card>
 
-      {/* ★ 使い方ガイド */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">💡 使い方</CardTitle></CardHeader>
+      {/* 使い方ガイド */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base text-gray-700">💡 使い方</CardTitle>
+        </CardHeader>
         <CardContent>
-          <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+          <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
             <li>名刺の画像ファイルを選択またはドラッグ＆ドロップ</li>
             <li>複数枚を一度にアップロード可能</li>
             <li>自動的にOCR処理が実行され、顧客・担当者が登録されます</li>
