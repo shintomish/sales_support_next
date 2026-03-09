@@ -4,8 +4,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface BusinessCard {
@@ -15,91 +13,39 @@ interface BusinessCard {
   postal_code: string | null; address: string | null;
   phone: string | null;       mobile: string | null;
   fax: string | null;         email: string | null;
-  website: string | null;     status: string;
+  website: string | null;     image_path: string | null;
+  status: string;             ocr_text: string | null;
+  created_at: string;
 }
 
-const FIELDS = [
-  { name: 'company_name', label: '会社名',     type: 'text',  placeholder: '例：株式会社サンプル' },
-  { name: 'person_name',  label: '氏名',       type: 'text',  placeholder: '例：山田 太郎' },
-  { name: 'department',   label: '部署',       type: 'text',  placeholder: '例：営業部' },
-  { name: 'position',     label: '役職',       type: 'text',  placeholder: '例：部長' },
-  { name: 'postal_code',  label: '郵便番号',   type: 'text',  placeholder: '例：100-0001' },
-  { name: 'address',      label: '住所',       type: 'text',  placeholder: '例：東京都千代田区...' },
-  { name: 'phone',        label: '電話',       type: 'tel',   placeholder: '例：03-1234-5678' },
-  { name: 'mobile',       label: '携帯',       type: 'tel',   placeholder: '例：090-1234-5678' },
-  { name: 'fax',          label: 'FAX',        type: 'tel',   placeholder: '例：03-1234-5679' },
-  { name: 'email',        label: 'メール',     type: 'email', placeholder: '例：yamada@example.com' },
-  { name: 'website',      label: 'Webサイト',  type: 'url',   placeholder: '例：https://example.com' },
-] as const;
+const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
+  registered: { bg: '#ECFDF5', color: '#065F46', label: '登録済み' },
+  processed:  { bg: '#EFF6FF', color: '#1D4ED8', label: '処理済み' },
+  pending:    { bg: '#F1F5F9', color: '#475569', label: '保留中' },
+};
 
-const STATUS_OPTIONS = [
-  { value: 'processed',  label: '処理済み', bg: '#EFF6FF', color: '#1D4ED8' },
-  { value: 'registered', label: '登録済み', bg: '#ECFDF5', color: '#065F46' },
-  { value: 'pending',    label: '保留中',   bg: '#F1F5F9', color: '#475569' },
-];
+const Em = () => <span className="text-gray-300">—</span>;
 
-const selectCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
-
-// フィールドをグループに分けて表示
-const FIELD_GROUPS = [
-  { title: '会社情報', fields: ['company_name', 'department', 'position'] },
-  { title: '担当者情報', fields: ['person_name', 'email', 'phone', 'mobile', 'fax'] },
-  { title: '住所', fields: ['postal_code', 'address', 'website'] },
-];
-
-export default function BusinessCardEditPage() {
-  const [form, setForm]       = useState<Partial<BusinessCard>>({});
+export default function BusinessCardDetailPage() {
+  const [card, setCard]       = useState<BusinessCard | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState('');
-  const [isDirty, setIsDirty] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
   const router = useRouter();
   const { id } = useParams();
 
   const fetchCard = useCallback(async () => {
     try {
+      setError(null);
       const res = await apiClient.get(`/api/v1/cards/${id}`);
-      setForm(res.data.data ?? res.data);
+      setCard(res.data.data ?? res.data);
     } catch (err: any) {
       if (err.response?.status === 401) router.push('/login');
-      else router.push('/business-cards');
+      else if (err.response?.status === 404) router.push('/business-cards');
+      else setError('名刺情報の取得に失敗しました');
     } finally { setLoading(false); }
   }, [id, router]);
 
   useEffect(() => { fetchCard(); }, [fetchCard]);
-
-  useEffect(() => {
-    if (!isDirty) return;
-    const handler = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [isDirty]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    setIsDirty(true);
-  };
-
-  const handleSubmit = async () => {
-    setSaving(true); setError('');
-    try {
-      await apiClient.put(`/api/v1/cards/${id}`, form);
-      setIsDirty(false);
-      router.push(`/business-cards/${id}`);
-    } catch (err: any) {
-      if (err.response?.status === 422) {
-        const messages = Object.values(err.response.data.errors ?? {}).flat();
-        setError(messages.join(' / ') as string);
-      } else {
-        setError('保存に失敗しました。時間をおいて再試行してください。');
-      }
-    } finally { setSaving(false); }
-  };
-
-  const handleBack = () => {
-    if (isDirty && !confirm('変更が保存されていません。戻りますか？')) return;
-    router.back();
-  };
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3">
@@ -108,83 +54,151 @@ export default function BusinessCardEditPage() {
     </div>
   );
 
+  if (error) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+      <div className="text-5xl">⚠️</div>
+      <p className="text-gray-600 font-medium">{error}</p>
+      <div className="flex gap-2">
+        <Button variant="outline" onClick={() => router.push('/business-cards')}>一覧に戻る</Button>
+        <Button onClick={fetchCard}>再試行</Button>
+      </div>
+    </div>
+  );
+
+  if (!card) return null;
+
+  const statusStyle = STATUS_STYLE[card.status] ?? { bg: '#F1F5F9', color: '#475569', label: card.status };
+
   return (
-    <div className="max-w-3xl mx-auto py-8 px-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="outline" size="sm" onClick={handleBack}>← 戻る</Button>
-        <h1 className="text-2xl font-bold text-gray-800">名刺編集</h1>
-        {isDirty && (
-          <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
-            未保存の変更あり
-          </span>
-        )}
+    <div className="max-w-4xl mx-auto py-8 px-6">
+
+      {/* ヘッダー */}
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">
+            {card.person_name ?? '氏名未登録'}
+          </h1>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                  style={{ backgroundColor: statusStyle.bg, color: statusStyle.color }}>
+              {statusStyle.label}
+            </span>
+            {card.company_name && (
+              <span className="text-sm text-gray-500">🏢 {card.company_name}</span>
+            )}
+            <span className="text-xs text-gray-400">
+              登録日: {new Date(card.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => router.push(`/business-cards/${id}/edit`)}>✏️ 編集</Button>
+          <Button variant="outline" onClick={() => router.push('/business-cards')}>← 一覧に戻る</Button>
+        </div>
       </div>
 
-      {error && (
-        <div className="flex items-start gap-2 bg-red-50 text-red-600 border border-red-200 p-3 rounded-md text-sm mb-4">
-          <span className="text-base">⚠️</span><span>{error}</span>
-        </div>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-      {/* ステータス */}
-      <Card className="mb-4 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base text-gray-700">📋 ステータス</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            {STATUS_OPTIONS.map(opt => {
-              const selected = (form.status ?? 'processed') === opt.value;
-              return (
-                <button key={opt.value} type="button"
-                  onClick={() => { setForm(prev => ({ ...prev, status: opt.value })); setIsDirty(true); }}
-                  className="px-4 py-1.5 rounded-md text-sm border transition-all font-medium"
-                  style={selected
-                    ? { backgroundColor: opt.bg, color: opt.color, borderColor: opt.color }
-                    : { backgroundColor: '#fff', color: '#64748B', borderColor: '#E2E8F0' }}>
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* フィールドグループ */}
-      {FIELD_GROUPS.map(group => (
-        <Card key={group.title} className="mb-4 shadow-sm">
+        {/* 名刺画像 */}
+        <Card className="shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base text-gray-700">{group.title}</CardTitle>
+            <CardTitle className="text-base text-gray-700">🪪 名刺画像</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              {FIELDS.filter(f => group.fields.includes(f.name)).map(({ name, label, type, placeholder }) => (
-                <div key={name} className={`space-y-1.5 ${name === 'address' ? 'col-span-2' : ''}`}>
-                  <Label htmlFor={name} className="text-sm font-medium text-gray-700">{label}</Label>
-                  <Input
-                    id={name} name={name} type={type}
-                    placeholder={placeholder}
-                    value={(form as any)[name] ?? ''}
-                    onChange={handleChange}
-                    className="border-gray-200"
-                  />
+            {card.image_path ? (
+              <img
+                src={`${process.env.NEXT_PUBLIC_API_URL}/storage/${card.image_path}`}
+                alt={`${card.person_name ?? ''}の名刺`}
+                className="w-full rounded-lg border border-gray-100 shadow-sm"
+              />
+            ) : (
+              <div className="h-44 bg-gray-50 rounded-lg flex flex-col items-center justify-center gap-2 border border-dashed border-gray-200">
+                <span className="text-3xl">🪪</span>
+                <span className="text-sm text-gray-400">画像なし</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 基本情報 */}
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base text-gray-700">ℹ️ 基本情報</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {[
+                { label: '会社名',   value: card.company_name },
+                { label: '氏名',     value: card.person_name },
+                { label: '部署',     value: card.department },
+                { label: '役職',     value: card.position },
+                { label: '郵便番号', value: card.postal_code },
+                { label: '住所',     value: card.address },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+                  <p className="text-sm font-medium text-gray-800">{value ?? <Em />}</p>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
-      ))}
 
-      {/* 保存ボタン */}
-      <div className="flex gap-2">
-        <Button variant="outline" className="flex-1" onClick={handleBack} disabled={saving}>
-          キャンセル
-        </Button>
-        <Button className="flex-1" onClick={handleSubmit} disabled={saving}>
-          {saving
-            ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />保存中...</>
-            : '💾 保存する'}
-        </Button>
+        {/* 連絡先 */}
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base text-gray-700">📞 連絡先</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs text-gray-400 mb-0.5">メール</p>
+                {card.email
+                  ? <a href={`mailto:${card.email}`} className="text-sm text-blue-500 hover:underline font-medium">{card.email}</a>
+                  : <Em />}
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-0.5">電話</p>
+                {card.phone
+                  ? <a href={`tel:${card.phone}`} className="text-sm text-blue-500 hover:underline font-medium">{card.phone}</a>
+                  : <Em />}
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-0.5">携帯</p>
+                {card.mobile
+                  ? <a href={`tel:${card.mobile}`} className="text-sm text-blue-500 hover:underline font-medium">{card.mobile}</a>
+                  : <Em />}
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-0.5">FAX</p>
+                <p className="text-sm font-medium text-gray-800">{card.fax ?? <Em />}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-0.5">Webサイト</p>
+                {card.website
+                  ? <a href={card.website} target="_blank" rel="noopener noreferrer"
+                       className="text-sm text-blue-500 hover:underline truncate block">{card.website}</a>
+                  : <Em />}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* OCRテキスト */}
+        {card.ocr_text && (
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base text-gray-700">📝 OCR読み取りテキスト</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-gray-50 rounded-md p-3 border border-gray-100">
+                <pre className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">
+                  {card.ocr_text}
+                </pre>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
