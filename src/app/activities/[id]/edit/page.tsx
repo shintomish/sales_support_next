@@ -20,6 +20,9 @@ const TYPE_STYLE: Record<string, { icon: string; bg: string; color: string }> = 
   その他: { icon: '•••', bg: '#F1F5F9', color: '#64748B' },
 };
 
+const selectCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400';
+const textareaCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none';
+
 export default function ActivityEditPage() {
   const [form, setForm]           = useState<Record<string, string>>({});
   const [content, setContent]     = useState('');
@@ -59,22 +62,18 @@ export default function ActivityEditPage() {
     } catch (err: any) {
       if (err.response?.status === 401) router.push('/login');
       else router.push('/activities');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [id, router]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // 顧客変更時に担当者・商談を絞り込む
   useEffect(() => {
     if (form.customer_id) {
       const cid = Number(form.customer_id);
       setFilteredContacts(contacts.filter(c => c.customer_id === cid));
       setFilteredDeals(deals.filter(d => d.customer_id === cid));
     } else {
-      setFilteredContacts([]);
-      setFilteredDeals([]);
+      setFilteredContacts([]); setFilteredDeals([]);
     }
   }, [form.customer_id, contacts, deals]);
 
@@ -93,8 +92,7 @@ export default function ActivityEditPage() {
   const handleSubmit = async () => {
     if (!form.customer_id) { setError('顧客を選択してください'); return; }
     if (!form.subject?.trim()) { setError('件名は必須です'); return; }
-    setSaving(true);
-    setError(null);
+    setSaving(true); setError(null);
     try {
       await apiClient.put(`/api/v1/activities/${id}`, { ...form, content });
       setIsDirty(false);
@@ -106,9 +104,7 @@ export default function ActivityEditPage() {
       } else {
         setError('更新に失敗しました');
       }
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   const handleBack = () => {
@@ -117,41 +113,43 @@ export default function ActivityEditPage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-500">読み込み中...</p>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3">
+      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <p className="text-sm text-gray-400">読み込み中...</p>
     </div>
   );
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-2xl">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" onClick={handleBack}>← 戻る</Button>
-        <h1 className="text-2xl font-bold">活動履歴編集</h1>
+    <div className="max-w-3xl mx-auto py-8 px-6">
+      <div className="flex items-center gap-3 mb-6">
+        <Button variant="outline" size="sm" onClick={handleBack}>← 戻る</Button>
+        <h1 className="text-2xl font-bold text-gray-800">活動履歴編集</h1>
         {isDirty && (
-          <span className="text-xs text-amber-500 border border-amber-300 rounded px-2 py-0.5">
+          <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
             未保存の変更あり
           </span>
         )}
       </div>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">活動情報を編集</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base text-gray-700">🕐 活動情報を編集</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
           {error && (
-            <div className="bg-red-50 text-red-600 border border-red-200 p-3 rounded-md text-sm">{error}</div>
+            <div className="flex items-start gap-2 bg-red-50 text-red-600 border border-red-200 p-3 rounded-md text-sm">
+              <span className="text-base">⚠️</span><span>{error}</span>
+            </div>
           )}
 
           <div className="grid grid-cols-2 gap-4">
-            {/* 活動日 */}
-            <div className="space-y-1">
-              <Label>活動日 <span className="text-red-500">*</span></Label>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-gray-700">活動日 <span className="text-red-500">*</span></Label>
               <Input name="activity_date" type="date"
-                value={form.activity_date ?? ''} onChange={handleChange} />
+                value={form.activity_date ?? ''} onChange={handleChange} className="border-gray-200" />
             </div>
-
-            {/* 活動種別 */}
-            <div className="space-y-1">
-              <Label>活動種別 <span className="text-red-500">*</span></Label>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-gray-700">活動種別 <span className="text-red-500">*</span></Label>
               <div className="flex gap-2 flex-wrap mt-1">
                 {TYPES.map(t => {
                   const s = TYPE_STYLE[t];
@@ -162,8 +160,7 @@ export default function ActivityEditPage() {
                       className="px-3 py-1.5 rounded-md text-sm border transition-all"
                       style={selected
                         ? { backgroundColor: s.bg, color: s.color, borderColor: s.color, fontWeight: 600 }
-                        : { backgroundColor: '#fff', color: '#64748B', borderColor: '#E2E8F0' }
-                      }>
+                        : { backgroundColor: '#fff', color: '#64748B', borderColor: '#E2E8F0' }}>
                       {s.icon} {t}
                     </button>
                   );
@@ -171,62 +168,53 @@ export default function ActivityEditPage() {
               </div>
             </div>
 
-            {/* 顧客選択 */}
-            <div className="space-y-1">
-              <Label>顧客 <span className="text-red-500">*</span></Label>
-              <select name="customer_id" value={form.customer_id ?? ''} onChange={handleChange}
-                className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-gray-700">顧客 <span className="text-red-500">*</span></Label>
+              <select name="customer_id" value={form.customer_id ?? ''} onChange={handleChange} className={selectCls}>
                 <option value="">顧客を選択してください</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
               </select>
             </div>
-
-            {/* 担当者選択 */}
-            <div className="space-y-1">
-              <Label>担当者</Label>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-gray-700">担当者</Label>
               <select name="contact_id" value={form.contact_id ?? ''} onChange={handleChange}
-                disabled={!form.customer_id}
-                className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50">
+                disabled={!form.customer_id} className={selectCls}>
                 <option value="">担当者を選択してください</option>
                 {filteredContacts.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}{c.position ? `（${c.position}）` : ''}
-                  </option>
+                  <option key={c.id} value={c.id}>{c.name}{c.position ? `（${c.position}）` : ''}</option>
                 ))}
               </select>
             </div>
 
-            {/* 関連商談 */}
-            <div className="space-y-1 col-span-2">
-              <Label>関連商談</Label>
+            <div className="space-y-1.5 col-span-2">
+              <Label className="text-sm font-medium text-gray-700">関連商談</Label>
               <select name="deal_id" value={form.deal_id ?? ''} onChange={handleChange}
-                disabled={!form.customer_id}
-                className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50">
+                disabled={!form.customer_id} className={selectCls}>
                 <option value="">商談を選択してください（任意）</option>
                 {filteredDeals.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
               </select>
             </div>
 
-            {/* 件名 */}
-            <div className="space-y-1 col-span-2">
-              <Label>件名 <span className="text-red-500">*</span></Label>
+            <div className="space-y-1.5 col-span-2">
+              <Label className="text-sm font-medium text-gray-700">件名 <span className="text-red-500">*</span></Label>
               <Input name="subject" placeholder="例：新システム提案のヒアリング"
-                value={form.subject ?? ''} onChange={handleChange} />
+                value={form.subject ?? ''} onChange={handleChange} className="border-gray-200" />
             </div>
 
-            {/* 内容 */}
-            <div className="space-y-1 col-span-2">
-              <Label>内容</Label>
+            <div className="space-y-1.5 col-span-2">
+              <Label className="text-sm font-medium text-gray-700">内容</Label>
               <textarea rows={5} placeholder="活動内容の詳細を入力してください"
                 value={content} onChange={e => { setContent(e.target.value); setIsDirty(true); }}
-                className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                className={textareaCls} />
             </div>
           </div>
 
-          <div className="flex gap-2 justify-end pt-2">
+          <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
             <Button variant="outline" onClick={handleBack} disabled={saving}>キャンセル</Button>
-            <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? '更新中...' : '💾 更新する'}
+            <Button onClick={handleSubmit} disabled={saving} className="min-w-[120px]">
+              {saving
+                ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />更新中...</>
+                : '💾 更新する'}
             </Button>
           </div>
         </CardContent>

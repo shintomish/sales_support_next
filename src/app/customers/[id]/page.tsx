@@ -46,15 +46,17 @@ interface Customer {
 const DEAL_STATUS_STYLE: Record<string, { bg: string; color: string }> = {
   成約: { bg: '#ECFDF5', color: '#065F46' },
   失注: { bg: '#FEF2F2', color: '#991B1B' },
-  交渉: { bg: '#FFFBEB', color: '#92400E' },
-  提案: { bg: '#EFF6FF', color: '#1E40AF' },
+  交渉: { bg: '#FFF3E0', color: '#E67E00' },
+  提案: { bg: '#EFF6FF', color: '#1D4ED8' },
   新規: { bg: '#F1F5F9', color: '#475569' },
 };
 
+const Em = () => <span className="text-gray-300">—</span>;
+
 export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
   const router = useRouter();
   const { id } = useParams();
 
@@ -72,19 +74,19 @@ export default function CustomerDetailPage() {
     }
   }, [id, router]);
 
-  useEffect(() => {
-    fetchCustomer();
-  }, [fetchCustomer]);
+  useEffect(() => { fetchCustomer(); }, [fetchCustomer]);
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-500">読み込み中...</p>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3">
+      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <p className="text-sm text-gray-400">読み込み中...</p>
     </div>
   );
 
   if (error) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <p className="text-red-500">{error}</p>
+      <div className="text-5xl">⚠️</div>
+      <p className="text-gray-600 font-medium">{error}</p>
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => router.push('/customers')}>一覧に戻る</Button>
         <Button onClick={fetchCustomer}>再試行</Button>
@@ -95,57 +97,68 @@ export default function CustomerDetailPage() {
   if (!customer) return null;
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-5xl">
+    <div className="max-w-5xl mx-auto py-8 px-6">
+
       {/* ヘッダー */}
       <div className="flex justify-between items-start mb-6">
         <div>
-          <h1 className="text-2xl font-bold">{customer.company_name}</h1>
+          <h1 className="text-2xl font-bold text-gray-800">{customer.company_name}</h1>
           <p className="text-sm text-gray-400 mt-1">
             登録日: {new Date(customer.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => router.push(`/customers/${id}/edit`)}>
-            ✏️ 編集
-          </Button>
-            <Button variant="outline" onClick={() => router.push('/customers')}>← 一覧に戻る
-          </Button>
+          <Button onClick={() => router.push(`/customers/${id}/edit`)}>✏️ 編集</Button>
+          <Button variant="outline" onClick={() => router.push('/customers')}>← 一覧に戻る</Button>
         </div>
       </div>
 
       {/* 基本情報 */}
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-base">ℹ️ 基本情報</CardTitle>
+      <Card className="mb-4 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base text-gray-700">ℹ️ 基本情報</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-            {[
-              { label: '会社名',   value: customer.company_name },
-              { label: '業種',     value: customer.industry
+            <div>
+              <p className="text-xs text-gray-400 mb-1">会社名</p>
+              <p className="text-sm font-medium text-gray-800">{customer.company_name}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">業種</p>
+              {customer.industry
                 ? <Badge variant="secondary">{customer.industry}</Badge>
-                : '-' },
-              { label: '従業員数', value: customer.employee_count
-                ? `${customer.employee_count.toLocaleString()}名`
-                : '-' },
-              { label: '電話番号', value: customer.phone
-                ? <a href={`tel:${customer.phone}`} className="text-blue-500 hover:underline">{customer.phone}</a>
-                : '-' },
-              { label: '住所',     value: customer.address ?? '-' },
-              { label: 'ウェブサイト', value: customer.website
+                : <Em />}
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">従業員数</p>
+              <p className="text-sm font-medium text-gray-800">
+                {customer.employee_count ? `${customer.employee_count.toLocaleString()}名` : <Em />}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">電話番号</p>
+              {customer.phone
+                ? <a href={`tel:${customer.phone}`} className="text-sm text-blue-500 hover:underline font-medium">{customer.phone}</a>
+                : <Em />}
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">住所</p>
+              <p className="text-sm font-medium text-gray-800">{customer.address ?? <Em />}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">ウェブサイト</p>
+              {customer.website
                 ? <a href={customer.website} target="_blank" rel="noopener noreferrer"
-                     className="text-blue-500 hover:underline truncate block">{customer.website}</a>
-                : '-' },
-            ].map(({ label, value }) => (
-              <div key={label}>
-                <p className="text-xs text-gray-400 mb-1">{label}</p>
-                <p className="text-sm font-medium">{value}</p>
-              </div>
-            ))}
+                     className="text-sm text-blue-500 hover:underline truncate block">{customer.website}</a>
+                : <Em />}
+            </div>
             {customer.notes && (
               <div className="col-span-2 md:col-span-3">
-                <p className="text-xs text-gray-400 mb-1">備考</p>
-                <p className="text-sm font-medium whitespace-pre-wrap">{customer.notes}</p>
+                <p className="text-xs text-gray-400 mb-2">備考</p>
+                <div className="bg-gray-50 rounded-md p-3 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed border border-gray-100">
+                  {customer.notes}
+                </div>
               </div>
             )}
           </div>
@@ -153,46 +166,59 @@ export default function CustomerDetailPage() {
       </Card>
 
       {/* 担当者一覧 */}
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
+      <Card className="mb-4 shadow-sm overflow-hidden">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base text-gray-700 flex items-center gap-2">
             👤 担当者
-            <Badge variant="secondary">{customer.contacts?.length ?? 0}名</Badge>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-normal">
+              {customer.contacts?.length ?? 0}名
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>氏名</TableHead>
-                <TableHead>部署</TableHead>
-                <TableHead>役職</TableHead>
-                <TableHead>メール</TableHead>
-                <TableHead>電話番号</TableHead>
+              <TableRow className="bg-gray-50 hover:bg-gray-50">
+                <TableHead className="font-semibold text-gray-600 py-2">氏名</TableHead>
+                <TableHead className="font-semibold text-gray-600">部署</TableHead>
+                <TableHead className="font-semibold text-gray-600">役職</TableHead>
+                <TableHead className="font-semibold text-gray-600">メール</TableHead>
+                <TableHead className="font-semibold text-gray-600">電話番号</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {customer.contacts?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-gray-400 py-6">
-                    担当者が登録されていません
+                  <TableCell colSpan={5} className="py-10">
+                    <div className="flex flex-col items-center gap-2 text-gray-400">
+                      <span className="text-3xl">👤</span>
+                      <p className="text-sm">担当者が登録されていません</p>
+                      <Button size="sm" variant="outline"
+                        onClick={() => router.push(`/contacts/create?customer_id=${id}`)}>
+                        担当者を登録する
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 customer.contacts?.map(c => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell>{c.department ?? '-'}</TableCell>
-                    <TableCell>{c.position ?? '-'}</TableCell>
+                  <TableRow key={c.id}
+                    className="hover:bg-blue-50/40 cursor-pointer transition-colors border-b last:border-0"
+                    onClick={() => router.push(`/contacts/${c.id}`)}>
+                    <TableCell className="font-semibold text-blue-600 py-2">{c.name}</TableCell>
+                    <TableCell className="text-gray-600">{c.department ?? <Em />}</TableCell>
+                    <TableCell className="text-gray-600">{c.position ?? <Em />}</TableCell>
                     <TableCell>
                       {c.email
-                        ? <a href={`mailto:${c.email}`} className="text-blue-500 hover:underline">{c.email}</a>
-                        : '-'}
+                        ? <a href={`mailto:${c.email}`} onClick={e => e.stopPropagation()}
+                             className="text-sm text-blue-500 hover:underline">{c.email}</a>
+                        : <Em />}
                     </TableCell>
                     <TableCell>
                       {c.phone
-                        ? <a href={`tel:${c.phone}`} className="text-blue-500 hover:underline">{c.phone}</a>
-                        : '-'}
+                        ? <a href={`tel:${c.phone}`} onClick={e => e.stopPropagation()}
+                             className="text-sm text-blue-500 hover:underline">{c.phone}</a>
+                        : <Em />}
                     </TableCell>
                   </TableRow>
                 ))
@@ -203,38 +229,51 @@ export default function CustomerDetailPage() {
       </Card>
 
       {/* 商談一覧 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
+      <Card className="shadow-sm overflow-hidden">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base text-gray-700 flex items-center gap-2">
             💼 商談
-            <Badge variant="secondary">{customer.deals?.length ?? 0}件</Badge>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-normal">
+              {customer.deals?.length ?? 0}件
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>商談名</TableHead>
-                <TableHead>金額</TableHead>
-                <TableHead>ステータス</TableHead>
-                <TableHead>成約確度</TableHead>
-                <TableHead>予定成約日</TableHead>
+              <TableRow className="bg-gray-50 hover:bg-gray-50">
+                <TableHead className="font-semibold text-gray-600 py-2">商談名</TableHead>
+                <TableHead className="font-semibold text-gray-600">金額</TableHead>
+                <TableHead className="font-semibold text-gray-600">ステータス</TableHead>
+                <TableHead className="font-semibold text-gray-600">成約確度</TableHead>
+                <TableHead className="font-semibold text-gray-600">予定成約日</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {customer.deals?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-gray-400 py-6">
-                    商談が登録されていません
+                  <TableCell colSpan={5} className="py-10">
+                    <div className="flex flex-col items-center gap-2 text-gray-400">
+                      <span className="text-3xl">💼</span>
+                      <p className="text-sm">商談が登録されていません</p>
+                      <Button size="sm" variant="outline"
+                        onClick={() => router.push(`/deals/create?customer_id=${id}`)}>
+                        商談を登録する
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 customer.deals?.map(d => {
                   const style = DEAL_STATUS_STYLE[d.status] ?? DEAL_STATUS_STYLE['新規'];
                   return (
-                    <TableRow key={d.id}>
-                      <TableCell className="font-medium">{d.title}</TableCell>
-                      <TableCell>¥{d.amount.toLocaleString()}</TableCell>
+                    <TableRow key={d.id}
+                      className="hover:bg-blue-50/40 cursor-pointer transition-colors border-b last:border-0"
+                      onClick={() => router.push(`/deals/${d.id}`)}>
+                      <TableCell className="font-semibold text-blue-600 py-2">{d.title}</TableCell>
+                      <TableCell className="font-semibold text-gray-700">
+                        ¥{Number(d.amount).toLocaleString()}
+                      </TableCell>
                       <TableCell>
                         <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
                               style={{ backgroundColor: style.bg, color: style.color }}>
@@ -250,12 +289,12 @@ export default function CustomerDetailPage() {
                             </div>
                             <span className="text-xs text-gray-500">{d.probability}%</span>
                           </div>
-                        ) : '-'}
+                        ) : <Em />}
                       </TableCell>
-                      <TableCell className="text-sm text-gray-500">
+                      <TableCell className="text-sm text-gray-400">
                         {d.expected_close_date
                           ? new Date(d.expected_close_date).toLocaleDateString('ja-JP')
-                          : '-'}
+                          : <Em />}
                       </TableCell>
                     </TableRow>
                   );
