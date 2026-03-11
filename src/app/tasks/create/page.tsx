@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
+import { validateTask, isValid, inputErrCls, FieldErrors } from '@/lib/validation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,7 +36,8 @@ export default function TaskCreatePage() {
   const [deals, setDeals]         = useState<Deal[]>([]);
   const [filteredDeals, setFilteredDeals] = useState<Deal[]>([]);
   const [saving, setSaving]       = useState(false);
-  const [error, setError]         = useState<string | null>(null);
+  const [errors, setErrors]       = useState<FieldErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const router = useRouter();
 
   const fetchMasters = useCallback(async () => {
@@ -60,22 +62,31 @@ export default function TaskCreatePage() {
     }
   }, [form.customer_id, deals]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    const updated = { ...form, [name]: value };
+    setForm(updated);
+    const newErrors = validateTask({ ...updated, description });
+    setErrors(prev => ({ ...prev, [name]: newErrors[name] ?? '' }));
+  };
 
   const handleSubmit = async () => {
-    if (!form.title?.trim()) { setError('タイトルは必須です'); return; }
-    if (!form.priority)      { setError('優先度を選択してください'); return; }
-    setSaving(true); setError(null);
+    const allErrors = validateTask({ ...form, description });
+    setErrors(allErrors);
+    if (!isValid(allErrors)) return;
+    setSaving(true); setSubmitError(null);
     try {
       await apiClient.post('/api/v1/tasks', { ...form, description });
       router.push('/tasks');
     } catch (err: any) {
       if (err.response?.status === 422) {
-        const messages = Object.values(err.response.data.errors ?? {}).flat();
-        setError(messages.join(' / ') as string);
+        const serverErrors: FieldErrors = {};
+        Object.entries(err.response.data.errors ?? {}).forEach(([k, v]) => {
+          serverErrors[k] = (v as string[])[0];
+        });
+        setErrors(serverErrors);
       } else {
-        setError('登録に失敗しました');
+        setSubmitError('登録に失敗しました');
       }
     } finally { setSaving(false); }
   };
@@ -92,21 +103,21 @@ export default function TaskCreatePage() {
           <CardTitle className="text-base text-gray-700">✅ タスク情報を入力</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {error && (
+          {submitError && (
             <div className="flex items-start gap-2 bg-red-50 text-red-600 border border-red-200 p-3 rounded-md text-sm">
-              <span className="text-base">⚠️</span><span>{error}</span>
+              <span>⚠️</span><span>{submitError}</span>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-4">
-            {/* タイトル */}
             <div className="space-y-1.5 col-span-2">
               <Label className="text-sm font-medium text-gray-700">タイトル <span className="text-red-500">*</span></Label>
               <Input name="title" placeholder="例：提案書の作成"
-                value={form.title ?? ''} onChange={handleChange} className="border-gray-200" />
+                value={form.title ?? ''} onChange={handleChange}
+                className={`border-gray-200 ${inputErrCls(errors, 'title')}`} />
+              {errors.title && <p className="text-xs text-red-500 mt-0.5">{errors.title}</p>}
             </div>
 
-            {/* 優先度 */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-gray-700">優先度 <span className="text-red-500">*</span></Label>
               <div className="flex gap-2 mt-1">
@@ -115,7 +126,7 @@ export default function TaskCreatePage() {
                   const selected = form.priority === p;
                   return (
                     <button key={p} type="button"
-                      onClick={() => setForm(prev => ({ ...prev, priority: p }))}
+                      onClick={() => { setForm(prev => ({ ...prev, priority: p })); setErrors(prev => ({ ...prev, priority: '' })); }}
                       className="px-4 py-1.5 rounded-md text-sm border transition-all font-medium"
                       style={selected
                         ? { backgroundColor: s.bg, color: s.color, borderColor: s.border }
@@ -127,7 +138,6 @@ export default function TaskCreatePage() {
               </div>
             </div>
 
-            {/* ステータス */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-gray-700">ステータス <span className="text-red-500">*</span></Label>
               <div className="flex gap-2 mt-1">
@@ -136,7 +146,7 @@ export default function TaskCreatePage() {
                   const selected = form.status === s;
                   return (
                     <button key={s} type="button"
-                      onClick={() => setForm(prev => ({ ...prev, status: s }))}
+                      onClick={() => { setForm(prev => ({ ...prev, status: s })); setErrors(prev => ({ ...prev, status: '' })); }}
                       className="px-3 py-1.5 rounded-md text-sm border transition-all font-medium"
                       style={selected
                         ? { backgroundColor: style.bg, color: style.color, borderColor: style.color }
@@ -148,7 +158,6 @@ export default function TaskCreatePage() {
               </div>
             </div>
 
-            {/* 期限日・顧客 */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-gray-700">期限日</Label>
               <Input name="due_date" type="date"
@@ -162,7 +171,6 @@ export default function TaskCreatePage() {
               </select>
             </div>
 
-            {/* 関連商談 */}
             <div className="space-y-1.5 col-span-2">
               <Label className="text-sm font-medium text-gray-700">関連商談（任意）</Label>
               <select name="deal_id" value={form.deal_id ?? ''} onChange={handleChange}
@@ -172,7 +180,6 @@ export default function TaskCreatePage() {
               </select>
             </div>
 
-            {/* 詳細 */}
             <div className="space-y-1.5 col-span-2">
               <Label className="text-sm font-medium text-gray-700">詳細</Label>
               <textarea rows={4} placeholder="タスクの詳細を入力してください"

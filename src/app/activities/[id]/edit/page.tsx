@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
+import { validateActivity, isValid, inputErrCls, FieldErrors } from '@/lib/validation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,7 +35,8 @@ export default function ActivityEditPage() {
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
   const [isDirty, setIsDirty]     = useState(false);
-  const [error, setError]         = useState<string | null>(null);
+  const [errors, setErrors]       = useState<FieldErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const router = useRouter();
   const { id } = useParams();
 
@@ -85,24 +87,31 @@ export default function ActivityEditPage() {
   }, [isDirty]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    setIsDirty(true);
+    const { name, value } = e.target;
+    const updated = { ...form, [name]: value };
+    setForm(updated); setIsDirty(true);
+    const newErrors = validateActivity({ ...updated, content });
+    setErrors(prev => ({ ...prev, [name]: newErrors[name] ?? '' }));
   };
 
   const handleSubmit = async () => {
-    if (!form.customer_id) { setError('顧客を選択してください'); return; }
-    if (!form.subject?.trim()) { setError('件名は必須です'); return; }
-    setSaving(true); setError(null);
+    const allErrors = validateActivity({ ...form, content });
+    setErrors(allErrors);
+    if (!isValid(allErrors)) return;
+    setSaving(true); setSubmitError(null);
     try {
       await apiClient.put(`/api/v1/activities/${id}`, { ...form, content });
       setIsDirty(false);
       router.push(`/activities/${id}`);
     } catch (err: any) {
       if (err.response?.status === 422) {
-        const messages = Object.values(err.response.data.errors ?? {}).flat();
-        setError(messages.join(' / ') as string);
+        const serverErrors: FieldErrors = {};
+        Object.entries(err.response.data.errors ?? {}).forEach(([k, v]) => {
+          serverErrors[k] = (v as string[])[0];
+        });
+        setErrors(serverErrors);
       } else {
-        setError('更新に失敗しました');
+        setSubmitError('更新に失敗しました');
       }
     } finally { setSaving(false); }
   };
@@ -136,9 +145,9 @@ export default function ActivityEditPage() {
           <CardTitle className="text-base text-gray-700">🕐 活動情報を編集</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {error && (
+          {submitError && (
             <div className="flex items-start gap-2 bg-red-50 text-red-600 border border-red-200 p-3 rounded-md text-sm">
-              <span className="text-base">⚠️</span><span>{error}</span>
+              <span>⚠️</span><span>{submitError}</span>
             </div>
           )}
 
@@ -146,7 +155,9 @@ export default function ActivityEditPage() {
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-gray-700">活動日 <span className="text-red-500">*</span></Label>
               <Input name="activity_date" type="date"
-                value={form.activity_date ?? ''} onChange={handleChange} className="border-gray-200" />
+                value={form.activity_date ?? ''} onChange={handleChange}
+                className={`border-gray-200 ${inputErrCls(errors, 'activity_date')}`} />
+              {errors.activity_date && <p className="text-xs text-red-500 mt-0.5">{errors.activity_date}</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-gray-700">活動種別 <span className="text-red-500">*</span></Label>
@@ -156,7 +167,7 @@ export default function ActivityEditPage() {
                   const selected = form.type === t;
                   return (
                     <button key={t} type="button"
-                      onClick={() => { setForm(prev => ({ ...prev, type: t })); setIsDirty(true); }}
+                      onClick={() => { setForm(prev => ({ ...prev, type: t })); setIsDirty(true); setErrors(prev => ({ ...prev, type: '' })); }}
                       className="px-3 py-1.5 rounded-md text-sm border transition-all"
                       style={selected
                         ? { backgroundColor: s.bg, color: s.color, borderColor: s.color, fontWeight: 600 }
@@ -170,10 +181,12 @@ export default function ActivityEditPage() {
 
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-gray-700">顧客 <span className="text-red-500">*</span></Label>
-              <select name="customer_id" value={form.customer_id ?? ''} onChange={handleChange} className={selectCls}>
+              <select name="customer_id" value={form.customer_id ?? ''} onChange={handleChange}
+                className={`${selectCls} ${errors.customer_id ? 'border-red-400' : ''}`}>
                 <option value="">顧客を選択してください</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
               </select>
+              {errors.customer_id && <p className="text-xs text-red-500 mt-0.5">{errors.customer_id}</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-gray-700">担当者</Label>
@@ -198,7 +211,9 @@ export default function ActivityEditPage() {
             <div className="space-y-1.5 col-span-2">
               <Label className="text-sm font-medium text-gray-700">件名 <span className="text-red-500">*</span></Label>
               <Input name="subject" placeholder="例：新システム提案のヒアリング"
-                value={form.subject ?? ''} onChange={handleChange} className="border-gray-200" />
+                value={form.subject ?? ''} onChange={handleChange}
+                className={`border-gray-200 ${inputErrCls(errors, 'subject')}`} />
+              {errors.subject && <p className="text-xs text-red-500 mt-0.5">{errors.subject}</p>}
             </div>
 
             <div className="space-y-1.5 col-span-2">

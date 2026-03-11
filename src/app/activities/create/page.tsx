@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
+import { validateActivity, isValid, inputErrCls, FieldErrors } from '@/lib/validation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,7 +36,8 @@ export default function ActivityCreatePage() {
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [filteredDeals, setFilteredDeals]       = useState<Deal[]>([]);
   const [saving, setSaving]       = useState(false);
-  const [error, setError]         = useState<string | null>(null);
+  const [errors, setErrors]       = useState<FieldErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const router = useRouter();
 
   const fetchMasters = useCallback(async () => {
@@ -64,23 +66,31 @@ export default function ActivityCreatePage() {
     }
   }, [form.customer_id, contacts, deals]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    const updated = { ...form, [name]: value };
+    setForm(updated);
+    const newErrors = validateActivity({ ...updated, content });
+    setErrors(prev => ({ ...prev, [name]: newErrors[name] ?? '' }));
+  };
 
   const handleSubmit = async () => {
-    if (!form.customer_id) { setError('顧客を選択してください'); return; }
-    if (!form.subject?.trim()) { setError('件名は必須です'); return; }
-    if (!form.type) { setError('活動種別を選択してください'); return; }
-    setSaving(true); setError(null);
+    const allErrors = validateActivity({ ...form, content });
+    setErrors(allErrors);
+    if (!isValid(allErrors)) return;
+    setSaving(true); setSubmitError(null);
     try {
       await apiClient.post('/api/v1/activities', { ...form, content });
       router.push('/activities');
     } catch (err: any) {
       if (err.response?.status === 422) {
-        const messages = Object.values(err.response.data.errors ?? {}).flat();
-        setError(messages.join(' / ') as string);
+        const serverErrors: FieldErrors = {};
+        Object.entries(err.response.data.errors ?? {}).forEach(([k, v]) => {
+          serverErrors[k] = (v as string[])[0];
+        });
+        setErrors(serverErrors);
       } else {
-        setError('登録に失敗しました');
+        setSubmitError('登録に失敗しました');
       }
     } finally { setSaving(false); }
   };
@@ -97,21 +107,21 @@ export default function ActivityCreatePage() {
           <CardTitle className="text-base text-gray-700">🕐 活動情報を入力</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {error && (
+          {submitError && (
             <div className="flex items-start gap-2 bg-red-50 text-red-600 border border-red-200 p-3 rounded-md text-sm">
-              <span className="text-base">⚠️</span><span>{error}</span>
+              <span>⚠️</span><span>{submitError}</span>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-4">
-            {/* 活動日 */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-gray-700">活動日 <span className="text-red-500">*</span></Label>
               <Input name="activity_date" type="date"
-                value={form.activity_date ?? ''} onChange={handleChange} className="border-gray-200" />
+                value={form.activity_date ?? ''} onChange={handleChange}
+                className={`border-gray-200 ${inputErrCls(errors, 'activity_date')}`} />
+              {errors.activity_date && <p className="text-xs text-red-500 mt-0.5">{errors.activity_date}</p>}
             </div>
 
-            {/* 活動種別 */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-gray-700">活動種別 <span className="text-red-500">*</span></Label>
               <div className="flex gap-2 flex-wrap mt-1">
@@ -120,7 +130,7 @@ export default function ActivityCreatePage() {
                   const selected = form.type === t;
                   return (
                     <button key={t} type="button"
-                      onClick={() => setForm(prev => ({ ...prev, type: t }))}
+                      onClick={() => { setForm(prev => ({ ...prev, type: t })); setErrors(prev => ({ ...prev, type: '' })); }}
                       className="px-3 py-1.5 rounded-md text-sm border transition-all"
                       style={selected
                         ? { backgroundColor: s.bg, color: s.color, borderColor: s.color, fontWeight: 600 }
@@ -132,13 +142,14 @@ export default function ActivityCreatePage() {
               </div>
             </div>
 
-            {/* 顧客・担当者 */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-gray-700">顧客 <span className="text-red-500">*</span></Label>
-              <select name="customer_id" value={form.customer_id ?? ''} onChange={handleChange} className={selectCls}>
+              <select name="customer_id" value={form.customer_id ?? ''} onChange={handleChange}
+                className={`${selectCls} ${errors.customer_id ? 'border-red-400' : ''}`}>
                 <option value="">顧客を選択してください</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
               </select>
+              {errors.customer_id && <p className="text-xs text-red-500 mt-0.5">{errors.customer_id}</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-gray-700">担当者</Label>
@@ -151,7 +162,6 @@ export default function ActivityCreatePage() {
               </select>
             </div>
 
-            {/* 関連商談 */}
             <div className="space-y-1.5 col-span-2">
               <Label className="text-sm font-medium text-gray-700">関連商談</Label>
               <select name="deal_id" value={form.deal_id ?? ''} onChange={handleChange}
@@ -161,14 +171,14 @@ export default function ActivityCreatePage() {
               </select>
             </div>
 
-            {/* 件名 */}
             <div className="space-y-1.5 col-span-2">
               <Label className="text-sm font-medium text-gray-700">件名 <span className="text-red-500">*</span></Label>
               <Input name="subject" placeholder="例：新システム提案のヒアリング"
-                value={form.subject ?? ''} onChange={handleChange} className="border-gray-200" />
+                value={form.subject ?? ''} onChange={handleChange}
+                className={`border-gray-200 ${inputErrCls(errors, 'subject')}`} />
+              {errors.subject && <p className="text-xs text-red-500 mt-0.5">{errors.subject}</p>}
             </div>
 
-            {/* 内容 */}
             <div className="space-y-1.5 col-span-2">
               <Label className="text-sm font-medium text-gray-700">内容</Label>
               <textarea rows={5} placeholder="活動内容の詳細を入力してください"

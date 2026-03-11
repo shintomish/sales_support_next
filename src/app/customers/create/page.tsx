@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
+import { validateCustomer, isValid, inputErrCls, FieldErrors } from '@/lib/validation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,31 +18,48 @@ const FIELDS = [
   { name: 'website',        label: 'ウェブサイト', type: 'url',    required: false, placeholder: '例：https://example.com',      span: 2 },
 ] as const;
 
-const selectCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
 const textareaCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none';
 
 export default function CustomerCreatePage() {
-  const [form, setForm]   = useState<Record<string, string>>({});
-  const [notes, setNotes] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState<string | null>(null);
+  const [form, setForm]             = useState<Record<string, string>>({});
+  const [notes, setNotes]           = useState('');
+  const [saving, setSaving]         = useState(false);
+  const [errors, setErrors]         = useState<FieldErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const router = useRouter();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    const updated = { ...form, [name]: value };
+    setForm(updated);
+    const newErrors = validateCustomer({ ...updated, notes });
+    setErrors(prev => ({ ...prev, [name]: newErrors[name] ?? '' }));
+  };
+
+  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNotes(e.target.value);
+    const newErrors = validateCustomer({ ...form, notes: e.target.value });
+    setErrors(prev => ({ ...prev, notes: newErrors.notes ?? '' }));
+  };
 
   const handleSubmit = async () => {
-    if (!form.company_name?.trim()) { setError('会社名は必須です'); return; }
-    setSaving(true); setError(null);
+    const allErrors = validateCustomer({ ...form, notes });
+    setErrors(allErrors);
+    if (!isValid(allErrors)) return;
+
+    setSaving(true); setSubmitError(null);
     try {
       await apiClient.post('/api/v1/customers', { ...form, notes });
       router.push('/customers');
     } catch (err: any) {
       if (err.response?.status === 422) {
-        const messages = Object.values(err.response.data.errors ?? {}).flat();
-        setError(messages.join(' / ') as string);
+        const serverErrors: FieldErrors = {};
+        Object.entries(err.response.data.errors ?? {}).forEach(([k, v]) => {
+          serverErrors[k] = (v as string[])[0];
+        });
+        setErrors(serverErrors);
       } else {
-        setError('登録に失敗しました');
+        setSubmitError('登録に失敗しました');
       }
     } finally { setSaving(false); }
   };
@@ -58,9 +76,9 @@ export default function CustomerCreatePage() {
           <CardTitle className="text-base text-gray-700">🏢 顧客情報を入力</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {error && (
+          {submitError && (
             <div className="flex items-start gap-2 bg-red-50 text-red-600 border border-red-200 p-3 rounded-md text-sm">
-              <span className="text-base">⚠️</span><span>{error}</span>
+              <span>⚠️</span><span>{submitError}</span>
             </div>
           )}
 
@@ -75,8 +93,9 @@ export default function CustomerCreatePage() {
                   placeholder={placeholder}
                   value={form[name] ?? ''}
                   onChange={handleChange}
-                  className="border-gray-200 focus:ring-blue-500"
+                  className={`border-gray-200 ${inputErrCls(errors, name)}`}
                 />
+                {errors[name] && <p className="text-xs text-red-500 mt-0.5">{errors[name]}</p>}
               </div>
             ))}
 
@@ -86,9 +105,10 @@ export default function CustomerCreatePage() {
                 id="notes" rows={4}
                 placeholder="備考を入力してください"
                 value={notes}
-                onChange={e => setNotes(e.target.value)}
-                className={textareaCls}
+                onChange={handleNotesChange}
+                className={`${textareaCls} ${errors.notes ? 'border-red-400' : ''}`}
               />
+              {errors.notes && <p className="text-xs text-red-500 mt-0.5">{errors.notes}</p>}
             </div>
           </div>
 

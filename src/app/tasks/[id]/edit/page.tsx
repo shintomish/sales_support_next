@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
+import { validateTask, isValid, inputErrCls, FieldErrors } from '@/lib/validation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,7 +38,8 @@ export default function TaskEditPage() {
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
   const [isDirty, setIsDirty]     = useState(false);
-  const [error, setError]         = useState<string | null>(null);
+  const [errors, setErrors]       = useState<FieldErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const router = useRouter();
   const { id } = useParams();
 
@@ -50,10 +52,10 @@ export default function TaskEditPage() {
       ]);
       const t = taskRes.data.data ?? taskRes.data;
       setForm({
-        title:       t.title               ?? '',
-        priority:    t.priority            ?? '中',
-        status:      t.status              ?? '未着手',
-        due_date:    t.due_date            ?? '',
+        title:       t.title                   ?? '',
+        priority:    t.priority                ?? '中',
+        status:      t.status                  ?? '未着手',
+        due_date:    t.due_date                ?? '',
         customer_id: t.customer_id?.toString() ?? '',
         deal_id:     t.deal_id?.toString()     ?? '',
       });
@@ -84,23 +86,31 @@ export default function TaskEditPage() {
   }, [isDirty]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    setIsDirty(true);
+    const { name, value } = e.target;
+    const updated = { ...form, [name]: value };
+    setForm(updated); setIsDirty(true);
+    const newErrors = validateTask({ ...updated, description });
+    setErrors(prev => ({ ...prev, [name]: newErrors[name] ?? '' }));
   };
 
   const handleSubmit = async () => {
-    if (!form.title?.trim()) { setError('タイトルは必須です'); return; }
-    setSaving(true); setError(null);
+    const allErrors = validateTask({ ...form, description });
+    setErrors(allErrors);
+    if (!isValid(allErrors)) return;
+    setSaving(true); setSubmitError(null);
     try {
       await apiClient.put(`/api/v1/tasks/${id}`, { ...form, description });
       setIsDirty(false);
       router.push(`/tasks/${id}`);
     } catch (err: any) {
       if (err.response?.status === 422) {
-        const messages = Object.values(err.response.data.errors ?? {}).flat();
-        setError(messages.join(' / ') as string);
+        const serverErrors: FieldErrors = {};
+        Object.entries(err.response.data.errors ?? {}).forEach(([k, v]) => {
+          serverErrors[k] = (v as string[])[0];
+        });
+        setErrors(serverErrors);
       } else {
-        setError('更新に失敗しました');
+        setSubmitError('更新に失敗しました');
       }
     } finally { setSaving(false); }
   };
@@ -134,9 +144,9 @@ export default function TaskEditPage() {
           <CardTitle className="text-base text-gray-700">✅ タスク情報を編集</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {error && (
+          {submitError && (
             <div className="flex items-start gap-2 bg-red-50 text-red-600 border border-red-200 p-3 rounded-md text-sm">
-              <span className="text-base">⚠️</span><span>{error}</span>
+              <span>⚠️</span><span>{submitError}</span>
             </div>
           )}
 
@@ -144,7 +154,9 @@ export default function TaskEditPage() {
             <div className="space-y-1.5 col-span-2">
               <Label className="text-sm font-medium text-gray-700">タイトル <span className="text-red-500">*</span></Label>
               <Input name="title" placeholder="例：提案書の作成"
-                value={form.title ?? ''} onChange={handleChange} className="border-gray-200" />
+                value={form.title ?? ''} onChange={handleChange}
+                className={`border-gray-200 ${inputErrCls(errors, 'title')}`} />
+              {errors.title && <p className="text-xs text-red-500 mt-0.5">{errors.title}</p>}
             </div>
 
             <div className="space-y-1.5">
@@ -155,7 +167,7 @@ export default function TaskEditPage() {
                   const selected = form.priority === p;
                   return (
                     <button key={p} type="button"
-                      onClick={() => { setForm(prev => ({ ...prev, priority: p })); setIsDirty(true); }}
+                      onClick={() => { setForm(prev => ({ ...prev, priority: p })); setIsDirty(true); setErrors(prev => ({ ...prev, priority: '' })); }}
                       className="px-4 py-1.5 rounded-md text-sm border transition-all font-medium"
                       style={selected
                         ? { backgroundColor: s.bg, color: s.color, borderColor: s.border }
@@ -175,7 +187,7 @@ export default function TaskEditPage() {
                   const selected = form.status === s;
                   return (
                     <button key={s} type="button"
-                      onClick={() => { setForm(prev => ({ ...prev, status: s })); setIsDirty(true); }}
+                      onClick={() => { setForm(prev => ({ ...prev, status: s })); setIsDirty(true); setErrors(prev => ({ ...prev, status: '' })); }}
                       className="px-3 py-1.5 rounded-md text-sm border transition-all font-medium"
                       style={selected
                         ? { backgroundColor: style.bg, color: style.color, borderColor: style.color }

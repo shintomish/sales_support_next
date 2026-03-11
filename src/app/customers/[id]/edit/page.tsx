@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
+import { validateCustomer, isValid, inputErrCls, FieldErrors } from '@/lib/validation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,12 +21,13 @@ const FIELDS = [
 const textareaCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none';
 
 export default function CustomerEditPage() {
-  const [form, setForm]     = useState<Record<string, string>>({});
-  const [notes, setNotes]   = useState('');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [form, setForm]             = useState<Record<string, string>>({});
+  const [notes, setNotes]           = useState('');
+  const [loading, setLoading]       = useState(true);
+  const [saving, setSaving]         = useState(false);
+  const [isDirty, setIsDirty]       = useState(false);
+  const [errors, setErrors]         = useState<FieldErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const router = useRouter();
   const { id } = useParams();
 
@@ -58,23 +60,39 @@ export default function CustomerEditPage() {
   }, [isDirty]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    const updated = { ...form, [name]: value };
+    setForm(updated);
     setIsDirty(true);
+    const newErrors = validateCustomer({ ...updated, notes });
+    setErrors(prev => ({ ...prev, [name]: newErrors[name] ?? '' }));
+  };
+
+  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNotes(e.target.value);
+    setIsDirty(true);
+    const newErrors = validateCustomer({ ...form, notes: e.target.value });
+    setErrors(prev => ({ ...prev, notes: newErrors.notes ?? '' }));
   };
 
   const handleSubmit = async () => {
-    if (!form.company_name?.trim()) { setError('会社名は必須です'); return; }
-    setSaving(true); setError(null);
+    const allErrors = validateCustomer({ ...form, notes });
+    setErrors(allErrors);
+    if (!isValid(allErrors)) return;
+    setSaving(true); setSubmitError(null);
     try {
       await apiClient.put(`/api/v1/customers/${id}`, { ...form, notes });
       setIsDirty(false);
       router.push(`/customers/${id}`);
     } catch (err: any) {
       if (err.response?.status === 422) {
-        const messages = Object.values(err.response.data.errors ?? {}).flat();
-        setError(messages.join(' / ') as string);
+        const serverErrors: FieldErrors = {};
+        Object.entries(err.response.data.errors ?? {}).forEach(([k, v]) => {
+          serverErrors[k] = (v as string[])[0];
+        });
+        setErrors(serverErrors);
       } else {
-        setError('更新に失敗しました');
+        setSubmitError('更新に失敗しました');
       }
     } finally { setSaving(false); }
   };
@@ -108,9 +126,9 @@ export default function CustomerEditPage() {
           <CardTitle className="text-base text-gray-700">🏢 顧客情報を編集</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {error && (
+          {submitError && (
             <div className="flex items-start gap-2 bg-red-50 text-red-600 border border-red-200 p-3 rounded-md text-sm">
-              <span className="text-base">⚠️</span><span>{error}</span>
+              <span>⚠️</span><span>{submitError}</span>
             </div>
           )}
 
@@ -125,20 +143,18 @@ export default function CustomerEditPage() {
                   placeholder={placeholder}
                   value={form[name] ?? ''}
                   onChange={handleChange}
-                  className="border-gray-200 focus:ring-blue-500"
+                  className={`border-gray-200 ${inputErrCls(errors, name)}`}
                 />
+                {errors[name] && <p className="text-xs text-red-500 mt-0.5">{errors[name]}</p>}
               </div>
             ))}
 
             <div className="space-y-1.5 col-span-2">
-              <Label htmlFor="notes" className="text-sm font-medium text-gray-700">備考</Label>
-              <textarea
-                id="notes" rows={4}
-                placeholder="備考を入力してください"
-                value={notes}
-                onChange={e => { setNotes(e.target.value); setIsDirty(true); }}
-                className={textareaCls}
-              />
+              <Label className="text-sm font-medium text-gray-700">備考</Label>
+              <textarea rows={4} placeholder="備考を入力してください"
+                value={notes} onChange={handleNotesChange}
+                className={`${textareaCls} ${errors.notes ? 'border-red-400' : ''}`} />
+              {errors.notes && <p className="text-xs text-red-500 mt-0.5">{errors.notes}</p>}
             </div>
           </div>
 
