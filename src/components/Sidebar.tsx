@@ -18,7 +18,7 @@ export default function Sidebar() {
   const overdueTasks = notifData?.overdue_tasks ?? [];
 
   const handleLogout = async () => {
-    await logout();
+    try { await logout(); } catch {}
     document.cookie = 'auth_token=; path=/; max-age=0';
     router.push('/login');
   };
