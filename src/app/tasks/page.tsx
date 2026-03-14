@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
@@ -47,7 +47,7 @@ const isToday = (due: string | null) => {
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
 };
 
-export default function TasksPage() {
+function TasksPage() {
   const router       = useRouter();
   const pathname     = usePathname();
   const searchParams = useSearchParams();
@@ -264,4 +264,8 @@ export default function TasksPage() {
       )}
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><TasksPage /></Suspense>;
 }

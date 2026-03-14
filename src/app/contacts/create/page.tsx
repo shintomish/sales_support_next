@@ -17,7 +17,7 @@ const FIELDS = [
   { name: 'position',   label: '役職',     type: 'text',  required: false, placeholder: '例：部長',               span: 1 },
   { name: 'email',      label: 'メール',   type: 'email', required: false, placeholder: '例：yamada@example.com', span: 1 },
   { name: 'phone',      label: '電話番号', type: 'tel',   required: false, placeholder: '例：03-1234-5678',       span: 1 },
-] as const;
+];
 
 const selectCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
 const textareaCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none';
@@ -105,8 +105,8 @@ export default function ContactCreatePage() {
               {errors.customer_id && <p className="text-xs text-red-500 mt-0.5">{errors.customer_id}</p>}
             </div>
 
-            {FIELDS.map(({ name, label, type, required, placeholder, span }) => (
-              <div key={name} className={`space-y-1.5 ${span === 2 ? 'col-span-2' : ''}`}>
+            {FIELDS.map(({ name, label, type, required, placeholder }) => (
+              <div key={name} className="space-y-1.5">
                 <Label htmlFor={name} className="text-sm font-medium text-gray-700">
                   {label}{required && <span className="text-red-500 ml-1">*</span>}
                 </Label>

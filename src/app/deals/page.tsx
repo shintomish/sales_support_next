@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
 const STATUSES = ['新規', '提案', '交渉', '成約', '失注'];
 const selectCls = 'border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
 
-export default function DealsPage() {
+function DealsPage() {
   const router       = useRouter();
   const pathname     = usePathname();
   const searchParams = useSearchParams();
@@ -240,4 +240,8 @@ export default function DealsPage() {
       )}
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><DealsPage /></Suspense>;
 }

@@ -16,7 +16,7 @@ const FIELDS = [
   { name: 'phone',          label: '電話番号',     type: 'tel',    required: false, placeholder: '例：03-1234-5678',             span: 1 },
   { name: 'address',        label: '住所',         type: 'text',   required: false, placeholder: '例：東京都千代田区丸の内1-1-1', span: 2 },
   { name: 'website',        label: 'ウェブサイト', type: 'url',    required: false, placeholder: '例：https://example.com',      span: 2 },
-] as const;
+];
 
 const textareaCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none';
 

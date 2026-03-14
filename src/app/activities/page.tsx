@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ const TYPE_STYLE: Record<string, { icon: string; bg: string; color: string }> = 
 const TYPES = ['訪問', '電話', 'メール', 'その他'];
 const selectCls = 'border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
 
-export default function ActivitiesPage() {
+function ActivitiesPage() {
   const router       = useRouter();
   const pathname     = usePathname();
   const searchParams = useSearchParams();
@@ -217,4 +217,8 @@ export default function ActivitiesPage() {
       )}
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><ActivitiesPage /></Suspense>;
 }

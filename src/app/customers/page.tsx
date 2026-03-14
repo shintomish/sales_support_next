@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ interface Meta { current_page: number; last_page: number; total: number; }
 
 const selectCls = 'border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
 
-export default function CustomersPage() {
+function CustomersPage() {
   const router       = useRouter();
   const pathname     = usePathname();
   const searchParams = useSearchParams();
@@ -186,4 +186,8 @@ export default function CustomersPage() {
       )}
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><CustomersPage /></Suspense>;
 }
