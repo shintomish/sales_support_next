@@ -38,7 +38,7 @@ export default function Sidebar() {
       {/* トースト通知 */}
       <NotificationToast tasks={overdueTasks} />
 
-      <aside className="w-64 min-h-screen bg-gray-900 text-white flex flex-col">
+      <aside className="w-64 h-screen sticky top-0 bg-gray-900 text-white flex flex-col">
         {/* ロゴ */}
         <div className="p-6 border-b border-gray-700">
           <h1 className="text-lg font-bold">営業支援システム</h1>

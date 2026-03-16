@@ -22,7 +22,7 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <main className="flex-1 bg-gray-50 overflow-auto">
         {children}
