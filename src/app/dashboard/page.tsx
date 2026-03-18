@@ -50,7 +50,7 @@ const QUICK_ACTIONS = [
 ];
 
 // ───────── ユーティリティ ─────────
-const formatManEn = (yen: number) => Math.floor(yen / 10000).toLocaleString();
+const formatManEn = (yen: number) => Math.floor(yen / 10000).toLocaleString('ja-JP', { maximumFractionDigits: 0 });
 const formatDate  = (s: string) => new Date(s).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' });
 const isPast  = (s: string|null) => !!s && new Date(s) < new Date();
 const isToday = (s: string|null) => {
