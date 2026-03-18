@@ -5,10 +5,6 @@ import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Table, TableBody, TableCell,
-  TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 
 interface BusinessCard {
   id: number;
@@ -28,6 +24,20 @@ const STATUS_STYLE: Record<string, { label: string; bg: string; color: string }>
   processed:  { label: '処理済み', bg: '#EFF6FF', color: '#1D4ED8' },
   pending:    { label: '保留中',   bg: '#F1F5F9', color: '#475569' },
 };
+
+// ヘッダー・ボディで幅を揃えるcolgroup定義
+const ColGroup = () => (
+  <colgroup>
+    <col style={{ width: '10%' }} />
+    <col style={{ width: '18%' }} />
+    <col style={{ width: '12%' }} />
+    <col style={{ width: '12%' }} />
+    <col style={{ width: '20%' }} />
+    <col style={{ width: '11%' }} />
+    <col style={{ width: '10%' }} />
+    <col style={{ width: '7%' }} />
+  </colgroup>
+);
 
 export default function BusinessCardsPage() {
   const [cards, setCards]     = useState<BusinessCard[]>([]);
@@ -66,9 +76,10 @@ export default function BusinessCardsPage() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-6">
-      {/* ヘッダー */}
-      <div className="flex justify-between items-center mb-6">
+    <div className="flex flex-col h-screen py-8 px-6 max-w-7xl mx-auto">
+
+      {/* ── タイトル ── */}
+      <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">名刺管理</h1>
           <p className="text-sm text-gray-400 mt-0.5">全 {cards.length} 件</p>
@@ -78,44 +89,58 @@ export default function BusinessCardsPage() {
         </Button>
       </div>
 
-      {/* テーブル */}
-      <Card className="shadow-sm overflow-hidden">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50 hover:bg-gray-50">
-                <TableHead className="font-semibold text-gray-600 py-3">画像</TableHead>
-                <TableHead className="font-semibold text-gray-600">会社名</TableHead>
-                <TableHead className="font-semibold text-gray-600">氏名</TableHead>
-                <TableHead className="font-semibold text-gray-600">役職</TableHead>
-                <TableHead className="font-semibold text-gray-600">連絡先</TableHead>
-                <TableHead className="font-semibold text-gray-600">ステータス</TableHead>
-                <TableHead className="font-semibold text-gray-600">登録日</TableHead>
-                <TableHead className="font-semibold text-gray-600 text-center">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {cards.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-16">
-                    <div className="flex flex-col items-center gap-3 text-gray-400">
-                      <span className="text-5xl">🪪</span>
-                      <p className="font-medium text-gray-500">名刺が登録されていません</p>
-                      <Button size="sm" variant="outline"
-                        onClick={() => router.push('/business-cards/create')}>
-                        名刺をアップロードする
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                cards.map(card => {
+      {/* ── テーブル（ボディのみスクロール） ── */}
+      <Card className="shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+        <CardContent className="p-0 flex flex-col h-full overflow-hidden">
+
+          {/* テーブルヘッダー（固定） */}
+          <div className="flex-shrink-0 border-b bg-gray-50">
+            <table className="w-full text-sm table-fixed">
+              <ColGroup />
+              <thead>
+                <tr>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">画像</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">会社名</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">氏名</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">役職</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">連絡先</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">ステータス</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">登録日</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-center">操作</th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+
+          {/* テーブルボディ（スクロール） */}
+          <div className="overflow-y-auto flex-1">
+            <table className="w-full text-sm table-fixed">
+              <ColGroup />
+              <tbody>
+                {cards.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-16">
+                      <div className="flex flex-col items-center gap-3 text-gray-400">
+                        <span className="text-5xl">🪪</span>
+                        <p className="font-medium text-gray-500">名刺が登録されていません</p>
+                        <Button size="sm" variant="outline" onClick={() => router.push('/business-cards/create')}>
+                          名刺をアップロードする
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : cards.map((card, index) => {
                   const statusStyle = STATUS_STYLE[card.status] ?? { label: card.status, bg: '#F1F5F9', color: '#475569' };
                   return (
-                    <TableRow key={card.id}
-                      className="hover:bg-blue-50/40 cursor-pointer transition-colors border-b last:border-0"
-                      onClick={() => router.push(`/business-cards/${card.id}`)}>
-                      <TableCell className="py-3">
+                    <tr
+                      key={card.id}
+                      className={`
+                        hover:bg-blue-50/60 cursor-pointer transition-colors border-b last:border-0
+                        ${index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}
+                      `}
+                      onClick={() => router.push(`/business-cards/${card.id}`)}
+                    >
+                      <td className="py-3 px-4">
                         {card.image_path ? (
                           <img
                             src={`${process.env.NEXT_PUBLIC_API_URL}/storage/${card.image_path}`}
@@ -127,42 +152,58 @@ export default function BusinessCardsPage() {
                             <span className="text-xs text-gray-400">画像なし</span>
                           </div>
                         )}
-                      </TableCell>
-                      <TableCell className="text-gray-700">{card.company_name ?? <span className="text-gray-300">—</span>}</TableCell>
-                      <TableCell className="font-semibold text-gray-800">{card.person_name ?? <span className="text-gray-300">—</span>}</TableCell>
-                      <TableCell className="text-gray-600 text-sm">{card.position ?? <span className="text-gray-300">—</span>}</TableCell>
-                      <TableCell>
-                        {card.email && <div className="text-sm text-gray-600">{card.email}</div>}
+                      </td>
+                      <td className="text-gray-700 px-4 truncate">
+                        {card.company_name ?? <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="font-semibold text-gray-800 px-4 truncate">
+                        {card.person_name ?? <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="text-gray-600 text-sm px-4 truncate">
+                        {card.position ?? <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4">
+                        {card.email && <div className="text-sm text-gray-600 truncate">{card.email}</div>}
                         {(card.mobile ?? card.phone) && (
                           <div className="text-sm text-gray-400">{card.mobile ?? card.phone}</div>
                         )}
                         {!card.email && !card.mobile && !card.phone && <span className="text-gray-300">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                              style={{ backgroundColor: statusStyle.bg, color: statusStyle.color }}>
+                      </td>
+                      <td className="px-4">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                          style={{ backgroundColor: statusStyle.bg, color: statusStyle.color }}
+                        >
                           {statusStyle.label}
                         </span>
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-400">
+                      </td>
+                      <td className="text-sm text-gray-400 px-4">
                         {new Date(card.created_at).toLocaleDateString('ja-JP')}
-                      </TableCell>
-                      <TableCell onClick={e => e.stopPropagation()}>
+                      </td>
+                      <td className="px-4" onClick={e => e.stopPropagation()}>
                         <div className="flex gap-1 justify-center">
-                          <button title="詳細" onClick={() => router.push(`/business-cards/${card.id}`)}
-                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-colors">👁</button>
-                          <button title="編集" onClick={() => router.push(`/business-cards/${card.id}/edit`)}
-                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-amber-100 hover:text-amber-600 transition-colors">✏️</button>
+                          <button
+                            title="詳細"
+                            onClick={() => router.push(`/business-cards/${card.id}`)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                          >👁</button>
+                          <button
+                            title="編集"
+                            onClick={() => router.push(`/business-cards/${card.id}/edit`)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-amber-100 hover:text-amber-600 transition-colors"
+                          >✏️</button>
                         </div>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   );
-                })
-              )}
-            </TableBody>
-          </Table>
+                })}
+              </tbody>
+            </table>
+          </div>
+
         </CardContent>
       </Card>
+
     </div>
   );
 }

@@ -6,10 +6,6 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-  Table, TableBody, TableCell,
-  TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 
 interface Task {
   id: number; title: string; priority: string; status: string;
@@ -46,6 +42,19 @@ const isToday = (due: string | null) => {
   const d = new Date(due), n = new Date();
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
 };
+
+// ヘッダー・ボディで幅を揃えるcolgroup定義
+const ColGroup = () => (
+  <colgroup>
+    <col style={{ width: '9%' }} />
+    <col style={{ width: '26%' }} />
+    <col style={{ width: '11%' }} />
+    <col style={{ width: '17%' }} />
+    <col style={{ width: '14%' }} />
+    <col style={{ width: '13%' }} />
+    <col style={{ width: '10%' }} />
+  </colgroup>
+);
 
 function TasksPage() {
   const router       = useRouter();
@@ -121,8 +130,10 @@ function TasksPage() {
   const hasFilter = !!(search || statusFilter || priorityFilter || dueFilter);
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="flex flex-col h-screen py-8 px-6 max-w-7xl mx-auto">
+
+      {/* ── タイトル ── */}
+      <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">タスク一覧</h1>
           {meta && <p className="text-sm text-gray-400 mt-0.5">全 {meta.total} 件{hasFilter && ' （絞り込み中）'}</p>}
@@ -132,7 +143,8 @@ function TasksPage() {
         </Button>
       </div>
 
-      <Card className="mb-4 shadow-sm">
+      {/* ── 検索フィルタ ── */}
+      <Card className="mb-4 shadow-sm flex-shrink-0">
         <CardContent className="py-3 px-4 space-y-2">
           <div className="flex gap-2 items-center flex-wrap">
             <div className="relative flex-1 min-w-40">
@@ -175,93 +187,146 @@ function TasksPage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-sm overflow-hidden">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50 hover:bg-gray-50">
-                <TableHead className="font-semibold text-gray-600 py-3">優先度</TableHead>
-                <TableHead className="font-semibold text-gray-600">タイトル</TableHead>
-                <TableHead className="font-semibold text-gray-600">ステータス</TableHead>
-                <TableHead className="font-semibold text-gray-600">顧客</TableHead>
-                <TableHead className="font-semibold text-gray-600">期限日</TableHead>
-                <TableHead className="font-semibold text-gray-600">担当者</TableHead>
-                <TableHead className="font-semibold text-gray-600 text-center">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tasks.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="py-16">
-                  <div className="flex flex-col items-center gap-3 text-gray-400">
-                    <span className="text-5xl">☑️</span>
-                    <p className="font-medium text-gray-500">
-                      {hasFilter ? '条件に一致するタスクが見つかりません' : 'タスクが登録されていません'}
-                    </p>
-                    {!hasFilter && <Button size="sm" variant="outline" onClick={() => router.push('/tasks/create')}>最初のタスクを登録する</Button>}
-                  </div>
-                </TableCell></TableRow>
-              ) : tasks.map(t => {
-                const pStyle  = PRIORITY_STYLE[t.priority] ?? PRIORITY_STYLE['低'];
-                const sStyle  = STATUS_STYLE[t.status]     ?? STATUS_STYLE['未着手'];
-                const overdue = isOverdue(t.due_date, t.status);
-                const today   = isToday(t.due_date);
-                return (
-                  <TableRow key={t.id}
-                    className={`hover:bg-blue-50/40 cursor-pointer transition-colors border-b last:border-0 ${t.status === '完了' ? 'opacity-60' : ''}`}
-                    onClick={() => router.push(`/tasks/${t.id}`)}>
-                    <TableCell className="py-3">
-                      <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                            style={{ backgroundColor: pStyle.bg, color: pStyle.color }}>{t.priority}</span>
-                    </TableCell>
-                    <TableCell>
-                      <p className={`font-semibold text-blue-600 ${t.status === '完了' ? 'line-through' : ''}`}>{t.title}</p>
-                      {t.description && (
-                        <p className="text-xs text-gray-400 mt-0.5">{t.description.slice(0, 40)}{t.description.length > 40 ? '…' : ''}</p>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                            style={{ backgroundColor: sStyle.bg, color: sStyle.color }}>{t.status}</span>
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-500">
-                      {t.customer?.company_name ?? <span className="text-gray-300">—</span>}
-                    </TableCell>
-                    <TableCell>
-                      {t.due_date ? (
-                        <span className="text-sm"
-                              style={{ color: overdue ? '#EF4444' : today ? '#FF8C00' : '#9CA3AF',
-                                       fontWeight: overdue || today ? 600 : 400 }}>
-                          {new Date(t.due_date).toLocaleDateString('ja-JP')}
-                          {today && <span className="ml-1 text-xs px-1 rounded" style={{ backgroundColor: '#FFF3E0', color: '#E67E00' }}>今日</span>}
-                          {overdue && !today && <span className="ml-1 text-xs px-1 rounded" style={{ backgroundColor: '#FEF2F2', color: '#991B1B' }}>超過</span>}
-                        </span>
-                      ) : <span className="text-gray-300">—</span>}
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-500">
-                      {t.user?.name ?? <span className="text-gray-300">—</span>}
-                    </TableCell>
-                    <TableCell onClick={e => e.stopPropagation()}>
-                      <div className="flex gap-1 justify-center">
-                        <button title="詳細" onClick={() => router.push(`/tasks/${t.id}`)} className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-colors">👁</button>
-                        <button title="編集" onClick={() => router.push(`/tasks/${t.id}/edit`)} className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-amber-100 hover:text-amber-600 transition-colors">✏️</button>
-                        <button title="削除" disabled={deletingId === t.id} onClick={() => handleDelete(t.id)} className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors disabled:opacity-40">🗑</button>
+      {/* ── テーブル（ボディのみスクロール） ── */}
+      <Card className="shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+        <CardContent className="p-0 flex flex-col h-full overflow-hidden">
+
+          {/* テーブルヘッダー（固定） */}
+          <div className="flex-shrink-0 border-b bg-gray-50">
+            <table className="w-full text-sm table-fixed">
+              <ColGroup />
+              <thead>
+                <tr>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">優先度</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">タイトル</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">ステータス</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">顧客</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">期限日</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">担当者</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-center">操作</th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+
+          {/* テーブルボディ（スクロール） */}
+          <div className="overflow-y-auto flex-1">
+            <table className="w-full text-sm table-fixed">
+              <ColGroup />
+              <tbody>
+                {tasks.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-16">
+                      <div className="flex flex-col items-center gap-3 text-gray-400">
+                        <span className="text-5xl">☑️</span>
+                        <p className="font-medium text-gray-500">
+                          {hasFilter ? '条件に一致するタスクが見つかりません' : 'タスクが登録されていません'}
+                        </p>
+                        {!hasFilter && (
+                          <Button size="sm" variant="outline" onClick={() => router.push('/tasks/create')}>
+                            最初のタスクを登録する
+                          </Button>
+                        )}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                    </td>
+                  </tr>
+                ) : tasks.map((t, index) => {
+                  const pStyle  = PRIORITY_STYLE[t.priority] ?? PRIORITY_STYLE['低'];
+                  const sStyle  = STATUS_STYLE[t.status]     ?? STATUS_STYLE['未着手'];
+                  const overdue = isOverdue(t.due_date, t.status);
+                  const today   = isToday(t.due_date);
+                  return (
+                    <tr
+                      key={t.id}
+                      className={`
+                        hover:bg-blue-50/60 cursor-pointer transition-colors border-b last:border-0
+                        ${t.status === '完了' ? 'opacity-60' : ''}
+                        ${index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}
+                      `}
+                      onClick={() => router.push(`/tasks/${t.id}`)}
+                    >
+                      <td className="py-3 px-4">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                          style={{ backgroundColor: pStyle.bg, color: pStyle.color }}
+                        >{t.priority}</span>
+                      </td>
+                      <td className="px-4">
+                        <p className={`font-semibold text-blue-600 truncate ${t.status === '完了' ? 'line-through' : ''}`}>
+                          {t.title}
+                        </p>
+                        {t.description && (
+                          <p className="text-xs text-gray-400 mt-0.5 truncate">
+                            {t.description.slice(0, 40)}{t.description.length > 40 ? '…' : ''}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                          style={{ backgroundColor: sStyle.bg, color: sStyle.color }}
+                        >{t.status}</span>
+                      </td>
+                      <td className="text-sm text-gray-500 px-4 truncate">
+                        {t.customer?.company_name ?? <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4">
+                        {t.due_date ? (
+                          <span
+                            className="text-sm"
+                            style={{
+                              color: overdue ? '#EF4444' : today ? '#FF8C00' : '#9CA3AF',
+                              fontWeight: overdue || today ? 600 : 400,
+                            }}
+                          >
+                            {new Date(t.due_date).toLocaleDateString('ja-JP')}
+                            {today && <span className="ml-1 text-xs px-1 rounded" style={{ backgroundColor: '#FFF3E0', color: '#E67E00' }}>今日</span>}
+                            {overdue && !today && <span className="ml-1 text-xs px-1 rounded" style={{ backgroundColor: '#FEF2F2', color: '#991B1B' }}>超過</span>}
+                          </span>
+                        ) : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="text-sm text-gray-500 px-4 truncate">
+                        {t.user?.name ?? <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4" onClick={e => e.stopPropagation()}>
+                        <div className="flex gap-1 justify-center">
+                          <button
+                            title="詳細"
+                            onClick={() => router.push(`/tasks/${t.id}`)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                          >👁</button>
+                          <button
+                            title="編集"
+                            onClick={() => router.push(`/tasks/${t.id}/edit`)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-amber-100 hover:text-amber-600 transition-colors"
+                          >✏️</button>
+                          <button
+                            title="削除"
+                            disabled={deletingId === t.id}
+                            onClick={() => handleDelete(t.id)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors disabled:opacity-40"
+                          >🗑</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
         </CardContent>
       </Card>
 
+      {/* ── ページネーション ── */}
       {meta && meta.last_page > 1 && (
-        <div className="flex justify-center items-center gap-3 mt-5">
+        <div className="flex justify-center items-center gap-3 mt-5 flex-shrink-0">
           <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← 前へ</Button>
           <span className="text-sm text-gray-500">{page} / {meta.last_page} ページ</span>
           <Button variant="outline" size="sm" disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}>次へ →</Button>
         </div>
       )}
+
     </div>
   );
 }

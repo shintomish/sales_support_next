@@ -6,10 +6,6 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-  Table, TableBody, TableCell,
-  TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 
 interface Deal {
   id: number; title: string; amount: number; status: string;
@@ -26,6 +22,19 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
 };
 const STATUSES = ['新規', '提案', '交渉', '成約', '失注'];
 const selectCls = 'border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+// ヘッダー・ボディで幅を揃えるcolgroup定義
+const ColGroup = () => (
+  <colgroup>
+    <col style={{ width: '22%' }} />
+    <col style={{ width: '16%' }} />
+    <col style={{ width: '13%' }} />
+    <col style={{ width: '10%' }} />
+    <col style={{ width: '14%' }} />
+    <col style={{ width: '14%' }} />
+    <col style={{ width: '11%' }} />
+  </colgroup>
+);
 
 function DealsPage() {
   const router       = useRouter();
@@ -107,8 +116,10 @@ function DealsPage() {
   const hasFilter = !!(search || statusFilter || customerFilter || amountMin || amountMax);
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="flex flex-col h-screen py-8 px-6 max-w-7xl mx-auto">
+
+      {/* ── タイトル ── */}
+      <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">商談一覧</h1>
           {meta && <p className="text-sm text-gray-400 mt-0.5">全 {meta.total} 件{hasFilter && ' （絞り込み中）'}</p>}
@@ -118,7 +129,8 @@ function DealsPage() {
         </Button>
       </div>
 
-      <Card className="mb-4 shadow-sm">
+      {/* ── 検索フィルタ ── */}
+      <Card className="mb-4 shadow-sm flex-shrink-0">
         <CardContent className="py-3 px-4 space-y-2">
           {/* 1行目: テキスト検索・ステータス・顧客 */}
           <div className="flex gap-2 items-center flex-wrap">
@@ -160,84 +172,130 @@ function DealsPage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-sm overflow-hidden">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50 hover:bg-gray-50">
-                <TableHead className="font-semibold text-gray-600 py-3">商談名</TableHead>
-                <TableHead className="font-semibold text-gray-600">顧客</TableHead>
-                <TableHead className="font-semibold text-gray-600">金額</TableHead>
-                <TableHead className="font-semibold text-gray-600">ステータス</TableHead>
-                <TableHead className="font-semibold text-gray-600">成約確度</TableHead>
-                <TableHead className="font-semibold text-gray-600">予定成約日</TableHead>
-                <TableHead className="font-semibold text-gray-600 text-center">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {deals.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="py-16">
-                  <div className="flex flex-col items-center gap-3 text-gray-400">
-                    <span className="text-5xl">💼</span>
-                    <p className="font-medium text-gray-500">
-                      {hasFilter ? '条件に一致する商談が見つかりません' : '商談が登録されていません'}
-                    </p>
-                    {!hasFilter && <Button size="sm" variant="outline" onClick={() => router.push('/deals/create')}>最初の商談を登録する</Button>}
-                  </div>
-                </TableCell></TableRow>
-              ) : deals.map(d => {
-                const style = STATUS_STYLE[d.status] ?? STATUS_STYLE['新規'];
-                return (
-                  <TableRow key={d.id}
-                    className="hover:bg-blue-50/40 cursor-pointer transition-colors border-b last:border-0"
-                    onClick={() => router.push(`/deals/${d.id}`)}>
-                    <TableCell className="font-semibold text-blue-600 py-3">{d.title}</TableCell>
-                    <TableCell>
-                      <button className="text-sm text-gray-500 hover:text-blue-500 hover:underline"
-                        onClick={e => { e.stopPropagation(); router.push(`/customers/${d.customer?.id}`); }}>
-                        {d.customer?.company_name ?? <span className="text-gray-300">—</span>}
-                      </button>
-                    </TableCell>
-                    <TableCell className="font-semibold text-gray-700">¥{Number(d.amount).toLocaleString()}</TableCell>
-                    <TableCell>
-                      <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                            style={{ backgroundColor: style.bg, color: style.color }}>{d.status}</span>
-                    </TableCell>
-                    <TableCell>
-                      {d.probability != null ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${d.probability}%` }} />
-                          </div>
-                          <span className="text-xs text-gray-500">{d.probability}%</span>
-                        </div>
-                      ) : <span className="text-gray-300">—</span>}
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-400">
-                      {d.expected_close_date ? new Date(d.expected_close_date).toLocaleDateString('ja-JP') : <span className="text-gray-300">—</span>}
-                    </TableCell>
-                    <TableCell onClick={e => e.stopPropagation()}>
-                      <div className="flex gap-1 justify-center">
-                        <button title="詳細" onClick={() => router.push(`/deals/${d.id}`)} className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-colors">👁</button>
-                        <button title="編集" onClick={() => router.push(`/deals/${d.id}/edit`)} className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-amber-100 hover:text-amber-600 transition-colors">✏️</button>
-                        <button title="削除" disabled={deletingId === d.id} onClick={() => handleDelete(d.id)} className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors disabled:opacity-40">🗑</button>
+      {/* ── テーブル（ボディのみスクロール） ── */}
+      <Card className="shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+        <CardContent className="p-0 flex flex-col h-full overflow-hidden">
+
+          {/* テーブルヘッダー（固定） */}
+          <div className="flex-shrink-0 border-b bg-gray-50">
+            <table className="w-full text-sm table-fixed">
+              <ColGroup />
+              <thead>
+                <tr>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">商談名</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">顧客</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">金額</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">ステータス</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">成約確度</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">予定成約日</th>
+                  <th className="font-semibold text-gray-600 py-3 px-4 text-center">操作</th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+
+          {/* テーブルボディ（スクロール） */}
+          <div className="overflow-y-auto flex-1">
+            <table className="w-full text-sm table-fixed">
+              <ColGroup />
+              <tbody>
+                {deals.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-16">
+                      <div className="flex flex-col items-center gap-3 text-gray-400">
+                        <span className="text-5xl">💼</span>
+                        <p className="font-medium text-gray-500">
+                          {hasFilter ? '条件に一致する商談が見つかりません' : '商談が登録されていません'}
+                        </p>
+                        {!hasFilter && (
+                          <Button size="sm" variant="outline" onClick={() => router.push('/deals/create')}>
+                            最初の商談を登録する
+                          </Button>
+                        )}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                    </td>
+                  </tr>
+                ) : deals.map((d, index) => {
+                  const style = STATUS_STYLE[d.status] ?? STATUS_STYLE['新規'];
+                  return (
+                    <tr
+                      key={d.id}
+                      className={`
+                        hover:bg-blue-50/60 cursor-pointer transition-colors border-b last:border-0
+                        ${index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}
+                      `}
+                      onClick={() => router.push(`/deals/${d.id}`)}
+                    >
+                      <td className="font-semibold text-blue-600 py-3 px-4 truncate">{d.title}</td>
+                      <td className="px-4">
+                        <button
+                          className="text-sm text-gray-500 hover:text-blue-500 hover:underline truncate block max-w-full"
+                          onClick={e => { e.stopPropagation(); router.push(`/customers/${d.customer?.id}`); }}
+                        >
+                          {d.customer?.company_name ?? <span className="text-gray-300">—</span>}
+                        </button>
+                      </td>
+                      <td className="font-semibold text-gray-700 px-4">¥{Number(d.amount).toLocaleString()}</td>
+                      <td className="px-4">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                          style={{ backgroundColor: style.bg, color: style.color }}
+                        >{d.status}</span>
+                      </td>
+                      <td className="px-4">
+                        {d.probability != null ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${d.probability}%` }} />
+                            </div>
+                            <span className="text-xs text-gray-500">{d.probability}%</span>
+                          </div>
+                        ) : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="text-sm text-gray-400 px-4">
+                        {d.expected_close_date
+                          ? new Date(d.expected_close_date).toLocaleDateString('ja-JP')
+                          : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4" onClick={e => e.stopPropagation()}>
+                        <div className="flex gap-1 justify-center">
+                          <button
+                            title="詳細"
+                            onClick={() => router.push(`/deals/${d.id}`)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                          >👁</button>
+                          <button
+                            title="編集"
+                            onClick={() => router.push(`/deals/${d.id}/edit`)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-amber-100 hover:text-amber-600 transition-colors"
+                          >✏️</button>
+                          <button
+                            title="削除"
+                            disabled={deletingId === d.id}
+                            onClick={() => handleDelete(d.id)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors disabled:opacity-40"
+                          >🗑</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
         </CardContent>
       </Card>
 
+      {/* ── ページネーション ── */}
       {meta && meta.last_page > 1 && (
-        <div className="flex justify-center items-center gap-3 mt-5">
+        <div className="flex justify-center items-center gap-3 mt-5 flex-shrink-0">
           <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← 前へ</Button>
           <span className="text-sm text-gray-500">{page} / {meta.last_page} ページ</span>
           <Button variant="outline" size="sm" disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}>次へ →</Button>
         </div>
       )}
+
     </div>
   );
 }
