@@ -2,16 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export async function proxy(request: NextRequest) {
-  const isLoginPage = request.nextUrl.pathname === '/login';
-  const token = request.cookies.get('auth_token')?.value;
-
-  if (!token && !isLoginPage) {
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
-  if (token && isLoginPage) {
-    return NextResponse.redirect(new URL('/business-cards', request.url));
-  }
-
+  // proxy.tsではクッキーチェックのみ行い
+  // クライアントサイドの認証チェックはlayoutに任せる
   return NextResponse.next();
 }
 

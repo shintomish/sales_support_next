@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { supabase } from '@/lib/supabase';
 
 const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -9,19 +10,13 @@ const apiClient = axios.create({
   },
 });
 
-// リクエストのたびにCookieからトークンを自動セット
-apiClient.interceptors.request.use((config) => {
-  if (typeof document !== 'undefined') {
-    const match = document.cookie.match(/auth_token=([^;]+)/);
-    if (match) {
-      config.headers['Authorization'] = `Bearer ${match[1]}`;
-    }
+// リクエストのたびにSupabaseセッションからJWTを自動セット
+apiClient.interceptors.request.use(async (config) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    config.headers['Authorization'] = `Bearer ${session.access_token}`;
   }
   return config;
 });
-
-export const getCsrfToken = async () => {
-  await apiClient.get('/sanctum/csrf-cookie');
-};
 
 export default apiClient;
