@@ -136,14 +136,18 @@ export default function BusinessCardsPage() {
                       key={card.id}
                       className={`
                         hover:bg-blue-50/60 cursor-pointer transition-colors border-b last:border-0
-                        ${index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}
+                        ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
                       `}
                       onClick={() => router.push(`/business-cards/${card.id}`)}
                     >
                       <td className="py-3 px-4">
                         {card.image_path ? (
                           <img
-                            src={`${process.env.NEXT_PUBLIC_API_URL}/storage/${card.image_path}`}
+                            src={
+                              card.image_path.startsWith('http')
+                                ? card.image_path  // Supabase URL
+                                : `${process.env.NEXT_PUBLIC_API_URL}/storage/${card.image_path}` // 旧ローカルパス
+                            }
                             alt={`${card.person_name ?? ''}の名刺`}
                             className="h-14 w-20 object-cover rounded-md shadow-sm border border-gray-100"
                           />
