@@ -136,7 +136,7 @@ export default function BusinessCardsPage() {
                       key={card.id}
                       className={`
                         hover:bg-blue-50/60 cursor-pointer transition-colors border-b last:border-0
-                        ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
+                        ${index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}
                       `}
                       onClick={() => router.push(`/business-cards/${card.id}`)}
                     >
