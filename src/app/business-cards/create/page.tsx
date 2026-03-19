@@ -3,7 +3,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
-import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -11,22 +10,6 @@ type SelectedFile = { file: File; preview: string; };
 
 const ACCEPT_TYPES = ['image/jpeg', 'image/png', 'image/jpg'];
 const MAX_SIZE_MB  = 10;
-const BUCKET       = 'business-cards';
-
-/** Supabase Storage に画像をアップロードして公開URLを返す */
-async function uploadToSupabase(file: File, tenantId: string): Promise<string> {
-  const ext      = file.name.split('.').pop();
-  const filename = `${tenantId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(filename, file, { contentType: file.type, upsert: false });
-
-  if (error) throw new Error(`Storage upload failed: ${error.message}`);
-
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filename);
-  return data.publicUrl;
-}
 
 export default function BusinessCardCreatePage() {
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
@@ -85,45 +68,37 @@ export default function BusinessCardCreatePage() {
 
     setUploading(true);
     setProgress(0);
-    setProgressLabel('Supabase にアップロード中...');
+    setProgressLabel('アップロード中...');
     setError(null);
 
+    // multipart/form-data で Laravel API に送信
+    // Laravel サーバーが Supabase Storage にアップロード → OCR 処理
+    const formData = new FormData();
+    selectedFiles.forEach(({ file }) => formData.append('images[]', file));
+
     try {
-      // ── Step 1: Supabase Storage に画像をアップロード ──
-      // tenant_id はLaravel APIから取得（/api/v1/me などがあれば使う）
-      // なければ 'default' をフォールバックとして使用
-      let tenantId = 'default';
-      try {
-        const meRes = await apiClient.get('/api/v1/me');
-        tenantId = String(meRes.data.tenant_id ?? 'default');
-      } catch {}
-
-      const imageUrls: string[] = [];
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const { file } = selectedFiles[i];
-        setProgressLabel(`Supabase にアップロード中... (${i + 1}/${selectedFiles.length})`);
-        setProgress(Math.round(((i + 0.5) / selectedFiles.length) * 60)); // 0〜60%
-
-        const url = await uploadToSupabase(file, tenantId);
-        imageUrls.push(url);
-      }
-
-      // ── Step 2: Laravel API に画像URLを送信してOCR・DB登録 ──
-      setProgressLabel('OCR処理中... しばらくお待ちください');
-      setProgress(70);
-
-      await apiClient.post('/api/v1/cards', {
-        image_urls: imageUrls,
+      await apiClient.post('/api/v1/cards', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (e) => {
+          if (e.total) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            setProgress(pct);
+            setProgressLabel(
+              pct < 100
+                ? `アップロード中... ${pct}%`
+                : 'OCR処理中... しばらくお待ちください'
+            );
+          }
+        },
       });
 
-      setProgress(100);
       selectedFiles.forEach(f => URL.revokeObjectURL(f.preview));
       router.push('/business-cards');
 
     } catch (err: any) {
       const messages: string[] = err.response?.data?.errors
         ? Object.values(err.response.data.errors).flat() as string[]
-        : [err.message ?? 'アップロードに失敗しました'];
+        : ['アップロードに失敗しました'];
       setError(messages.join(' / '));
       setUploading(false);
       setProgress(0);
@@ -250,7 +225,7 @@ export default function BusinessCardCreatePage() {
           <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
             <li>名刺の画像ファイルを選択またはドラッグ＆ドロップ</li>
             <li>複数枚を一度にアップロード可能</li>
-            <li>Supabase Storage に画像が保存され、OCR処理が実行されます</li>
+            <li>自動的にOCR処理が実行され、顧客・担当者が登録されます</li>
             <li>処理完了後、名刺一覧画面で確認できます</li>
           </ol>
         </CardContent>
