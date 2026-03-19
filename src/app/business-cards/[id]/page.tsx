@@ -107,7 +107,9 @@ export default function BusinessCardDetailPage() {
           <CardContent>
             {card.image_path ? (
               <img
-                src={`${process.env.NEXT_PUBLIC_API_URL}/storage/${card.image_path}`}
+                src={card.image_path.startsWith('http')
+                  ? card.image_path
+                  : `${process.env.NEXT_PUBLIC_API_URL}/storage/${card.image_path}`}
                 alt={`${card.person_name ?? ''}の名刺`}
                 className="w-full rounded-lg border border-gray-100 shadow-sm"
               />
