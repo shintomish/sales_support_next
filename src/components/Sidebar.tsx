@@ -31,6 +31,7 @@ export default function Sidebar() {
     { label: '活動履歴',       path: '/activities',     icon: '🕐',  badge: 0 },
     { label: 'タスク管理',     path: '/tasks',          icon: '☑',   badge: overdueCount },
     { label: '名刺管理',       path: '/business-cards', icon: '🪪',  badge: 0 },
+    { label: 'メール',         path: '/emails',         icon: '✉️',  badge: 0 },
   ];
 
   return (
