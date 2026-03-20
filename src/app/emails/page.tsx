@@ -15,7 +15,6 @@ type Email = {
   body_text: string | null
   body_html: string | null
   thread_id: string | null
-  body_text: string | null
   received_at: string
   is_read: boolean
   contact?: { id: number; name: string } | null
