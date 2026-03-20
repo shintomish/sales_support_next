@@ -11,6 +11,7 @@ type Email = {
   subject: string
   from_name: string | null
   from_address: string
+  to_address: string
   body_text: string | null
   received_at: string
   is_read: boolean
