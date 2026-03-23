@@ -519,8 +519,8 @@ function SesContractsPage() {
                   <div className="flex-shrink-0 border-b bg-gray-50">
                     <table className="w-full text-sm whitespace-nowrap">
                       <thead><tr>
-                        {['項番','氏名','顧客側 控除単価','控除h','超過単価','超過h','精算(分)','入金サイト','仕入側 控除単価','控除h','超過単価','超過h','支払サイト'].map(h => (
-                          <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left first:pl-4 text-xs">{h}</th>
+                        {['項番','氏名','顧客側 控除単価','控除h','超過単価','超過h','精算(分)','入金サイト','仕入側 控除単価','控除h②','超過単価②','超過h②','支払サイト'].map((h, i) => (
+                          <th key={i} className="font-semibold text-gray-600 py-3 px-3 text-left first:pl-4 text-xs">{h.replace('②','')}</th>
                         ))}
                       </tr></thead>
                     </table>
