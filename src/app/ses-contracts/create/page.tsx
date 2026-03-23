@@ -49,6 +49,7 @@ interface FormData {
   contract_period_start: string;
   contract_period_end: string;
   affiliation_period_end: string;
+  notes: string;
 }
 
 const initialForm: FormData = {
@@ -64,7 +65,7 @@ const initialForm: FormData = {
   vendor_deduction_unit_price: '', vendor_deduction_hours: '',
   vendor_overtime_unit_price: '', vendor_overtime_hours: '', vendor_payment_site: '',
   contract_start: '', contract_period_start: '', contract_period_end: '',
-  affiliation_period_end: '',
+  affiliation_period_end: '', notes: '',
 };
 
 export default function SesContractCreatePage() {
@@ -180,9 +181,13 @@ export default function SesContractCreatePage() {
               <label className={labelCls}>現場最寄駅</label>
               <Input value={form.nearest_station} onChange={set('nearest_station')} placeholder="渋谷" />
             </div>
-            <div className="md:col-span-2">
-              <label className={labelCls}>適格請求書番号 / 特記事項</label>
-              <Input value={form.invoice_number} onChange={set('invoice_number')} placeholder="T1234567890123 / 備考" />
+            <div>
+              <label className={labelCls}>適格請求書番号</label>
+              <Input value={form.invoice_number} onChange={set('invoice_number')} placeholder="T1234567890123" />
+            </div>
+            <div>
+              <label className={labelCls}>特記事項</label>
+              <Input value={form.notes} onChange={set('notes')} placeholder="備考・補足事項" />
             </div>
           </CardContent>
         </Card>

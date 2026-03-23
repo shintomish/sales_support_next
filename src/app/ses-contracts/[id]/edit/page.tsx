@@ -48,6 +48,7 @@ interface FormData {
   contract_period_start: string;
   contract_period_end: string;
   affiliation_period_end: string;
+  notes: string;
 }
 
 const toStr = (v: number | string | null | undefined): string =>
@@ -107,6 +108,7 @@ export default function SesContractEditPage() {
         contract_period_start:       toDateStr(d.contract_period_start),
         contract_period_end:         toDateStr(d.contract_period_end),
         affiliation_period_end:      toStr(d.affiliation_period_end),
+        notes:                       toStr(d.notes),
       });
     } catch (err: any) {
       if (err.response?.status === 401) router.push('/login');
@@ -242,9 +244,13 @@ export default function SesContractEditPage() {
               <label className={labelCls}>現場最寄駅</label>
               <Input value={form.nearest_station} onChange={set('nearest_station')} />
             </div>
-            <div className="md:col-span-2">
-              <label className={labelCls}>適格請求書番号 / 特記事項</label>
+            <div>
+              <label className={labelCls}>適格請求書番号</label>
               <Input value={form.invoice_number} onChange={set('invoice_number')} />
+            </div>
+            <div>
+              <label className={labelCls}>特記事項</label>
+              <Input value={form.notes} onChange={set('notes')} />
             </div>
           </CardContent>
         </Card>
