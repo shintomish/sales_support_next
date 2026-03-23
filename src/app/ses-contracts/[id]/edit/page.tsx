@@ -65,6 +65,7 @@ export default function SesContractEditPage() {
   const [form, setForm]           = useState<FormData | null>(null);
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
+  const [promoting, setPromoting] = useState(false);
   const [errors, setErrors]       = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'basic' | 'amount' | 'settlement' | 'work'>('basic');
 
@@ -123,6 +124,19 @@ export default function SesContractEditPage() {
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm(f => f ? { ...f, [key]: e.target.value } : f);
 
+
+  const handlePromote = async () => {
+    if (!confirm('この案件を商談管理に登録しますか？')) return;
+    setPromoting(true);
+    try {
+      const res = await apiClient.post(`/api/v1/ses-contracts/${id}/promote`);
+      alert(res.data.message);
+      router.push(`/deals/${res.data.deal_id}`);
+    } catch {
+      alert('登録に失敗しました');
+    } finally { setPromoting(false); }
+  };
+
   const handleSubmit = async () => {
     if (!form) return;
     if (!form.engineer_name.trim()) { setErrors({ engineer_name: '氏名は必須です' }); return; }
@@ -170,6 +184,10 @@ export default function SesContractEditPage() {
         <div className="flex gap-2">
           <Button onClick={handleSubmit} disabled={saving}>
             {saving ? '保存中...' : '💾 保存'}
+          </Button>
+          <Button variant="outline" disabled={promoting} onClick={handlePromote}
+            className="border-blue-300 text-blue-600 hover:bg-blue-50">
+            {promoting ? '登録中...' : '💼 商談管理に登録'}
           </Button>
           <Button variant="outline" onClick={() => router.push('/ses-contracts')}>← 戻る</Button>
         </div>
@@ -326,6 +344,10 @@ export default function SesContractEditPage() {
       <div className="flex justify-end gap-2 mt-6">
         <Button onClick={handleSubmit} disabled={saving}>
           {saving ? '保存中...' : '💾 保存する'}
+        </Button>
+        <Button variant="outline" disabled={promoting} onClick={handlePromote}
+          className="border-blue-300 text-blue-600 hover:bg-blue-50">
+          {promoting ? '登録中...' : '💼 商談管理に登録'}
         </Button>
         <Button variant="outline" onClick={() => router.push('/ses-contracts')}>キャンセル</Button>
       </div>
