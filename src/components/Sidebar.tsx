@@ -28,6 +28,7 @@ export default function Sidebar() {
     { label: '顧客管理',       path: '/customers',      icon: '👥',  badge: 0 },
     { label: '担当者管理',     path: '/contacts',       icon: '👤',  badge: 0 },
     { label: '商談管理',       path: '/deals',          icon: '💼',  badge: 0 },
+    { label: 'SES台帳',         path: '/ses-contracts',  icon: '📋',  badge: 0 },
     { label: '活動履歴',       path: '/activities',     icon: '🕐',  badge: 0 },
     { label: 'タスク管理',     path: '/tasks',          icon: '☑',   badge: overdueCount },
     { label: '名刺管理',       path: '/business-cards', icon: '🪪',  badge: 0 },
