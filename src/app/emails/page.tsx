@@ -229,7 +229,7 @@ export default function EmailsPage() {
               <div className="text-sm text-gray-600 space-y-1">
                 <p><span className="text-gray-400">差出人:</span> {fromLabel(selectedEmail)}</p>
                 <p><span className="text-gray-400">宛先:</span> {selectedEmail.to_address}</p>
-                <p><span className="text-gray-400">受信:</span> {new Date(selectedEmail.received_at).toLocaleString('ja-JP')}</p>
+                <p><span className="text-gray-400">受信:</span> {new Date(selectedEmail.received_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>
               </div>
             </div>
 
