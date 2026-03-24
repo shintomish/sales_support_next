@@ -52,6 +52,11 @@ interface SesContract {
   invoice_received_date: string | null;
   notes: string | null;
   days_until_expiry: number | null;
+  sales_person: string | null;
+  client_contact: string | null;
+  client_mobile: string | null;
+  client_phone: string | null;
+  client_fax: string | null;
 }
 
 interface Summary {
@@ -421,19 +426,31 @@ function SesContractsPage() {
               {columnGroup === 'basic' && (
                 <>
                   <div className="flex-shrink-0 border-b bg-gray-50">
-                    <table className="w-full text-sm whitespace-nowrap">
+                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1200px'}}>
+                      <colgroup>
+                        <col style={{width:'60px'}} /><col style={{width:'100px'}} /><col style={{width:'80px'}} />
+                        <col style={{width:'80px'}} /><col style={{width:'140px'}} /><col style={{width:'120px'}} />
+                        <col style={{width:'160px'}} /><col style={{width:'90px'}} /><col style={{width:'100px'}} />
+                        <col style={{width:'70px'}} /><col style={{width:'50px'}} />
+                      </colgroup>
                       <thead><tr>
-                        {['項番','氏名','変更種別','所属','顧客','エンド','案件名','最寄駅','ステータス','契約終了','残日数','操作'].map(h => (
+                        {['項番','氏名','変更種別','所属','顧客','エンド','案件名','ステータス','契約終了','残日数','操作'].map((h,i) => (
                           <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left first:pl-4 text-xs">{h}</th>
                         ))}
                       </tr></thead>
                     </table>
                   </div>
                   <div className="overflow-auto flex-1">
-                    <table className="w-full text-sm whitespace-nowrap">
+                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1200px'}}>
+                      <colgroup>
+                        <col style={{width:'60px'}} /><col style={{width:'100px'}} /><col style={{width:'80px'}} />
+                        <col style={{width:'80px'}} /><col style={{width:'140px'}} /><col style={{width:'120px'}} />
+                        <col style={{width:'160px'}} /><col style={{width:'90px'}} /><col style={{width:'100px'}} />
+                        <col style={{width:'70px'}} /><col style={{width:'50px'}} />
+                      </colgroup>
                       <tbody>
                         {contracts.length === 0 ? (
-                          <tr><td colSpan={12} className="py-16 text-center">
+                          <tr><td colSpan={12} colSpan={14} className="py-16 text-center">
                             <div className="flex flex-col items-center gap-3 text-gray-400">
                               <span className="text-5xl">📋</span>
                               <p>SES台帳が登録されていません</p>
@@ -449,13 +466,12 @@ function SesContractsPage() {
                               className={`hover:bg-blue-50/60 cursor-pointer transition-colors border-b last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/30'}`}
                               onClick={() => router.push(`/ses-contracts/${c.id}/edit`)}>
                               <td className="py-2.5 px-3 pl-4 text-gray-400 text-xs">{c.project_number ?? <Em />}</td>
-                              <td className="px-3 font-semibold text-blue-600 text-sm">{c.engineer_name ?? <Em />}</td>
+                              <td className="px-3 font-semibold text-blue-600 text-sm truncate max-w-0">{c.engineer_name ?? <Em />}</td>
                               <td className="px-3 text-xs text-gray-500">{c.change_type ?? <Em />}</td>
-                              <td className="px-3 text-xs text-gray-500">{c.affiliation ?? <Em />}</td>
+                              <td className="px-3 text-xs text-gray-500 truncate max-w-0">{c.affiliation ?? <Em />}</td>
                               <td className="px-3 text-xs text-gray-700 max-w-32 truncate">{c.customer_name ?? <Em />}</td>
                               <td className="px-3 text-xs text-gray-500 max-w-28 truncate">{c.end_client ?? <Em />}</td>
-                              <td className="px-3 text-xs text-gray-700 max-w-40 truncate">{c.project_name ?? <Em />}</td>
-                              <td className="px-3 text-xs text-gray-500">{c.nearest_station ?? <Em />}</td>
+                              <td className="px-3 text-xs text-gray-700 truncate max-w-0">{c.project_name ?? <Em />}</td>
                               <td className="px-3">
                                 <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
                                   style={{ backgroundColor: cfg.bg, color: cfg.color }}>{c.status}</span>
@@ -479,7 +495,13 @@ function SesContractsPage() {
               {columnGroup === 'amount' && (
                 <>
                   <div className="flex-shrink-0 border-b bg-gray-50">
-                    <table className="w-full text-sm whitespace-nowrap">
+                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1100px'}}>
+                      <colgroup>
+                        <col style={{width:'60px'}} /><col style={{width:'90px'}} /><col style={{width:'120px'}} />
+                        <col style={{width:'100px'}} /><col style={{width:'100px'}} /><col style={{width:'100px'}} />
+                        <col style={{width:'130px'}} /><col style={{width:'100px'}} /><col style={{width:'100px'}} />
+                        <col style={{width:'100px'}} /><col style={{width:'100px'}} />
+                      </colgroup>
                       <thead><tr>
                         {['項番','氏名','顧客','入金','支払+22%','支払+29%','営業支援費支払先','営業支援費','調整金額','利益','利益/29%'].map(h => (
                           <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left first:pl-4 text-xs">{h}</th>
@@ -488,15 +510,21 @@ function SesContractsPage() {
                     </table>
                   </div>
                   <div className="overflow-auto flex-1">
-                    <table className="w-full text-sm whitespace-nowrap">
+                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1100px'}}>
+                      <colgroup>
+                        <col style={{width:'60px'}} /><col style={{width:'90px'}} /><col style={{width:'120px'}} />
+                        <col style={{width:'100px'}} /><col style={{width:'100px'}} /><col style={{width:'100px'}} />
+                        <col style={{width:'130px'}} /><col style={{width:'100px'}} /><col style={{width:'100px'}} />
+                        <col style={{width:'100px'}} /><col style={{width:'100px'}} />
+                      </colgroup>
                       <tbody>
                         {contracts.map((c, idx) => (
                           <tr key={c.id}
                             className={`hover:bg-blue-50/60 cursor-pointer transition-colors border-b last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/30'}`}
                             onClick={() => router.push(`/ses-contracts/${c.id}/edit`)}>
                             <td className="py-2.5 px-3 pl-4 text-gray-400 text-xs">{c.project_number ?? <Em />}</td>
-                            <td className="px-3 font-semibold text-blue-600 text-xs">{c.engineer_name ?? <Em />}</td>
-                            <td className="px-3 text-xs text-gray-600 max-w-28 truncate">{c.customer_name ?? <Em />}</td>
+                            <td className="px-3 font-semibold text-blue-600 text-xs truncate max-w-0">{c.engineer_name ?? <Em />}</td>
+                            <td className="px-3 text-xs text-gray-600 truncate max-w-0">{c.customer_name ?? <Em />}</td>
                             <td className="px-3 text-sm font-semibold text-gray-800">{fmt(c.income_amount)}</td>
                             <td className="px-3 text-xs text-gray-600">{fmt(c.billing_plus_22)}</td>
                             <td className="px-3 text-xs text-gray-600">{fmt(c.billing_plus_29)}</td>
@@ -517,7 +545,14 @@ function SesContractsPage() {
               {columnGroup === 'settlement' && (
                 <>
                   <div className="flex-shrink-0 border-b bg-gray-50">
-                    <table className="w-full text-sm whitespace-nowrap">
+                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1100px'}}>
+                      <colgroup>
+                        <col style={{width:'55px'}} /><col style={{width:'90px'}} /><col style={{width:'100px'}} />
+                        <col style={{width:'65px'}} /><col style={{width:'90px'}} /><col style={{width:'65px'}} />
+                        <col style={{width:'70px'}} /><col style={{width:'80px'}} /><col style={{width:'100px'}} />
+                        <col style={{width:'65px'}} /><col style={{width:'90px'}} /><col style={{width:'65px'}} />
+                        <col style={{width:'80px'}} />
+                      </colgroup>
                       <thead><tr>
                         {['項番','氏名','顧客側 控除単価','控除h','超過単価','超過h','精算(分)','入金サイト','仕入側 控除単価','控除h②','超過単価②','超過h②','支払サイト'].map((h, i) => (
                           <th key={i} className="font-semibold text-gray-600 py-3 px-3 text-left first:pl-4 text-xs">{h.replace('②','')}</th>
@@ -526,14 +561,21 @@ function SesContractsPage() {
                     </table>
                   </div>
                   <div className="overflow-auto flex-1">
-                    <table className="w-full text-sm whitespace-nowrap">
+                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1100px'}}>
+                      <colgroup>
+                        <col style={{width:'55px'}} /><col style={{width:'90px'}} /><col style={{width:'100px'}} />
+                        <col style={{width:'65px'}} /><col style={{width:'90px'}} /><col style={{width:'65px'}} />
+                        <col style={{width:'70px'}} /><col style={{width:'80px'}} /><col style={{width:'100px'}} />
+                        <col style={{width:'65px'}} /><col style={{width:'90px'}} /><col style={{width:'65px'}} />
+                        <col style={{width:'80px'}} />
+                      </colgroup>
                       <tbody>
                         {contracts.map((c, idx) => (
                           <tr key={c.id}
                             className={`hover:bg-blue-50/60 cursor-pointer transition-colors border-b last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/30'}`}
                             onClick={() => router.push(`/ses-contracts/${c.id}/edit`)}>
                             <td className="py-2.5 px-3 pl-4 text-gray-400 text-xs">{c.project_number ?? <Em />}</td>
-                            <td className="px-3 font-semibold text-blue-600 text-xs">{c.engineer_name ?? <Em />}</td>
+                            <td className="px-3 font-semibold text-blue-600 text-xs truncate max-w-0">{c.engineer_name ?? <Em />}</td>
                             <td className="px-3 text-xs text-gray-600">{fmt(c.client_deduction_unit_price)}</td>
                             <td className="px-3 text-xs text-gray-600">{c.client_deduction_hours ?? '—'}</td>
                             <td className="px-3 text-xs text-gray-600">{fmt(c.client_overtime_unit_price)}</td>
@@ -557,23 +599,45 @@ function SesContractsPage() {
               {columnGroup === 'work' && (
                 <>
                   <div className="flex-shrink-0 border-b bg-gray-50">
-                    <table className="w-full text-sm whitespace-nowrap">
+                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1000px'}}>
+                      <colgroup>
+                        <col style={{width:'50px'}} /><col style={{width:'80px'}} /><col style={{width:'80px'}} />
+                        <col style={{width:'80px'}} /><col style={{width:'90px'}} /><col style={{width:'90px'}} />
+                        <col style={{width:'80px'}} /><col style={{width:'75px'}} /><col style={{width:'85px'}} />
+                        <col style={{width:'90px'}} /><col style={{width:'90px'}} /><col style={{width:'90px'}} />
+                        <col style={{width:'85px'}} /><col style={{width:'75px'}} /><col style={{width:'65px'}} />
+                        <col style={{width:'auto'}} />
+                      </colgroup>
                       <thead><tr>
-                        {['項番','氏名','契約開始','契約期間開始','契約期間終了','期間末(所属)','勤務表受領','交通費','請求書','特記事項'].map(h => (
+                        {['項番','氏名','自社担当者','所属担当者','客先担当者','携帯','TEL','FAX','契約開始','契約期間開始','契約期間終了','期間末(所属)','勤務表受領','交通費','請求書','特記事項'].map(h => (
                           <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left first:pl-4 text-xs">{h}</th>
                         ))}
                       </tr></thead>
                     </table>
                   </div>
                   <div className="overflow-auto flex-1">
-                    <table className="w-full text-sm whitespace-nowrap">
+                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1000px'}}>
+                      <colgroup>
+                        <col style={{width:'50px'}} /><col style={{width:'80px'}} /><col style={{width:'80px'}} />
+                        <col style={{width:'80px'}} /><col style={{width:'90px'}} /><col style={{width:'90px'}} />
+                        <col style={{width:'80px'}} /><col style={{width:'75px'}} /><col style={{width:'85px'}} />
+                        <col style={{width:'90px'}} /><col style={{width:'90px'}} /><col style={{width:'90px'}} />
+                        <col style={{width:'85px'}} /><col style={{width:'75px'}} /><col style={{width:'65px'}} />
+                        <col style={{width:'auto'}} />
+                      </colgroup>
                       <tbody>
                         {contracts.map((c, idx) => (
                           <tr key={c.id}
                             className={`hover:bg-blue-50/60 cursor-pointer transition-colors border-b last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/30'}`}
                             onClick={() => router.push(`/ses-contracts/${c.id}/edit`)}>
                             <td className="py-2.5 px-3 pl-4 text-gray-400 text-xs">{c.project_number ?? <Em />}</td>
-                            <td className="px-3 font-semibold text-blue-600 text-xs">{c.engineer_name ?? <Em />}</td>
+                            <td className="px-3 font-semibold text-blue-600 text-xs truncate max-w-0">{c.engineer_name ?? <Em />}</td>
+                            <td className="px-3 text-xs text-gray-500 truncate max-w-0">{c.sales_person ?? <Em />}</td>
+                            <td className="px-3 text-xs text-gray-500 truncate max-w-0">{c.affiliation_contact ?? <Em />}</td>
+                            <td className="px-3 text-xs text-gray-500 truncate max-w-0">{c.client_contact ?? <Em />}</td>
+                            <td className="px-3 text-xs text-gray-500">{c.client_mobile ?? <Em />}</td>
+                            <td className="px-3 text-xs text-gray-500">{c.client_phone ?? <Em />}</td>
+                            <td className="px-3 text-xs text-gray-500">{c.client_fax ?? <Em />}</td>
                             <td className="px-3 text-xs text-gray-500">{fmtDate(c.contract_start)}</td>
                             <td className="px-3 text-xs text-gray-500">{fmtDate(c.contract_period_start)}</td>
                             <td className="px-3 text-xs text-gray-500">{fmtDate(c.contract_period_end)}</td>
