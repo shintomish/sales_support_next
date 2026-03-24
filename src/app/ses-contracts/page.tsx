@@ -450,7 +450,7 @@ function SesContractsPage() {
                       </colgroup>
                       <tbody>
                         {contracts.length === 0 ? (
-                          <tr><td colSpan={12} colSpan={14} className="py-16 text-center">
+                          <tr><td colSpan={11} className="py-16 text-center">
                             <div className="flex flex-col items-center gap-3 text-gray-400">
                               <span className="text-5xl">📋</span>
                               <p>SES台帳が登録されていません</p>
