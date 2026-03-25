@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useUnreadEmailCount } from '@/hooks/useUnreadEmailCount';
 import NotificationToast from '@/components/NotificationToast';
 
 export default function Sidebar() {
@@ -14,8 +15,9 @@ export default function Sidebar() {
   const user     = useAuthStore((state) => state.user);
 
   const { data: notifData } = useNotifications();
-  const overdueCount = notifData?.overdue_tasks_count ?? 0;
-  const overdueTasks = notifData?.overdue_tasks ?? [];
+  const overdueCount  = notifData?.overdue_tasks_count ?? 0;
+  const overdueTasks  = notifData?.overdue_tasks ?? [];
+  const unreadEmails  = useUnreadEmailCount();
 
   const handleLogout = async () => {
     try { await logout(); } catch {}
@@ -32,7 +34,7 @@ export default function Sidebar() {
     { label: '活動履歴',       path: '/activities',     icon: '🕐',  badge: 0 },
     { label: 'タスク管理',     path: '/tasks',          icon: '☑',   badge: overdueCount },
     { label: '名刺管理',       path: '/business-cards', icon: '🪪',  badge: 0 },
-    { label: 'メール',         path: '/emails',         icon: '✉️',  badge: 0 },
+    { label: 'メール',         path: '/emails',         icon: '✉️',  badge: unreadEmails },
   ];
 
   return (
