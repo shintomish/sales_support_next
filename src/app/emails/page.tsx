@@ -1,10 +1,17 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from '@/lib/axios'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
+import { createClient } from '@supabase/supabase-js'
+
+// ── Supabase クライアント（Realtime用）────────────────────
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 type Email = {
   id: number
@@ -40,6 +47,10 @@ export default function EmailsPage() {
   const [connectUrl, setConnectUrl] = useState('')
   const [page, setPage] = useState(1)
   const [syncMessage, setSyncMessage] = useState('')
+  const [newEmailCount, setNewEmailCount] = useState(0) // 新着バッジ用
+
+  // fetchEmails を Realtime から参照するために ref で保持
+  const fetchEmailsRef = useRef<() => void>(() => {})
 
   // Gmail接続状態確認
   useEffect(() => {
@@ -64,9 +75,43 @@ export default function EmailsPage() {
       params: { search, unread: unreadOnly ? 1 : undefined, page, per_page: 30 }
     })
     setEmails(res.data)
+    setNewEmailCount(0) // 取得したらバッジをリセット
   }, [search, unreadOnly, page])
 
+  // ref を最新の fetchEmails に同期
+  useEffect(() => {
+    fetchEmailsRef.current = fetchEmails
+  }, [fetchEmails])
+
   useEffect(() => { fetchEmails() }, [fetchEmails])
+
+  // ── Supabase Realtime 購読 ────────────────────────────
+  useEffect(() => {
+    const channel = supabase
+      .channel('emails-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',       // 新規メール挿入を検知
+          schema: 'public',
+          table: 'emails',
+        },
+        (payload) => {
+          console.log('[Realtime] 新着メール:', payload.new)
+          // ページ1表示中なら即リロード、それ以外はバッジ表示
+          if (page === 1 && !search && !unreadOnly) {
+            fetchEmailsRef.current()
+          } else {
+            setNewEmailCount(c => c + 1)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [page, search, unreadOnly]) // フィルタ変化時に再購読
 
   // Gmail認証URL取得
   const handleConnect = async () => {
@@ -110,7 +155,18 @@ export default function EmailsPage() {
         {/* ヘッダー */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-semibold text-gray-900">メール</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-gray-900">メール</h1>
+              {/* 新着バッジ */}
+              {newEmailCount > 0 && (
+                <button
+                  onClick={() => { setPage(1); fetchEmails(); }}
+                  className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full animate-pulse hover:bg-blue-600"
+                >
+                  +{newEmailCount} 新着
+                </button>
+              )}
+            </div>
             <div className="flex gap-2">
               {!gmailConnected ? (
                 <button
