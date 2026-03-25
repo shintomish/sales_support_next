@@ -22,9 +22,16 @@ interface FormData {
   email: string;
   phone: string;
   change_type: string;
+  sales_person: string;
   nearest_station: string;
   status: string;
   invoice_number: string;
+  // 客先担当者（追加）
+  client_contact: string;
+  client_mobile: string;
+  client_phone: string;
+  client_fax: string;
+  // 金額
   income_amount: string;
   billing_plus_22: string;
   billing_plus_29: string;
@@ -33,6 +40,7 @@ interface FormData {
   adjustment_amount: string;
   profit: string;
   profit_rate_29: string;
+  // 精算条件
   client_deduction_unit_price: string;
   client_deduction_hours: string;
   client_overtime_unit_price: string;
@@ -44,10 +52,15 @@ interface FormData {
   vendor_overtime_unit_price: string;
   vendor_overtime_hours: string;
   vendor_payment_site: string;
+  // 契約期間
   contract_start: string;
   contract_period_start: string;
   contract_period_end: string;
   affiliation_period_end: string;
+  // 勤務表・請求書（追加）
+  timesheet_received_date: string;
+  transportation_fee: string;
+  invoice_received_date: string;
   notes: string;
 }
 
@@ -83,9 +96,16 @@ export default function SesContractEditPage() {
         email:                       toStr(d.email),
         phone:                       toStr(d.phone),
         change_type:                 toStr(d.change_type),
+        sales_person:                toStr(d.sales_person),
         nearest_station:             toStr(d.nearest_station),
         status:                      toStr(d.status) || '稼働中',
         invoice_number:              toStr(d.invoice_number),
+        // 客先担当者
+        client_contact:              toStr(d.client_contact),
+        client_mobile:               toStr(d.client_mobile),
+        client_phone:                toStr(d.client_phone),
+        client_fax:                  toStr(d.client_fax),
+        // 金額
         income_amount:               toStr(d.income_amount),
         billing_plus_22:             toStr(d.billing_plus_22),
         billing_plus_29:             toStr(d.billing_plus_29),
@@ -94,6 +114,7 @@ export default function SesContractEditPage() {
         adjustment_amount:           toStr(d.adjustment_amount),
         profit:                      toStr(d.profit),
         profit_rate_29:              toStr(d.profit_rate_29),
+        // 精算条件
         client_deduction_unit_price: toStr(d.client_deduction_unit_price),
         client_deduction_hours:      toStr(d.client_deduction_hours),
         client_overtime_unit_price:  toStr(d.client_overtime_unit_price),
@@ -105,10 +126,15 @@ export default function SesContractEditPage() {
         vendor_overtime_unit_price:  toStr(d.vendor_overtime_unit_price),
         vendor_overtime_hours:       toStr(d.vendor_overtime_hours),
         vendor_payment_site:         toStr(d.vendor_payment_site),
+        // 契約期間
         contract_start:              toDateStr(d.contract_start),
         contract_period_start:       toDateStr(d.contract_period_start),
         contract_period_end:         toDateStr(d.contract_period_end),
         affiliation_period_end:      toStr(d.affiliation_period_end),
+        // 勤務表・請求書
+        timesheet_received_date:     toDateStr(d.timesheet_received_date),
+        transportation_fee:          toStr(d.transportation_fee),
+        invoice_received_date:       toDateStr(d.invoice_received_date),
         notes:                       toStr(d.notes),
       });
     } catch (err: any) {
@@ -123,7 +149,6 @@ export default function SesContractEditPage() {
   const set = (key: keyof FormData) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm(f => f ? { ...f, [key]: e.target.value } : f);
-
 
   const handlePromote = async () => {
     if (!confirm('この案件を商談管理に登録しますか？')) return;
@@ -209,69 +234,98 @@ export default function SesContractEditPage() {
 
       {/* 基本情報 */}
       {activeTab === 'basic' && (
-        <Card className="shadow-sm">
-          <CardHeader><CardTitle className="text-base text-gray-700">基本情報</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>氏名 <span className="text-red-500">*</span></label>
-              <Input value={form.engineer_name} onChange={set('engineer_name')}
-                className={errors.engineer_name ? 'border-red-400' : ''} />
-              {errors.engineer_name && <p className="text-xs text-red-500 mt-1">{errors.engineer_name}</p>}
-            </div>
-            <div>
-              <label className={labelCls}>顧客（所属先） <span className="text-red-500">*</span></label>
-              <Input value={form.customer_name} onChange={set('customer_name')}
-                className={errors.customer_name ? 'border-red-400' : ''} />
-              {errors.customer_name && <p className="text-xs text-red-500 mt-1">{errors.customer_name}</p>}
-            </div>
-            <div>
-              <label className={labelCls}>エンド（常駐先）</label>
-              <Input value={form.end_client} onChange={set('end_client')} />
-            </div>
-            <div>
-              <label className={labelCls}>案件名</label>
-              <Input value={form.project_name} onChange={set('project_name')} />
-            </div>
-            <div>
-              <label className={labelCls}>変更種別</label>
-              <Input value={form.change_type} onChange={set('change_type')} placeholder="新規・変更無 等" />
-            </div>
-            <div>
-              <label className={labelCls}>ステータス</label>
-              <select value={form.status} onChange={set('status')} className={selectCls}>
-                {SES_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>所属</label>
-              <Input value={form.affiliation} onChange={set('affiliation')} placeholder="社員・フリー 等" />
-            </div>
-            <div>
-              <label className={labelCls}>所属担当者</label>
-              <Input value={form.affiliation_contact} onChange={set('affiliation_contact')} />
-            </div>
-            <div>
-              <label className={labelCls}>メール</label>
-              <Input type="email" value={form.email} onChange={set('email')} />
-            </div>
-            <div>
-              <label className={labelCls}>TEL</label>
-              <Input value={form.phone} onChange={set('phone')} />
-            </div>
-            <div>
-              <label className={labelCls}>現場最寄駅</label>
-              <Input value={form.nearest_station} onChange={set('nearest_station')} />
-            </div>
-            <div>
-              <label className={labelCls}>適格請求書番号</label>
-              <Input value={form.invoice_number} onChange={set('invoice_number')} />
-            </div>
-            <div>
-              <label className={labelCls}>特記事項</label>
-              <Input value={form.notes} onChange={set('notes')} />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="text-base text-gray-700">基本情報</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>氏名 <span className="text-red-500">*</span></label>
+                <Input value={form.engineer_name} onChange={set('engineer_name')}
+                  className={errors.engineer_name ? 'border-red-400' : ''} />
+                {errors.engineer_name && <p className="text-xs text-red-500 mt-1">{errors.engineer_name}</p>}
+              </div>
+              <div>
+                <label className={labelCls}>顧客（所属先） <span className="text-red-500">*</span></label>
+                <Input value={form.customer_name} onChange={set('customer_name')}
+                  className={errors.customer_name ? 'border-red-400' : ''} />
+                {errors.customer_name && <p className="text-xs text-red-500 mt-1">{errors.customer_name}</p>}
+              </div>
+              <div>
+                <label className={labelCls}>エンド（常駐先）</label>
+                <Input value={form.end_client} onChange={set('end_client')} />
+              </div>
+              <div>
+                <label className={labelCls}>案件名</label>
+                <Input value={form.project_name} onChange={set('project_name')} />
+              </div>
+              <div>
+                <label className={labelCls}>変更種別</label>
+                <Input value={form.change_type} onChange={set('change_type')} placeholder="新規・変更無 等" />
+              </div>
+              <div>
+                <label className={labelCls}>自社担当者</label>
+                <Input value={form.sales_person} onChange={set('sales_person')} />
+              </div>
+              <div>
+                <label className={labelCls}>ステータス</label>
+                <select value={form.status} onChange={set('status')} className={selectCls}>
+                  {SES_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>所属</label>
+                <Input value={form.affiliation} onChange={set('affiliation')} placeholder="社員・フリー 等" />
+              </div>
+              <div>
+                <label className={labelCls}>所属担当者</label>
+                <Input value={form.affiliation_contact} onChange={set('affiliation_contact')} />
+              </div>
+              <div>
+                <label className={labelCls}>メール（技術者）</label>
+                <Input type="email" value={form.email} onChange={set('email')} />
+              </div>
+              <div>
+                <label className={labelCls}>TEL（技術者）</label>
+                <Input value={form.phone} onChange={set('phone')} />
+              </div>
+              <div>
+                <label className={labelCls}>現場最寄駅</label>
+                <Input value={form.nearest_station} onChange={set('nearest_station')} />
+              </div>
+              <div>
+                <label className={labelCls}>適格請求書番号</label>
+                <Input value={form.invoice_number} onChange={set('invoice_number')} />
+              </div>
+              <div className="md:col-span-2">
+                <label className={labelCls}>特記事項</label>
+                <Input value={form.notes} onChange={set('notes')} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 客先担当者（追加） */}
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="text-base text-gray-700">客先担当者</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>担当者名</label>
+                <Input value={form.client_contact} onChange={set('client_contact')} />
+              </div>
+              <div>
+                <label className={labelCls}>携帯</label>
+                <Input value={form.client_mobile} onChange={set('client_mobile')} />
+              </div>
+              <div>
+                <label className={labelCls}>TEL</label>
+                <Input value={form.client_phone} onChange={set('client_phone')} />
+              </div>
+              <div>
+                <label className={labelCls}>FAX</label>
+                <Input value={form.client_fax} onChange={set('client_fax')} />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* 金額 */}
@@ -330,15 +384,36 @@ export default function SesContractEditPage() {
 
       {/* 契約・SES */}
       {activeTab === 'work' && (
-        <Card className="shadow-sm">
-          <CardHeader><CardTitle className="text-base text-gray-700">契約期間・SES情報</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div><label className={labelCls}>契約開始</label><Input type="date" value={form.contract_start} onChange={set('contract_start')} /></div>
-            <div><label className={labelCls}>契約期間 開始</label><Input type="date" value={form.contract_period_start} onChange={set('contract_period_start')} /></div>
-            <div><label className={labelCls}>契約期間 終了</label><Input type="date" value={form.contract_period_end} onChange={set('contract_period_end')} /></div>
-            <div><label className={labelCls}>期間末（所属）</label><Input value={form.affiliation_period_end} onChange={set('affiliation_period_end')} placeholder="2026/03末" /></div>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="text-base text-gray-700">契約期間</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div><label className={labelCls}>契約開始</label><Input type="date" value={form.contract_start} onChange={set('contract_start')} /></div>
+              <div><label className={labelCls}>契約期間 開始</label><Input type="date" value={form.contract_period_start} onChange={set('contract_period_start')} /></div>
+              <div><label className={labelCls}>契約期間 終了</label><Input type="date" value={form.contract_period_end} onChange={set('contract_period_end')} /></div>
+              <div><label className={labelCls}>期間末（所属）</label><Input value={form.affiliation_period_end} onChange={set('affiliation_period_end')} placeholder="2026/03末" /></div>
+            </CardContent>
+          </Card>
+
+          {/* 勤務表・請求書（追加） */}
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="text-base text-gray-700">勤務表・請求書</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>勤務表 受領日</label>
+                <Input type="date" value={form.timesheet_received_date} onChange={set('timesheet_received_date')} />
+              </div>
+              <div>
+                <label className={labelCls}>交通費</label>
+                <Input type="number" value={form.transportation_fee} onChange={set('transportation_fee')} placeholder="0" />
+              </div>
+              <div>
+                <label className={labelCls}>請求書 受領日</label>
+                <Input type="date" value={form.invoice_received_date} onChange={set('invoice_received_date')} />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <div className="flex justify-end gap-2 mt-6">

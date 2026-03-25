@@ -82,7 +82,7 @@ const COLUMN_GROUPS: { key: ColumnGroup; label: string }[] = [
   { key: 'basic',      label: '📋 基本' },
   { key: 'amount',     label: '💰 金額' },
   { key: 'settlement', label: '⚖️ 精算条件' },
-  { key: 'work',       label: '📅 勤務表・SES' },
+  { key: 'work',       label: '📅 契約・SES' },
 ];
 
 const SES_STATUSES = ['稼働中', '更新交渉中', '期限切れ', '新規', '提案', '交渉', '成約', '失注'];
