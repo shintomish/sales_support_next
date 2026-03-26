@@ -107,8 +107,21 @@ export default function EmailsPage() {
     }
   }, [page, search, unreadOnly]) // フィルタ変化時に再購読
 
-  // Gmail認証URL取得
-  const handleConnect = async () => {
+  const [markingAllRead, setMarkingAllRead] = useState(false)
+
+  // 全件既読
+  const handleMarkAllRead = async () => {
+    setMarkingAllRead(true)
+    try {
+      const res = await axios.post('/api/v1/emails/mark-all-read')
+      setSyncMessage(res.data.message)
+      fetchEmails()
+    } catch {
+      setSyncMessage('既読処理に失敗しました')
+    } finally {
+      setMarkingAllRead(false)
+    }
+  }
     const res = await axios.get('/api/v1/gmail/redirect')
     window.location.href = res.data.url
   }
@@ -170,13 +183,22 @@ export default function EmailsPage() {
                   Gmail接続
                 </button>
               ) : (
-                <button
-                  onClick={handleSync}
-                  disabled={syncing}
-                  className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50"
-                >
-                  {syncing ? '同期中...' : '同期'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleMarkAllRead}
+                    disabled={markingAllRead}
+                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50"
+                  >
+                    {markingAllRead ? '処理中...' : '全て既読'}
+                  </button>
+                  <button
+                    onClick={handleSync}
+                    disabled={syncing}
+                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50"
+                  >
+                    {syncing ? '同期中...' : '同期'}
+                  </button>
+                </div>
               )}
             </div>
           </div>
