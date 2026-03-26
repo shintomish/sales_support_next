@@ -260,7 +260,7 @@ export default function EmailsPage() {
                   </span>
                 </div>
                 <span className="text-xs text-gray-400 flex-shrink-0">
-                  {formatDistanceToNow(new Date(email.received_at + 'Z'), { locale: ja, addSuffix: true })}
+                  {formatDistanceToNow(new Date(email.received_at.endsWith('Z') ? email.received_at : email.received_at + 'Z'), { locale: ja, addSuffix: true })}
                 </span>
               </div>
               <p className={`text-sm mt-0.5 truncate ${!email.is_read ? 'font-medium text-gray-800' : 'text-gray-600'}`}>
