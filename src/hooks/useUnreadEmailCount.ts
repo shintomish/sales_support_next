@@ -1,13 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import apiClient from '@/lib/axios';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export function useUnreadEmailCount() {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -24,7 +19,7 @@ export function useUnreadEmailCount() {
   useEffect(() => {
     fetchUnreadCount();
 
-    // Realtime購読：新着メールが来たら未読数を再取得
+    // Realtime購読：新着・既読更新時に未読数を再取得
     const channel = supabase
       .channel('sidebar-emails-unread')
       .on(

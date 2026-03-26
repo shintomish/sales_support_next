@@ -5,13 +5,7 @@ import axios from '@/lib/axios'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { createClient } from '@supabase/supabase-js'
-
-// ── Supabase クライアント（Realtime用）────────────────────
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+import { supabase } from '@/lib/supabase'
 
 type Email = {
   id: number
