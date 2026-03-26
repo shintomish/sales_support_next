@@ -17,7 +17,7 @@ export default function Sidebar() {
   const { data: notifData } = useNotifications();
   const overdueCount  = notifData?.overdue_tasks_count ?? 0;
   const overdueTasks  = notifData?.overdue_tasks ?? [];
-  const unreadEmails  = useUnreadEmailCount();
+  const { unreadCount: unreadEmails } = useUnreadEmailCount();
 
   const handleLogout = async () => {
     try { await logout(); } catch {}

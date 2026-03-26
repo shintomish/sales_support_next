@@ -1,20 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import apiClient from '@/lib/axios';
 
 export function useUnreadEmailCount() {
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const fetchUnreadCount = async () => {
+  const fetchUnreadCount = useCallback(async () => {
     try {
       const res = await apiClient.get('/api/v1/emails/unread-count');
       setUnreadCount(res.data.count ?? 0);
     } catch {
       // 取得失敗時は0のまま
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchUnreadCount();
@@ -34,8 +34,15 @@ export function useUnreadEmailCount() {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+    // 全件既読ボタン押下時のカスタムイベントを受信
+    const handleMarkAllRead = () => { fetchUnreadCount(); };
+    window.addEventListener('emails:mark-all-read', handleMarkAllRead);
 
-  return unreadCount;
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('emails:mark-all-read', handleMarkAllRead);
+    };
+  }, [fetchUnreadCount]);
+
+  return { unreadCount, fetchUnreadCount };
 }
