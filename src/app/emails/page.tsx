@@ -7,6 +7,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { supabase } from '@/lib/supabase'
 
+
 type Email = {
   id: number
   subject: string
@@ -260,7 +261,21 @@ export default function EmailsPage() {
                   </span>
                 </div>
                 <span className="text-xs text-gray-400 flex-shrink-0">
-                  {email.received_at ? formatDistanceToNow(new Date(email.received_at.replace(' ', 'T') + 'Z'), { locale: ja, addSuffix: true }) : '—'}
+                  {(() => {
+                    try {
+                      if (!email.received_at) return '—';
+                      const raw = email.received_at;
+                      // UTCとして強制解釈（Z付与）
+                      const dateStr = raw.endsWith('Z') ? raw
+                        : raw.includes('T') ? raw + 'Z'
+                        : raw.replace(' ', 'T') + 'Z';
+                      const d = new Date(dateStr);
+                      if (isNaN(d.getTime())) return '—';
+                      return formatDistanceToNow(d, { locale: ja, addSuffix: true });
+                    } catch {
+                      return '—';
+                    }
+                  })()}
                 </span>
               </div>
               <p className={`text-sm mt-0.5 truncate ${!email.is_read ? 'font-medium text-gray-800' : 'text-gray-600'}`}>
@@ -307,7 +322,7 @@ export default function EmailsPage() {
               <div className="text-sm text-gray-600 space-y-1">
                 <p><span className="text-gray-400">差出人:</span> {fromLabel(selectedEmail)}</p>
                 <p><span className="text-gray-400">宛先:</span> {selectedEmail.to_address}</p>
-                <p><span className="text-gray-400">受信:</span> {new Date(selectedEmail.received_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>
+                <p><span className="text-gray-400">受信:</span> {(() => { const r = selectedEmail.received_at; const s = r.replace(" ", "T") + (r.endsWith("Z") ? "" : "Z"); return new Date(s).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }); })()}</p>
               </div>
             </div>
 
