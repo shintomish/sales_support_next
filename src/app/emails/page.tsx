@@ -122,6 +122,9 @@ export default function EmailsPage() {
       setMarkingAllRead(false)
     }
   }
+
+  // Gmail認証URL取得
+  const handleConnect = async () => {
     const res = await axios.get('/api/v1/gmail/redirect')
     window.location.href = res.data.url
   }
