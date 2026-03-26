@@ -69,7 +69,8 @@ export default function EmailsPage() {
       params: { search, unread: unreadOnly ? 1 : undefined, page, per_page: 30 }
     })
     setEmails(res.data)
-    setNewEmailCount(0) // 取得したらバッジをリセット
+    setNewEmailCount(0)   // 新着バッジリセット
+    setSyncMessage('')    // メッセージリセット
   }, [search, unreadOnly, page])
 
   // ref を最新の fetchEmails に同期
@@ -114,8 +115,8 @@ export default function EmailsPage() {
     setMarkingAllRead(true)
     try {
       const res = await axios.post('/api/v1/emails/mark-all-read')
-      setSyncMessage(res.data.message)
-      fetchEmails()
+      await fetchEmails()                  // リスト更新（syncMessageがリセットされる）
+      setSyncMessage(res.data.message)     // その後メッセージを上書きセット
     } catch {
       setSyncMessage('既読処理に失敗しました')
     } finally {
