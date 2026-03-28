@@ -19,17 +19,12 @@ export function useUnreadEmailCount() {
   useEffect(() => {
     fetchUnreadCount();
 
-    // Realtime購読：新着・既読更新時に未読数を再取得
+    // Realtime購読：新着メールのINSERTのみ検知（UPDATEは無限ループになるため除外）
     const channel = supabase
       .channel('sidebar-emails-unread')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'emails' },
-        () => { fetchUnreadCount(); }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'emails' },
         () => { fetchUnreadCount(); }
       )
       .subscribe();
