@@ -1,6 +1,7 @@
 // src/hooks/useNotifications.ts
 import { useState, useEffect, useCallback } from 'react';
 import apiClient from '@/lib/axios';
+import { supabase } from '@/lib/supabase';
 
 export interface OverdueTask {
   id: number;
@@ -34,7 +35,21 @@ export function useNotifications() {
     fetch();
     // 5分ごとに再取得
     const timer = setInterval(fetch, 5 * 60 * 1000);
-    return () => clearInterval(timer);
+
+    // タスク更新時に即時再取得（期限日変更でバッジを即反映）
+    const channel = supabase
+      .channel('notifications-tasks')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tasks' },
+        () => { fetch(); }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(timer);
+      supabase.removeChannel(channel);
+    };
   }, [fetch]);
 
   return { data, loading, refetch: fetch };
