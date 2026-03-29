@@ -1,118 +1,67 @@
-# 営業支援システム - Next.js フロントエンド
+# CLAUDE.md - sales_support_next（Next.js フロントエンド）
 
 ## プロジェクト概要
-SES企業向け営業支援システムのフロントエンド。Next.js 15 + TypeScript + Supabase Auth。
-
-## 環境構成
-| 環境 | URL |
-|------|-----|
-| ローカル | http://localhost:3000 |
-| 本番（Vercel） | https://app.ai-mon.net |
-| API（ローカル） | http://localhost:8090 |
-| API（本番） | https://sales.ai-mon.net |
+SES企業向け営業支援システムのフロントエンド。
+Next.js 15 + Supabase Auth + Vercel構成。
 
 ## 技術スタック
-- Next.js 15, TypeScript
-- Tailwind CSS, shadcn/ui
+- Next.js 15 / TypeScript
+- Tailwind CSS / shadcn/ui
 - Supabase Auth（ES256 JWT）
-- Supabase Realtime
 - Zustand（authStore）
-- Vercel（自動デプロイ）
+- Supabase Realtime（tasks/deals/activities/business_cards）
+- Vercel（本番自動デプロイ）
 
-## よく使うコマンド
-
-### 開発サーバー起動
+## ローカル起動
 ```bash
 cd ~/sales_support_next
 npm run dev
+# フロント: http://localhost:3000
+# ※ WSL2環境ではWATCHPACK_POLLING=true が .env.local に必要
 ```
 
-### ビルドエラー時
-```bash
-rm -rf .next
-npm run dev
+## 環境変数（.env.local）
+```
+NEXT_PUBLIC_API_URL=http://localhost:8090
+NEXT_PUBLIC_SUPABASE_URL=https://smzoqpvaxznqcwrsgjju.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGci...
+WATCHPACK_POLLING=true
 ```
 
-### パッケージ追加後
-```bash
-npm install
+## 重要な注意点
+- ルートファイルは必ずpage.tsxという名前にする
+- Supabase Storage直接アップロードはRLS違反→Laravel経由でservice_roleキー使用
+- レガシー画像パス: startsWith('http')で判定してURL切り替え
+- Realtimeループ防止: UPDATEイベント購読しない（DB書き込み→UPDATE→無限ループ）
+- 未読バッジリセットはカスタムDOMイベント(emails:mark-all-read)で対応
+
+## ディレクトリ構成
+```
+src/
+├── app/
+│   ├── dashboard/
+│   ├── customers/
+│   ├── contacts/
+│   ├── deals/
+│   ├── activities/
+│   ├── tasks/
+│   ├── business-cards/
+│   └── emails/
+├── lib/         # axios.ts, supabase.ts
+├── store/       # authStore.ts（Zustand）
+├── components/  # Sidebar, RealtimeToast等
+└── hooks/       # useRealtimeNotifications
 ```
 
-## デプロイ手順
+## 本番デプロイ
 ```bash
-cd ~/sales_support_next
-git add .
-git commit -m "feat: ..."
 git push origin main
 # → Vercel自動デプロイ
 ```
 
-## 重要な注意事項
-
-### WSL2環境
-Turbopackがファイル変更を検知できない場合：
+## 長期記憶の参照方法
+過去のセッションで議論した設計判断・トラブル対応は以下で検索できる:
 ```bash
-# .env.localに追加
-WATCHPACK_POLLING=true
+cd ~/memory_engine
+uv run python search_memory.py "検索したい内容" --project sales_support_next
 ```
-
-### 環境変数（.env.local）
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8090
-NEXT_PUBLIC_SUPABASE_URL=https://smzoqpvaxznqcwrsgjju.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
-```
-
-### Supabaseクライアント
-複数インスタンス作成禁止。必ず共通クライアントを使用：
-```typescript
-import { supabase } from '@/lib/supabase'
-```
-
-### 認証フロー
-1. Supabase Authでログイン → JWT取得
-2. axios.tsのインターセプターでJWTをAuthorizationヘッダーに付与
-3. LaravelのSupabaseAuthミドルウェアがJWT検証
-
-## 主要ファイル構成
-```
-src/
-├── app/
-│   ├── dashboard/          ダッシュボード
-│   ├── customers/          顧客管理
-│   ├── contacts/           担当者管理
-│   ├── deals/              商談管理
-│   ├── ses-contracts/      SES台帳
-│   ├── activities/         活動履歴
-│   ├── tasks/              タスク管理
-│   ├── business-cards/     名刺管理
-│   ├── emails/             メール管理
-│   └── login/              ログイン
-├── components/
-│   ├── Sidebar.tsx         サイドメニュー（未読バッジ）
-│   └── NotificationToast.tsx
-├── hooks/
-│   ├── useNotifications.ts
-│   └── useUnreadEmailCount.ts  メール未読数（Realtime）
-├── lib/
-│   ├── axios.ts            APIクライアント
-│   └── supabase.ts         Supabaseクライアント（共通）
-└── store/
-    └── authStore.ts        Zustand認証ストア
-```
-
-## Supabase Realtime
-以下のテーブルがRealtime有効：
-- `emails`（未読バッジ・自動反映）
-- `tasks`（期限通知）
-- `deals`、`activities`、`business_cards`
-
-カスタムイベント：
-- `emails:mark-all-read` → 全て既読後にバッジ即時更新
-
-## テストユーザー
-| メール | パスワード | ロール |
-|--------|-----------|--------|
-| shintomi.sh@gmail.com | password | super_admin |
-| suzuki.k@izen-solution.jp | password | tenant_admin |
-| sato.m@izen-solution.jp | password | tenant_user |
