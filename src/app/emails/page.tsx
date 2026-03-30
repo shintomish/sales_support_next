@@ -150,12 +150,17 @@ export default function EmailsPage() {
 
   // メール選択（既読に）
   const handleSelectEmail = async (email: Email) => {
+    const wasUnread = !email.is_read
     const res = await axios.get(`/api/v1/emails/${email.id}`)
     setSelectedEmail(res.data)
     setEmails(prev => prev ? {
       ...prev,
       data: prev.data.map(e => e.id === email.id ? { ...e, is_read: true } : e)
     } : null)
+    // 未読メールを開いた場合、サイドバーのバッジを更新
+    if (wasUnread) {
+      window.dispatchEvent(new CustomEvent('emails:mark-all-read'))
+    }
   }
 
   const fromLabel = (email: Email) =>
