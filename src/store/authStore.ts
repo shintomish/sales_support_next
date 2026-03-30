@@ -13,6 +13,7 @@ interface User {
     name: string;
     slug: string;
     plan: string;
+    ses_enabled: boolean;
   };
 }
 

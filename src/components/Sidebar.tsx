@@ -25,17 +25,21 @@ export default function Sidebar() {
     router.push('/login');
   };
 
-  const menuItems = [
-    { label: 'ダッシュボード', path: '/dashboard',      icon: '⊞',  badge: 0 },
-    { label: '顧客管理',       path: '/customers',      icon: '👥',  badge: 0 },
-    { label: '担当者管理',     path: '/contacts',       icon: '👤',  badge: 0 },
-    { label: '商談管理',       path: '/deals',          icon: '💼',  badge: 0 },
-    { label: 'SES台帳',         path: '/ses-contracts',  icon: '📋',  badge: 0 },
-    { label: '活動履歴',       path: '/activities',     icon: '🕐',  badge: 0 },
-    { label: 'タスク管理',     path: '/tasks',          icon: '☑',   badge: overdueCount },
-    { label: '名刺管理',       path: '/business-cards', icon: '🪪',  badge: 0 },
-    { label: 'メール',         path: '/emails',         icon: '✉️',  badge: unreadEmails },
+  const allMenuItems = [
+    { label: 'ダッシュボード', path: '/dashboard',      icon: '⊞',  badge: 0,            sesOnly: false },
+    { label: '顧客管理',       path: '/customers',      icon: '👥',  badge: 0,            sesOnly: false },
+    { label: '担当者管理',     path: '/contacts',       icon: '👤',  badge: 0,            sesOnly: false },
+    { label: '商談管理',       path: '/deals',          icon: '💼',  badge: 0,            sesOnly: false },
+    { label: 'SES台帳',        path: '/ses-contracts',  icon: '📋',  badge: 0,            sesOnly: true  },
+    { label: '活動履歴',       path: '/activities',     icon: '🕐',  badge: 0,            sesOnly: false },
+    { label: 'タスク管理',     path: '/tasks',          icon: '☑',   badge: overdueCount, sesOnly: false },
+    { label: '名刺管理',       path: '/business-cards', icon: '🪪',  badge: 0,            sesOnly: false },
+    { label: 'メール',         path: '/emails',         icon: '✉️',  badge: unreadEmails, sesOnly: false },
   ];
+
+  const menuItems = allMenuItems.filter(
+    (item) => !item.sesOnly || user?.tenant?.ses_enabled
+  );
 
   return (
     <>
