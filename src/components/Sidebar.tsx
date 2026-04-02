@@ -56,7 +56,7 @@ export default function Sidebar() {
         </div>
 
         {/* メニュー */}
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           <p className="text-xs text-gray-500 px-2 mb-2 tracking-widest">メインメニュー</p>
           {menuItems.map((item) => (
             <button
