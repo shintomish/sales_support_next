@@ -89,6 +89,8 @@ type Email = {
   registered_at: string | null
   registered_engineer_id: number | null
   registered_project_id: number | null
+  best_match_score: number | null
+  match_count: number
   contact?: { id: number; name: string } | null
   deal?: { id: number; name: string } | null
   customer?: { id: number; name: string } | null
@@ -256,10 +258,20 @@ export default function EmailsPage() {
     setExtracting(true); setRegisterMessage(null)
     try {
       const res = await axios.post(`/api/v1/emails/${selectedEmail.id}/extract`)
-      const updated = { ...selectedEmail, extracted_data: res.data.email.extracted_data }
+      const updated = {
+        ...selectedEmail,
+        extracted_data:   res.data.email.extracted_data,
+        best_match_score: res.data.email.best_match_score ?? null,
+        match_count:      res.data.email.match_count ?? 0,
+      }
       setSelectedEmail(updated)
       setSkillMap(res.data.skill_map ?? [])
-      setEmails(prev => prev ? { ...prev, data: prev.data.map(e => e.id === updated.id ? { ...e, extracted_data: updated.extracted_data } : e) } : null)
+      setEmails(prev => prev ? { ...prev, data: prev.data.map(e => e.id === updated.id ? {
+        ...e,
+        extracted_data:   updated.extracted_data,
+        best_match_score: updated.best_match_score,
+        match_count:      updated.match_count,
+      } : e) } : null)
     } catch { setRegisterMessage({ type: 'error', text: '抽出に失敗しました' }) }
     finally { setExtracting(false) }
   }
@@ -404,10 +416,16 @@ export default function EmailsPage() {
           )}
           {emails?.data.map(email => {
             const badge = email.category ? CATEGORY_BADGE[email.category] : null
+            const scoreBg = email.best_match_score === null || email.best_match_score === undefined ? ''
+              : email.best_match_score >= 70 ? 'bg-green-50'
+              : email.best_match_score >= 45 ? 'bg-yellow-50'
+              : 'bg-gray-100'
             return (
               <div key={email.id} onClick={() => handleSelectEmail(email)}
-                className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
-                  selectedEmail?.id === email.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''}`}>
+                className={`p-4 border-b border-gray-100 cursor-pointer transition-colors ${
+                  selectedEmail?.id === email.id
+                    ? 'bg-blue-50 border-l-2 border-l-blue-500'
+                    : `${scoreBg} hover:brightness-95`}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     {!email.is_read && <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />}
@@ -517,11 +535,19 @@ export default function EmailsPage() {
                       {/* マッチング候補ボタン */}
                       {selectedEmail.extracted_data?.result && !selectedEmail.extracted_data.result.parse_error && (
                         <button onClick={handleMatchPreview} disabled={loadingMatch}
-                          className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50 flex items-center gap-1.5">
+                          className={`text-xs text-white px-3 py-1.5 rounded-lg disabled:opacity-50 flex items-center gap-1.5 ${
+                            selectedEmail.best_match_score === null || selectedEmail.best_match_score === undefined
+                              ? 'bg-amber-500 hover:bg-amber-600'
+                              : selectedEmail.best_match_score >= 70
+                              ? 'bg-green-600 hover:bg-green-700'
+                              : selectedEmail.best_match_score >= 45
+                              ? 'bg-yellow-500 hover:bg-yellow-600'
+                              : 'bg-gray-400 hover:bg-gray-500'
+                          }`}>
                           {loadingMatch && <Spinner size={12} />}
                           {selectedEmail.category === 'engineer'
-                            ? `案件候補${matchCandidates.length > 0 ? matchCandidates.length : 5}件`
-                            : `技術者候補${matchCandidates.length > 0 ? matchCandidates.length : 5}人`}
+                            ? `案件候補${matchCandidates.length > 0 ? matchCandidates.length : selectedEmail.match_count}件`
+                            : `技術者候補${matchCandidates.length > 0 ? matchCandidates.length : selectedEmail.match_count}人`}
                         </button>
                       )}
                       {/* 登録ボタン */}
