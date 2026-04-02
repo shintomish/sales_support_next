@@ -424,7 +424,7 @@ export default function EmailsPage() {
             return (
               <div key={email.id} onClick={() => handleSelectEmail(email)}
                 style={scoreBgStyle}
-                className={`p-4 border-b border-gray-100 cursor-pointer transition-colors ${
+                className={`p-4 border-b border-gray-100 cursor-pointer transition-colors hover:brightness-85 ${
                   selectedEmail?.id === email.id
                     ? 'bg-blue-50 border-l-2 border-l-blue-500'
                     : ''}`}>
