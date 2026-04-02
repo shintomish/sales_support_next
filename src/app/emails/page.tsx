@@ -39,6 +39,25 @@ type ExtractResult = {
   parse_error?: boolean
 }
 
+type MatchCandidate = {
+  id: number
+  name?: string        // engineer
+  title?: string       // project
+  score: number
+  skill_matches: string[]
+  // engineer
+  desired_price_min?: number | null
+  desired_price_max?: number | null
+  available_from?: string | null
+  affiliation?: string | null
+  // project
+  unit_price_min?: number | null
+  unit_price_max?: number | null
+  start_date?: string | null
+  work_location?: string | null
+  work_style?: string | null
+}
+
 type Attachment = {
   id: number
   filename: string
@@ -124,6 +143,11 @@ export default function EmailsPage() {
   const [selectedSkillIds, setSelectedSkillIds] = useState<number[]>([])
   const [registering, setRegistering] = useState(false)
   const [registerMessage, setRegisterMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // マッチングプレビュー
+  const [showMatchPreview, setShowMatchPreview] = useState(false)
+  const [matchCandidates, setMatchCandidates] = useState<MatchCandidate[]>([])
+  const [loadingMatch, setLoadingMatch] = useState(false)
 
   const fetchEmailsRef = useRef<() => void>(() => {})
 
@@ -212,9 +236,11 @@ export default function EmailsPage() {
     setSelectedEmail(res.data)
     setEmails(prev => prev ? { ...prev, data: prev.data.map(e => e.id === email.id ? { ...e, is_read: true } : e) } : null)
     if (wasUnread) window.dispatchEvent(new CustomEvent('emails:mark-all-read'))
-    // 登録パネルをリセット
+    // 各パネルをリセット
     setShowRegisterPanel(false)
     setRegisterMessage(null)
+    setShowMatchPreview(false)
+    setMatchCandidates([])
     // 既に抽出済みならスキルマップをセット
     if (res.data.extracted_data?.result) {
       setSkillMap(buildSkillMapFromResult(res.data.extracted_data.result, allSkills))
@@ -272,6 +298,20 @@ export default function EmailsPage() {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '登録に失敗しました'
       setRegisterMessage({ type: 'error', text: msg })
     } finally { setRegistering(false) }
+  }
+
+  const handleMatchPreview = async () => {
+    if (!selectedEmail) return
+    setLoadingMatch(true)
+    setShowMatchPreview(true)
+    try {
+      const res = await axios.get(`/api/v1/emails/${selectedEmail.id}/match-preview`)
+      setMatchCandidates(res.data.matches ?? [])
+    } catch {
+      setMatchCandidates([])
+    } finally {
+      setLoadingMatch(false)
+    }
   }
 
   const handleDownloadAttachment = async (emailId: number, attachmentId: number, filename: string, mimeType: string | null) => {
@@ -474,6 +514,14 @@ export default function EmailsPage() {
                           {extracting ? '抽出中...' : selectedEmail.extracted_data?.result ? '再抽出' : 'Claude抽出'}
                         </button>
                       )}
+                      {/* マッチング候補ボタン */}
+                      {selectedEmail.extracted_data?.result && !selectedEmail.extracted_data.result.parse_error && (
+                        <button onClick={handleMatchPreview} disabled={loadingMatch}
+                          className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50 flex items-center gap-1.5">
+                          {loadingMatch && <Spinner size={12} />}
+                          {selectedEmail.category === 'engineer' ? '案件候補5件' : '技術者候補5件'}
+                        </button>
+                      )}
                       {/* 登録ボタン */}
                       {selectedEmail.extracted_data?.result && !selectedEmail.extracted_data.result.parse_error && !selectedEmail.registered_at && (
                         <button onClick={handleOpenRegisterPanel}
@@ -565,6 +613,17 @@ export default function EmailsPage() {
         )}
       </div>
 
+      {/* マッチングプレビューモーダル */}
+      {showMatchPreview && selectedEmail && (
+        <MatchPreviewModal
+          email={selectedEmail}
+          candidates={matchCandidates}
+          loading={loadingMatch}
+          onClose={() => setShowMatchPreview(false)}
+          onRegister={() => { setShowMatchPreview(false); handleOpenRegisterPanel() }}
+        />
+      )}
+
       {/* 登録モーダル */}
       {showRegisterPanel && selectedEmail && (
         <RegisterModal
@@ -647,6 +706,150 @@ function ExtractPreview({ result, category, skillMap }: {
         </p>
       )}
     </div>
+  )
+}
+
+// ── マッチングプレビューモーダル ──────────────────────────
+
+function MatchPreviewModal({ email, candidates, loading, onClose, onRegister }: {
+  email: Email
+  candidates: MatchCandidate[]
+  loading: boolean
+  onClose: () => void
+  onRegister: () => void
+}) {
+  const isEngineer = email.category === 'engineer'
+  const title = isEngineer ? 'おすすめ案件 トップ5' : 'おすすめ技術者 トップ5'
+  const accentCls = isEngineer ? 'bg-blue-600' : 'bg-purple-600'
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[85vh] flex flex-col">
+
+        {/* ヘッダー */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+            <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{email.subject}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+
+        {/* 候補リスト */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+          {loading && (
+            <div className="flex items-center justify-center gap-3 py-12 text-gray-400">
+              <Spinner size={20} />
+              <span className="text-sm">マッチング計算中...</span>
+            </div>
+          )}
+          {!loading && candidates.length === 0 && (
+            <p className="text-center text-sm text-gray-400 py-12">候補が見つかりませんでした</p>
+          )}
+          {!loading && candidates.map((c, i) => (
+            <div key={c.id} className="border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-colors">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  {/* 順位バッジ */}
+                  <span className={`flex-shrink-0 w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold ${accentCls}`}>
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {c.name ?? c.title ?? '—'}
+                    </p>
+                    {/* サブ情報 */}
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {isEngineer ? (
+                        <>
+                          {(c.unit_price_min || c.unit_price_max) && (
+                            <span className="text-xs text-gray-500">
+                              💴 {formatPrice(c.unit_price_min, c.unit_price_max)}
+                            </span>
+                          )}
+                          {c.work_location && (
+                            <span className="text-xs text-gray-500">📍 {c.work_location}</span>
+                          )}
+                          {c.start_date && (
+                            <span className="text-xs text-gray-500">📅 {c.start_date}</span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {(c.desired_price_min || c.desired_price_max) && (
+                            <span className="text-xs text-gray-500">
+                              💴 {formatPrice(c.desired_price_min, c.desired_price_max)}
+                            </span>
+                          )}
+                          {c.affiliation && (
+                            <span className="text-xs text-gray-500">🏢 {c.affiliation}</span>
+                          )}
+                          {c.available_from && (
+                            <span className="text-xs text-gray-500">📅 {c.available_from}</span>
+                          )}
+                        </>
+                      )}
+                      {c.work_style && (
+                        <span className="text-xs text-gray-500">{workStyleLabel(c.work_style)}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* スコアバッジ + 詳細リンク */}
+                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                  <ScoreBadge score={c.score} />
+                  <a
+                    href={isEngineer ? `/public-projects/${c.id}` : `/engineers/${c.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    詳細 →
+                  </a>
+                </div>
+              </div>
+
+              {/* 一致スキル */}
+              {c.skill_matches.length > 0 && (
+                <div className="mt-2.5 flex flex-wrap gap-1">
+                  {c.skill_matches.map(s => (
+                    <span key={s} className="text-xs px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded-full">
+                      ✓ {s}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* フッター */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+          <button onClick={onClose} className="text-sm text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-100">
+            閉じる
+          </button>
+          {!email.registered_at && (
+            <button onClick={onRegister}
+              className={`text-sm text-white px-5 py-2 rounded-lg ${
+                isEngineer ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+              {isEngineer ? '技術者として登録する →' : '案件として登録する →'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ScoreBadge({ score }: { score: number }) {
+  const color = score >= 70 ? 'bg-green-500'
+    : score >= 45 ? 'bg-yellow-500'
+    : 'bg-gray-400'
+  return (
+    <span className={`text-xs text-white font-bold px-2 py-0.5 rounded-full ${color}`}>
+      {score}点
+    </span>
   )
 }
 
