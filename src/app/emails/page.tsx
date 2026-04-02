@@ -535,16 +535,19 @@ export default function EmailsPage() {
                       {/* マッチング候補ボタン */}
                       {selectedEmail.extracted_data?.result && !selectedEmail.extracted_data.result.parse_error && (
                         <button onClick={handleMatchPreview} disabled={loadingMatch}
-                          className={`text-xs text-white px-3 py-1.5 rounded-lg disabled:opacity-50 flex items-center gap-1.5 ${
-                            selectedEmail.best_match_score === null || selectedEmail.best_match_score === undefined
-                              ? 'bg-amber-500 hover:bg-amber-600'
-                              : selectedEmail.best_match_score >= 70
-                              ? 'bg-green-600 hover:bg-green-700'
-                              : selectedEmail.best_match_score >= 45
-                              ? 'bg-yellow-500 hover:bg-yellow-600'
-                              : 'bg-gray-400 hover:bg-gray-500'
+                          className={`text-xs px-3 py-1.5 rounded-lg disabled:opacity-50 flex items-center gap-1.5 ${
+                            selectedEmail.best_match_score !== null && selectedEmail.best_match_score !== undefined && selectedEmail.best_match_score >= 70
+                              ? 'bg-green-600 hover:bg-green-700 text-white'
+                              : selectedEmail.best_match_score !== null && selectedEmail.best_match_score !== undefined && selectedEmail.best_match_score >= 45
+                              ? 'bg-yellow-400 hover:bg-yellow-500 text-gray-800'
+                              : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
                           }`}>
                           {loadingMatch && <Spinner size={12} />}
+                          {selectedEmail.best_match_score !== null && selectedEmail.best_match_score !== undefined && selectedEmail.best_match_score >= 70
+                            ? '🟢 '
+                            : selectedEmail.best_match_score !== null && selectedEmail.best_match_score !== undefined && selectedEmail.best_match_score >= 45
+                            ? '🟡 '
+                            : ''}
                           {selectedEmail.category === 'engineer'
                             ? `案件候補${matchCandidates.length > 0 ? matchCandidates.length : selectedEmail.match_count}件`
                             : `技術者候補${matchCandidates.length > 0 ? matchCandidates.length : selectedEmail.match_count}人`}
