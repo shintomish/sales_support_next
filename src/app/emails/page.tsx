@@ -519,7 +519,9 @@ export default function EmailsPage() {
                         <button onClick={handleMatchPreview} disabled={loadingMatch}
                           className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50 flex items-center gap-1.5">
                           {loadingMatch && <Spinner size={12} />}
-                          {selectedEmail.category === 'engineer' ? '案件候補5件' : '技術者候補5件'}
+                          {selectedEmail.category === 'engineer'
+                            ? `案件候補${matchCandidates.length > 0 ? matchCandidates.length : 5}件`
+                            : `技術者候補${matchCandidates.length > 0 ? matchCandidates.length : 5}人`}
                         </button>
                       )}
                       {/* 登録ボタン */}
@@ -719,7 +721,9 @@ function MatchPreviewModal({ email, candidates, loading, onClose, onRegister }: 
   onRegister: () => void
 }) {
   const isEngineer = email.category === 'engineer'
-  const title = isEngineer ? 'おすすめ案件 トップ5' : 'おすすめ技術者 トップ5'
+  const title = isEngineer
+    ? `案件候補 ${candidates.length}件`
+    : `技術者候補 ${candidates.length}人`
   const accentCls = isEngineer ? 'bg-blue-600' : 'bg-purple-600'
 
   return (
@@ -747,7 +751,11 @@ function MatchPreviewModal({ email, candidates, loading, onClose, onRegister }: 
             <p className="text-center text-sm text-gray-400 py-12">候補が見つかりませんでした</p>
           )}
           {!loading && candidates.map((c, i) => (
-            <div key={c.id} className="border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-colors">
+            <div key={c.id} className={`border-2 rounded-xl p-4 transition-colors ${
+              c.score >= 70 ? 'border-green-400'
+              : c.score >= 45 ? 'border-yellow-400'
+              : 'border-gray-800'
+            }`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   {/* 順位バッジ */}
@@ -845,7 +853,7 @@ function MatchPreviewModal({ email, candidates, loading, onClose, onRegister }: 
 function ScoreBadge({ score }: { score: number }) {
   const color = score >= 70 ? 'bg-green-500'
     : score >= 45 ? 'bg-yellow-500'
-    : 'bg-gray-400'
+    : 'bg-gray-800'
   return (
     <span className={`text-xs text-white font-bold px-2 py-0.5 rounded-full ${color}`}>
       {score}点
