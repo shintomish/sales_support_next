@@ -416,16 +416,18 @@ export default function EmailsPage() {
           )}
           {emails?.data.map(email => {
             const badge = email.category ? CATEGORY_BADGE[email.category] : null
-            const scoreBg = email.best_match_score === null || email.best_match_score === undefined ? ''
-              : email.best_match_score >= 70 ? 'bg-green-100'
-              : email.best_match_score >= 45 ? 'bg-yellow-100'
-              : 'bg-gray-100'
+            const scoreBgStyle = selectedEmail?.id === email.id ? {} :
+              email.best_match_score === null || email.best_match_score === undefined ? {} :
+              email.best_match_score >= 70 ? { backgroundColor: '#bbf7d0' } :  // green-200
+              email.best_match_score >= 45 ? { backgroundColor: '#fef08a' } :  // yellow-200
+              { backgroundColor: '#e5e7eb' }                                   // gray-200
             return (
               <div key={email.id} onClick={() => handleSelectEmail(email)}
+                style={scoreBgStyle}
                 className={`p-4 border-b border-gray-100 cursor-pointer transition-colors ${
                   selectedEmail?.id === email.id
                     ? 'bg-blue-50 border-l-2 border-l-blue-500'
-                    : `${scoreBg} hover:brightness-95`}`}>
+                    : ''}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     {!email.is_read && <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />}
