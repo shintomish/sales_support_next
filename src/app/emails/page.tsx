@@ -317,7 +317,8 @@ export default function EmailsPage() {
                     {markingAllRead ? '処理中...' : '全て既読'}
                   </button>
                   <button onClick={handleSync} disabled={syncing}
-                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50">
+                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50 flex items-center gap-1.5">
+                    {syncing && <Spinner size={12} />}
                     {syncing ? '同期中...' : '同期'}
                   </button>
                 </div>
@@ -468,7 +469,8 @@ export default function EmailsPage() {
                       {/* 抽出ボタン */}
                       {!selectedEmail.registered_at && (
                         <button onClick={handleExtract} disabled={extracting}
-                          className="text-xs bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+                          className="text-xs bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5">
+                          {extracting && <Spinner size={12} />}
                           {extracting ? '抽出中...' : selectedEmail.extracted_data?.result ? '再抽出' : 'Claude抽出'}
                         </button>
                       )}
@@ -485,8 +487,16 @@ export default function EmailsPage() {
                     </div>
                   </div>
 
+                  {/* 抽出中オーバーレイ */}
+                  {extracting && (
+                    <div className="flex items-center justify-center gap-3 py-8 text-gray-500">
+                      <Spinner size={20} />
+                      <span className="text-sm">Claude APIで情報を抽出しています...</span>
+                    </div>
+                  )}
+
                   {/* 抽出結果プレビュー */}
-                  {selectedEmail.extracted_data?.result && !selectedEmail.extracted_data.result.parse_error && (
+                  {!extracting && selectedEmail.extracted_data?.result && !selectedEmail.extracted_data.result.parse_error && (
                     <div className="p-4">
                       <ExtractPreview
                         result={selectedEmail.extracted_data.result}
@@ -825,8 +835,9 @@ function RegisterModal({ email, form, setForm, allSkills, skillMap, selectedSkil
             キャンセル
           </button>
           <button onClick={onRegister} disabled={registering}
-            className={`text-sm text-white px-5 py-2 rounded-lg disabled:opacity-50 ${
+            className={`text-sm text-white px-5 py-2 rounded-lg disabled:opacity-50 flex items-center gap-2 ${
               isEngineer ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+            {registering && <Spinner size={14} className="text-white" />}
             {registering ? '登録中...' : isEngineer ? '技術者として登録' : '案件として登録'}
           </button>
         </div>
@@ -836,6 +847,20 @@ function RegisterModal({ email, form, setForm, allSkills, skillMap, selectedSkil
 }
 
 // ── ヘルパーコンポーネント ────────────────────────────────
+
+function Spinner({ size = 14, className = '' }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size} height={size}
+      viewBox="0 0 24 24" fill="none"
+      className={`animate-spin ${className}`}
+    >
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  )
+}
 
 function FormRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
