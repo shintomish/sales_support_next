@@ -417,8 +417,8 @@ export default function EmailsPage() {
           {emails?.data.map(email => {
             const badge = email.category ? CATEGORY_BADGE[email.category] : null
             const scoreBg = email.best_match_score === null || email.best_match_score === undefined ? ''
-              : email.best_match_score >= 70 ? 'bg-green-50'
-              : email.best_match_score >= 45 ? 'bg-yellow-50'
+              : email.best_match_score >= 70 ? 'bg-green-100'
+              : email.best_match_score >= 45 ? 'bg-yellow-100'
               : 'bg-gray-100'
             return (
               <div key={email.id} onClick={() => handleSelectEmail(email)}
