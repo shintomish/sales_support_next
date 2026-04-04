@@ -54,29 +54,6 @@ type Paginated = {
   total: number
 }
 
-type MatchedEngineer = {
-  engineer_id: number
-  engineer_name: string
-  affiliation: string | null
-  affiliation_type: 'self' | 'bp' | null
-  age: number | null
-  score: number
-  breakdown: {
-    requirements: number
-    skills: number
-    conditions: number
-    availability: number
-    track_record: number
-  }
-  reasons: string[]
-  availability_status: string | null
-  available_from: string | null
-  work_style: string | null
-  desired_unit_price_min: number | null
-  desired_unit_price_max: number | null
-  skills: { name: string; experience_years: number }[]
-}
-
 // ── 定数 ─────────────────────────────────────────────────
 
 const STATUS_TABS = [
@@ -149,9 +126,6 @@ export default function ProjectMailsPage() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [showBody, setShowBody] = useState(false)
-  const [matchedEngineers, setMatchedEngineers] = useState<MatchedEngineer[]>([])
-  const [matchLoading, setMatchLoading] = useState(false)
-  const [matchError, setMatchError] = useState<string | null>(null)
 
   const fetchList = useCallback(async () => {
     const sf = SCORE_FILTERS.find(f => f.value === scoreFilter) ?? SCORE_FILTERS[0]
@@ -177,27 +151,6 @@ export default function ProjectMailsPage() {
     setForm(res.data)
     setSaveMsg(null)
     setShowBody(false)
-    setMatchedEngineers([])
-    setMatchError(null)
-  }
-
-  // マッチング技術者取得
-  const handleMatchEngineers = async (mailId: number) => {
-    setMatchLoading(true)
-    setMatchError(null)
-    setMatchedEngineers([])
-    try {
-      const res = await axios.get(`/api/v1/project-mails/${mailId}/matched-engineers`)
-      console.log('[matching] status:', res.status, 'res.data:', res.data)
-      const engineers = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : []
-      console.log('[matching] engineers count:', engineers.length)
-      setMatchedEngineers(engineers)
-    } catch (e: unknown) {
-      console.error('[matching] error:', e)
-      const msg = (e as { response?: { data?: { message?: string }; status?: number } })?.response?.data?.message
-      const status = (e as { response?: { status?: number } })?.response?.status
-      setMatchError(`取得失敗 (${status ?? 'error'}): ${msg ?? 'サーバーエラー'}`)
-    } finally { setMatchLoading(false) }
   }
 
   // 一括スコアリング（新着未処理のみ）
@@ -599,91 +552,6 @@ export default function ProjectMailsPage() {
               </div>
             </div>
 
-            {/* マッチング技術者 */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-700">マッチング技術者</h2>
-                <button
-                  onClick={() => handleMatchEngineers(selected.id)}
-                  disabled={matchLoading}
-                  className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1.5">
-                  {matchLoading && <Spinner size={11} />}
-                  {matchLoading ? '計算中...' : 'マッチング実行'}
-                </button>
-              </div>
-              {matchError && (
-                <p className="text-xs text-red-600 px-4 py-3">{matchError}</p>
-              )}
-              {matchedEngineers.length > 0 ? (
-                <div className="divide-y divide-gray-100">
-                  {matchedEngineers.map(eng => (
-                    <div key={eng.engineer_id} className="p-4">
-                      <div className="flex items-start gap-3">
-                        <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
-                          eng.score >= 70 ? 'bg-green-100 text-green-700' :
-                          eng.score >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {eng.score}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">{eng.engineer_name}</span>
-                            {eng.affiliation && <span className="text-xs text-gray-500">{eng.affiliation}</span>}
-                            {eng.age && <span className="text-xs text-gray-400">{eng.age}歳</span>}
-                            {eng.availability_status === 'available' && (
-                              <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">稼働可</span>
-                            )}
-                            {eng.availability_status === 'scheduled' && (
-                              <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">稼働予定</span>
-                            )}
-                            {eng.availability_status === 'working' && (
-                              <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">稼働中</span>
-                            )}
-                          </div>
-                          {/* スコア内訳 */}
-                          <div className="flex gap-2 mt-1.5 flex-wrap">
-                            <ScoreBar label="必須条件" score={eng.breakdown.requirements} max={40} />
-                            <ScoreBar label="スキル" score={eng.breakdown.skills} max={25} />
-                            <ScoreBar label="条件" score={eng.breakdown.conditions} max={20} />
-                            <ScoreBar label="稼働" score={eng.breakdown.availability} max={10} />
-                            <ScoreBar label="実績" score={eng.breakdown.track_record} max={5} />
-                          </div>
-                          {/* マッチング理由 */}
-                          {eng.reasons.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1.5">
-                              {eng.reasons.map((r, i) => (
-                                <span key={i} className="text-xs px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded-full">{r}</span>
-                              ))}
-                            </div>
-                          )}
-                          {/* スキル */}
-                          {eng.skills.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1.5">
-                              {eng.skills.slice(0, 6).map((s, i) => (
-                                <span key={i} className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">{s.name}</span>
-                              ))}
-                              {eng.skills.length > 6 && (
-                                <span className="text-xs text-gray-400">+{eng.skills.length - 6}件</span>
-                              )}
-                            </div>
-                          )}
-                          {/* 単価 */}
-                          {eng.desired_unit_price_min && (
-                            <p className="text-xs text-gray-400 mt-1">
-                              希望単価: {eng.desired_unit_price_min}〜{eng.desired_unit_price_max ?? '?'}万円
-                              {eng.available_from && ` / 稼働可能: ${eng.available_from}`}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : matchedEngineers.length === 0 && !matchLoading ? (
-                <p className="text-xs text-gray-400 text-center py-6">「マッチング実行」ボタンで技術者候補を表示します</p>
-              ) : null}
-            </div>
-
             {/* 元メール */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <button onClick={() => setShowBody(v => !v)}
@@ -733,20 +601,6 @@ function FormRow({ label, children }: { label: string; children: React.ReactNode
     <div>
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
       {children}
-    </div>
-  )
-}
-
-function ScoreBar({ label, score, max }: { label: string; score: number; max: number }) {
-  const pct = Math.round((score / max) * 100)
-  const color = pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-yellow-400' : 'bg-gray-300'
-  return (
-    <div className="flex items-center gap-1">
-      <span className="text-xs text-gray-500 w-12 flex-shrink-0">{label}</span>
-      <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-      <span className="text-xs text-gray-600 font-medium">{score}/{max}</span>
     </div>
   )
 }

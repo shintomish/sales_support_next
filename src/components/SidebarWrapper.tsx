@@ -1,5 +1,5 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import RealtimeToast from '@/components/RealtimeToast';
@@ -11,6 +11,7 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
   const pathname = usePathname();
   const router = useRouter();
   const { fetchUser, user, loading } = useAuthStore();
+  const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     fetchUser();
@@ -24,6 +25,11 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
       router.push('/login');
     }
   }, [loading, user, pathname, router]);
+
+  // ページ遷移時に main のスクロール位置をリセット
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, [pathname]);
 
   const showSidebar = !NO_SIDEBAR_PATHS.includes(pathname);
 
@@ -42,7 +48,7 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <main className="flex-1 bg-gray-50 overflow-auto">
+      <main ref={mainRef} className="flex-1 bg-gray-50 overflow-auto">
         {children}
       </main>
       <RealtimeToast />
