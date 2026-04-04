@@ -93,10 +93,10 @@ const STATUS_NEXT: Record<string, { label: string; value: string; cls: string }[
 }
 
 const SCORE_FILTERS = [
-  { value: 'all', label: '全て',    scoreMin: 0,  scoreMax: 100 },
-  { value: 'high', label: '高 60+', scoreMin: 60, scoreMax: 100 },
-  { value: 'mid',  label: '中 40-', scoreMin: 40, scoreMax: 59  },
-  { value: 'low',  label: '低 ～39',scoreMin: 0,  scoreMax: 39  },
+  { value: 'all',  label: '全て',    scoreMin: 0,  scoreMax: 100 },
+  { value: 'high', label: '高 80+',  scoreMin: 80, scoreMax: 100 },
+  { value: 'mid',  label: '中 60-',  scoreMin: 60, scoreMax: 79  },
+  { value: 'low',  label: '低 ～39', scoreMin: 0,  scoreMax: 39  },
 ]
 
 function scoreRank(score: number) {
