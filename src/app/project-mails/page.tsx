@@ -435,13 +435,18 @@ export default function ProjectMailsPage() {
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 <button
+                  onClick={() => router.push(`/matching/${selected.id}`)}
+                  className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 font-medium">
+                  マッチング →
+                </button>
+                <button
                   onClick={() => router.push(`/emails?email_id=${selected.email_id}`)}
                   className="text-xs border border-blue-300 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-50">
                   メール詳細 →
                 </button>
                 <button onClick={handleRescore}
                   className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50">
-                  再スコアリング
+                  再スコア
                 </button>
               </div>
             </div>
