@@ -77,6 +77,14 @@ export default function EmailsPage() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('connected') === '1') { setSyncMessage('Gmail接続が完了しました'); router.replace('/emails') }
     if (params.get('error')) setSyncMessage('Gmail接続に失敗しました')
+    const emailId = params.get('email_id')
+    if (emailId) {
+      axios.get(`/api/v1/emails/${emailId}`).then(res => {
+        setSelectedEmail(res.data)
+        setCategoryFilter('')
+        router.replace('/emails')
+      }).catch(() => {})
+    }
   }, [])
 
   // メール一覧取得

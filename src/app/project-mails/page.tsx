@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
@@ -25,6 +26,8 @@ type ProjectMail = {
   score_reasons: string[]
   engine: string
   customer_name: string | null
+  sales_contact: string | null
+  phone: string | null
   title: string | null
   required_skills: string[] | null
   preferred_skills: string[] | null
@@ -89,6 +92,13 @@ const STATUS_NEXT: Record<string, { label: string; value: string; cls: string }[
   ],
 }
 
+const SCORE_FILTERS = [
+  { value: 'all', label: '全て',    scoreMin: 0,  scoreMax: 100 },
+  { value: 'high', label: '高 60+', scoreMin: 60, scoreMax: 100 },
+  { value: 'mid',  label: '中 40-', scoreMin: 40, scoreMax: 59  },
+  { value: 'low',  label: '低 ～39',scoreMin: 0,  scoreMax: 39  },
+]
+
 function scoreRank(score: number) {
   if (score >= 85) return { label: '◎', cls: 'bg-green-500 text-white' }
   if (score >= 70) return { label: '○', cls: 'bg-blue-500 text-white' }
@@ -99,12 +109,15 @@ function scoreRank(score: number) {
 // ── メインコンポーネント ──────────────────────────────────
 
 export default function ProjectMailsPage() {
+  const router = useRouter()
   const [items, setItems] = useState<Paginated | null>(null)
   const [selected, setSelected] = useState<ProjectMail | null>(null)
   const [statusFilter, setStatusFilter] = useState('review')
+  const [scoreFilter, setScoreFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [scoring, setScoring] = useState(false)
+  const [rescoring, setRescoring] = useState(false)
   const [extracting, setExtracting] = useState(false)
   const [scoreMsg, setScoreMsg] = useState('')
 
@@ -115,11 +128,19 @@ export default function ProjectMailsPage() {
   const [showBody, setShowBody] = useState(false)
 
   const fetchList = useCallback(async () => {
+    const sf = SCORE_FILTERS.find(f => f.value === scoreFilter) ?? SCORE_FILTERS[0]
     const res = await axios.get('/api/v1/project-mails', {
-      params: { status: statusFilter, search: search || undefined, page, per_page: 30 }
+      params: {
+        status:    statusFilter,
+        search:    search || undefined,
+        page,
+        per_page:  30,
+        score_min: sf.scoreMin,
+        score_max: sf.scoreMax,
+      }
     })
     setItems(res.data)
-  }, [statusFilter, search, page])
+  }, [statusFilter, scoreFilter, search, page])
 
   useEffect(() => { fetchList() }, [fetchList])
 
@@ -141,6 +162,23 @@ export default function ProjectMailsPage() {
       fetchList()
     } catch { setScoreMsg('スコアリングに失敗しました') }
     finally { setScoring(false) }
+  }
+
+  // 既存レコードを全件再スコアリング
+  const handleRescoreAll = async () => {
+    if (!confirm('全件を再スコアリングします。ステータスが自動変更されますがよろしいですか？')) return
+    setRescoring(true); setScoreMsg('')
+    try {
+      const res = await axios.post('/api/v1/project-mails/rescore-all')
+      setScoreMsg(res.data.message)
+      fetchList()
+      if (selected) {
+        const refreshed = await axios.get(`/api/v1/project-mails/${selected.id}`)
+        setSelected(refreshed.data)
+        setForm(refreshed.data)
+      }
+    } catch { setScoreMsg('再スコアリングに失敗しました') }
+    finally { setRescoring(false) }
   }
 
   // 既存レコードの抽出情報を一括更新
@@ -177,6 +215,8 @@ export default function ProjectMailsPage() {
     try {
       const payload = {
         customer_name:   form.customer_name,
+        sales_contact:   form.sales_contact,
+        phone:           form.phone,
         title:           form.title,
         required_skills: typeof form.required_skills === 'string'
           ? (form.required_skills as string).split(',').map(s => s.trim()).filter(Boolean)
@@ -233,6 +273,11 @@ export default function ProjectMailsPage() {
                 className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50">
                 {scoring ? '処理中...' : '新着取込'}
               </button>
+              <button onClick={handleRescoreAll} disabled={rescoring}
+                className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
+                {rescoring && <Spinner size={11} />}
+                {rescoring ? '再スコア中...' : '全件再スコア'}
+              </button>
               <button onClick={handleReextractAll} disabled={extracting}
                 className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1.5 rounded-md hover:bg-blue-100 disabled:opacity-50 flex items-center gap-1.5">
                 {extracting && <Spinner size={11} />}
@@ -257,6 +302,21 @@ export default function ProjectMailsPage() {
                     : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
                 }`}>
                 {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* スコアフィルター */}
+          <div className="flex gap-1">
+            {SCORE_FILTERS.map(sf => (
+              <button key={sf.value}
+                onClick={() => { setScoreFilter(sf.value); setPage(1) }}
+                className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                  scoreFilter === sf.value
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                }`}>
+                {sf.label}
               </button>
             ))}
           </div>
@@ -337,10 +397,17 @@ export default function ProjectMailsPage() {
                   ))}
                 </div>
               </div>
-              <button onClick={handleRescore}
-                className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex-shrink-0">
-                再スコアリング
-              </button>
+              <div className="flex gap-2 flex-shrink-0">
+                <button
+                  onClick={() => router.push(`/emails?email_id=${selected.email_id}`)}
+                  className="text-xs border border-blue-300 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-50">
+                  メール詳細 →
+                </button>
+                <button onClick={handleRescore}
+                  className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50">
+                  再スコアリング
+                </button>
+              </div>
             </div>
 
             {/* ステータス操作 */}
@@ -373,6 +440,17 @@ export default function ProjectMailsPage() {
                   <FormRow label="案件タイトル">
                     <input value={form.title ?? ''} onChange={e => set('title', e.target.value)}
                       className="form-input" placeholder="Javaバックエンド開発" />
+                  </FormRow>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormRow label="営業担当者">
+                    <input value={form.sales_contact ?? ''} onChange={e => set('sales_contact', e.target.value || null)}
+                      className="form-input" placeholder="山田 太郎" />
+                  </FormRow>
+                  <FormRow label="電話番号">
+                    <input value={form.phone ?? ''} onChange={e => set('phone', e.target.value || null)}
+                      className="form-input" placeholder="090-1234-5678" />
                   </FormRow>
                 </div>
 
