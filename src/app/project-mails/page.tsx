@@ -105,6 +105,7 @@ export default function ProjectMailsPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [scoring, setScoring] = useState(false)
+  const [extracting, setExtracting] = useState(false)
   const [scoreMsg, setScoreMsg] = useState('')
 
   // 編集フォーム state
@@ -131,7 +132,7 @@ export default function ProjectMailsPage() {
     setShowBody(false)
   }
 
-  // 一括スコアリング
+  // 一括スコアリング（新着未処理のみ）
   const handleScoreAll = async () => {
     setScoring(true); setScoreMsg('')
     try {
@@ -140,6 +141,22 @@ export default function ProjectMailsPage() {
       fetchList()
     } catch { setScoreMsg('スコアリングに失敗しました') }
     finally { setScoring(false) }
+  }
+
+  // 既存レコードの抽出情報を一括更新
+  const handleReextractAll = async () => {
+    setExtracting(true); setScoreMsg('')
+    try {
+      const res = await axios.post('/api/v1/project-mails/reextract-all')
+      setScoreMsg(res.data.message)
+      fetchList()
+      if (selected) {
+        const refreshed = await axios.get(`/api/v1/project-mails/${selected.id}`)
+        setSelected(refreshed.data)
+        setForm(refreshed.data)
+      }
+    } catch { setScoreMsg('抽出情報の更新に失敗しました') }
+    finally { setExtracting(false) }
   }
 
   // 再スコアリング
@@ -211,10 +228,16 @@ export default function ProjectMailsPage() {
         <div className="p-4 border-b border-gray-200 space-y-3">
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-semibold text-gray-900">案件メール</h1>
-            <button onClick={handleScoreAll} disabled={scoring}
-              className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50">
-              {scoring ? 'スコアリング中...' : 'スコアリング実行'}
-            </button>
+            <div className="flex gap-1.5">
+              <button onClick={handleScoreAll} disabled={scoring}
+                className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50">
+                {scoring ? '処理中...' : '新着取込'}
+              </button>
+              <button onClick={handleReextractAll} disabled={extracting}
+                className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1.5 rounded-md hover:bg-blue-100 disabled:opacity-50">
+                {extracting ? '更新中...' : '情報抽出'}
+              </button>
+            </div>
           </div>
           {scoreMsg && <p className="text-xs text-green-600">{scoreMsg}</p>}
 
