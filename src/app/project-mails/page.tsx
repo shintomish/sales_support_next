@@ -188,8 +188,12 @@ export default function ProjectMailsPage() {
     setMatchedEngineers([])
     try {
       const res = await axios.get(`/api/v1/project-mails/${mailId}/matched-engineers`)
-      setMatchedEngineers(res.data.data ?? [])
+      console.log('[matching] status:', res.status, 'res.data:', res.data)
+      const engineers = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : []
+      console.log('[matching] engineers count:', engineers.length)
+      setMatchedEngineers(engineers)
     } catch (e: unknown) {
+      console.error('[matching] error:', e)
       const msg = (e as { response?: { data?: { message?: string }; status?: number } })?.response?.data?.message
       const status = (e as { response?: { status?: number } })?.response?.status
       setMatchError(`取得失敗 (${status ?? 'error'}): ${msg ?? 'サーバーエラー'}`)
