@@ -151,6 +151,7 @@ export default function ProjectMailsPage() {
   const [showBody, setShowBody] = useState(false)
   const [matchedEngineers, setMatchedEngineers] = useState<MatchedEngineer[]>([])
   const [matchLoading, setMatchLoading] = useState(false)
+  const [matchError, setMatchError] = useState<string | null>(null)
 
   const fetchList = useCallback(async () => {
     const sf = SCORE_FILTERS.find(f => f.value === scoreFilter) ?? SCORE_FILTERS[0]
@@ -177,16 +178,22 @@ export default function ProjectMailsPage() {
     setSaveMsg(null)
     setShowBody(false)
     setMatchedEngineers([])
+    setMatchError(null)
   }
 
   // マッチング技術者取得
   const handleMatchEngineers = async (mailId: number) => {
     setMatchLoading(true)
+    setMatchError(null)
+    setMatchedEngineers([])
     try {
       const res = await axios.get(`/api/v1/project-mails/${mailId}/matched-engineers`)
-      setMatchedEngineers(res.data.data)
-    } catch { /* ignore */ }
-    finally { setMatchLoading(false) }
+      setMatchedEngineers(res.data.data ?? [])
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string }; status?: number } })?.response?.data?.message
+      const status = (e as { response?: { status?: number } })?.response?.status
+      setMatchError(`取得失敗 (${status ?? 'error'}): ${msg ?? 'サーバーエラー'}`)
+    } finally { setMatchLoading(false) }
   }
 
   // 一括スコアリング（新着未処理のみ）
@@ -600,6 +607,9 @@ export default function ProjectMailsPage() {
                   {matchLoading ? '計算中...' : 'マッチング実行'}
                 </button>
               </div>
+              {matchError && (
+                <p className="text-xs text-red-600 px-4 py-3">{matchError}</p>
+              )}
               {matchedEngineers.length > 0 ? (
                 <div className="divide-y divide-gray-100">
                   {matchedEngineers.map(eng => (
