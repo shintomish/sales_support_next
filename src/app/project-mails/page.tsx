@@ -234,8 +234,9 @@ export default function ProjectMailsPage() {
                 {scoring ? '処理中...' : '新着取込'}
               </button>
               <button onClick={handleReextractAll} disabled={extracting}
-                className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1.5 rounded-md hover:bg-blue-100 disabled:opacity-50">
-                {extracting ? '更新中...' : '情報抽出'}
+                className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1.5 rounded-md hover:bg-blue-100 disabled:opacity-50 flex items-center gap-1.5">
+                {extracting && <Spinner size={11} />}
+                {extracting ? '抽出中...' : '情報抽出'}
               </button>
             </div>
           </div>
@@ -502,6 +503,15 @@ export default function ProjectMailsPage() {
 }
 
 // ── サブコンポーネント ────────────────────────────────────
+
+function Spinner({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="animate-spin">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  )
+}
 
 function FormRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
