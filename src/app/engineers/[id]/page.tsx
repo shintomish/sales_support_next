@@ -13,6 +13,12 @@ const fmtDate = (v: string | null) =>
   v ? new Date(v).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }) : null;
 
 const WORK_STYLE_LABEL: Record<string, string> = { remote: 'フルリモート', office: '出社', hybrid: 'ハイブリッド' };
+const AVAILABILITY_LABEL: Record<string, { label: string; cls: string }> = {
+  available:  { label: '空き',     cls: 'bg-green-100 text-green-700' },
+  working:    { label: '稼働中',   cls: 'bg-orange-100 text-orange-700' },
+  scheduled:  { label: '◯月予定', cls: 'bg-blue-100 text-blue-700' },
+};
+const AFFILIATION_TYPE_LABEL: Record<string, string> = { self: '自社', bp: 'BP' };
 const SKILL_COLOR: Record<string, string> = {
   language: 'bg-blue-100 text-blue-700', framework: 'bg-purple-100 text-purple-700',
   database: 'bg-green-100 text-green-700', infrastructure: 'bg-orange-100 text-orange-700',
@@ -22,9 +28,12 @@ const SKILL_COLOR: Record<string, string> = {
 interface Engineer {
   id: number; name: string; name_kana: string | null; email: string | null; phone: string | null;
   affiliation: string | null; affiliation_contact: string | null;
+  age: number | null; nationality: string | null; affiliation_type: string | null;
   profile: {
     desired_unit_price_min: number | null; desired_unit_price_max: number | null;
-    available_from: string | null; work_style: string | null; preferred_location: string | null;
+    available_from: string | null; availability_status: string | null;
+    past_client_count: number | null;
+    work_style: string | null; preferred_location: string | null;
     self_introduction: string | null; github_url: string | null; portfolio_url: string | null;
     is_public: boolean;
   } | null;
@@ -81,6 +90,11 @@ export default function EngineerDetailPage() {
   const [github, setGithub]         = useState('');
   const [portfolio, setPortfolio]   = useState('');
   const [isPublic, setIsPublic]     = useState(false);
+  const [age, setAge]                     = useState('');
+  const [nationality, setNationality]     = useState('');
+  const [affiliationType, setAffiliationType] = useState('');
+  const [availabilityStatus, setAvailabilityStatus] = useState('available');
+  const [pastClientCount, setPastClientCount] = useState('');
   const [addedSkills, setAddedSkills] = useState<SkillItem[]>([]);
   const [skillQuery, setSkillQuery] = useState('');
   const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
@@ -103,6 +117,11 @@ export default function EngineerDetailPage() {
       setPhone(e.phone ?? '');
       setAffiliation(e.affiliation ?? '');
       setAffiliationContact(e.affiliation_contact ?? '');
+      setAge(e.age?.toString() ?? '');
+      setNationality(e.nationality ?? '');
+      setAffiliationType(e.affiliation_type ?? '');
+      setAvailabilityStatus(e.profile?.availability_status ?? 'available');
+      setPastClientCount(e.profile?.past_client_count?.toString() ?? '');
       setPriceMin(e.profile?.desired_unit_price_min?.toString() ?? '');
       setPriceMax(e.profile?.desired_unit_price_max?.toString() ?? '');
       setAvailableFrom(e.profile?.available_from ?? '');
@@ -145,6 +164,11 @@ export default function EngineerDetailPage() {
         name, name_kana: nameKana || null, email: email || null,
         phone: phone || null, affiliation: affiliation || null,
         affiliation_contact: affiliationContact || null,
+        age: age ? Number(age) : null,
+        nationality: nationality || null,
+        affiliation_type: affiliationType || null,
+        availability_status: availabilityStatus || 'available',
+        past_client_count: pastClientCount ? Number(pastClientCount) : null,
         desired_unit_price_min: priceMin ? Number(priceMin) : null,
         desired_unit_price_max: priceMax ? Number(priceMax) : null,
         available_from: availableFrom || null, work_style: workStyle || null,
@@ -212,6 +236,21 @@ export default function EngineerDetailPage() {
                   <div><p className="text-xs text-gray-400">電話</p><p>{engineer.phone ?? <Em />}</p></div>
                   <div><p className="text-xs text-gray-400">所属</p><p>{engineer.affiliation ?? <Em />}</p></div>
                   <div><p className="text-xs text-gray-400">所属担当者</p><p>{engineer.affiliation_contact ?? <Em />}</p></div>
+                  <div><p className="text-xs text-gray-400">年齢</p><p>{engineer.age ? `${engineer.age}歳` : <Em />}</p></div>
+                  <div><p className="text-xs text-gray-400">国籍</p><p>{engineer.nationality ?? <Em />}</p></div>
+                  <div>
+                    <p className="text-xs text-gray-400">所属区分</p>
+                    <p>{engineer.affiliation_type ? AFFILIATION_TYPE_LABEL[engineer.affiliation_type] ?? engineer.affiliation_type : <Em />}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">稼働状況</p>
+                    {engineer.profile?.availability_status
+                      ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${AVAILABILITY_LABEL[engineer.profile.availability_status]?.cls ?? 'bg-gray-100 text-gray-600'}`}>
+                          {AVAILABILITY_LABEL[engineer.profile.availability_status]?.label ?? engineer.profile.availability_status}
+                        </span>
+                      : <Em />}
+                  </div>
+                  <div><p className="text-xs text-gray-400">稼働実績社数</p><p>{engineer.profile?.past_client_count != null ? `${engineer.profile.past_client_count}社` : <Em />}</p></div>
                 </CardContent>
               </Card>
 
@@ -271,6 +310,38 @@ export default function EngineerDetailPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className={labelCls}>所属</label><input className={inputCls} value={affiliation} onChange={e => setAffiliation(e.target.value)} /></div>
                   <div><label className={labelCls}>所属担当者</label><input className={inputCls} value={affiliationContact} onChange={e => setAffiliationContact(e.target.value)} /></div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className={labelCls}>年齢</label>
+                    <input className={inputCls} type="number" min="18" max="80" value={age} onChange={e => setAge(e.target.value)} placeholder="35" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>国籍</label>
+                    <input className={inputCls} value={nationality} onChange={e => setNationality(e.target.value)} placeholder="日本" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>所属区分</label>
+                    <select className={inputCls} value={affiliationType} onChange={e => setAffiliationType(e.target.value)}>
+                      <option value="">選択</option>
+                      <option value="self">自社</option>
+                      <option value="bp">BP</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>稼働状況</label>
+                    <select className={inputCls} value={availabilityStatus} onChange={e => setAvailabilityStatus(e.target.value)}>
+                      <option value="available">空き</option>
+                      <option value="working">稼働中</option>
+                      <option value="scheduled">◯月予定</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>稼働実績社数</label>
+                    <input className={inputCls} type="number" min="0" value={pastClientCount} onChange={e => setPastClientCount(e.target.value)} placeholder="5" />
+                  </div>
                 </div>
                 <div className="border-t pt-4">
                   <p className="text-xs text-gray-500 mb-2 font-medium">スキル</p>

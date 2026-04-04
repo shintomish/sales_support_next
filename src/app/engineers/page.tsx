@@ -20,10 +20,13 @@ interface Engineer {
   name_kana: string | null;
   email: string | null;
   affiliation: string | null;
+  age: number | null;
+  affiliation_type: string | null;
   profile: {
     desired_unit_price_min: number | null;
     desired_unit_price_max: number | null;
     available_from: string | null;
+    availability_status: string | null;
     work_style: string | null;
     is_public: boolean;
   } | null;
@@ -33,6 +36,11 @@ interface Meta { current_page: number; last_page: number; total: number; }
 
 const WORK_STYLE_LABEL: Record<string, string> = {
   remote: 'フルリモート', office: '出社', hybrid: 'ハイブリッド',
+};
+const AVAILABILITY_BADGE: Record<string, { label: string; cls: string }> = {
+  available: { label: '空き',    cls: 'bg-green-100 text-green-700' },
+  working:   { label: '稼働中',  cls: 'bg-orange-100 text-orange-700' },
+  scheduled: { label: '◯月予定',cls: 'bg-blue-100 text-blue-700' },
 };
 const SKILL_CATEGORY_COLOR: Record<string, string> = {
   language:       'bg-blue-100 text-blue-700',
@@ -130,6 +138,11 @@ export default function EngineersPage() {
                         {e.name_kana && <p className="text-xs text-gray-400">{e.name_kana}</p>}
                       </div>
                       <div className="flex flex-col items-end gap-1">
+                        {e.profile?.availability_status && AVAILABILITY_BADGE[e.profile.availability_status] && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${AVAILABILITY_BADGE[e.profile.availability_status].cls}`}>
+                            {AVAILABILITY_BADGE[e.profile.availability_status].label}
+                          </span>
+                        )}
                         {e.profile?.is_public
                           ? <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">公開中</span>
                           : <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">非公開</span>
