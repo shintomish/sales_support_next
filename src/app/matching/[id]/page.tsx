@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import axios from '@/lib/axios'
 
 // ── 型定義 ────────────────────────────────────────────────
@@ -68,8 +68,9 @@ const AVAILABILITY_LABEL: Record<string, string> = {
 
 // ── メインコンポーネント ────────────────────────────────
 
-export default function MatchingPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function MatchingPage() {
+  const params = useParams()
+  const id = params.id as string
   const router = useRouter()
 
   const [mail, setMail] = useState<ProjectMail | null>(null)
