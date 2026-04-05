@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/authStore';
 import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
+import SortableHeader from '@/components/SortableHeader';
 
 
 interface Deal {
@@ -203,6 +204,8 @@ function DealsPage() {
   const [userFilter, setUserFilter] = useState<string>('all');
   useEffect(() => { setUserFilter(defaultUserFilter(user)); }, [user]);
   const [page, setPage]       = useState(Number(searchParams.get('page') ?? '1'));
+  const [sortField, setSortField] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -219,7 +222,7 @@ function DealsPage() {
       setError(null);
       const [res, cRes, allRes] = await Promise.all([
         apiClient.get('/api/v1/deals', {
-          params: { search, status: statusFilter, customer_id: customerFilter, amount_min: amountMin, amount_max: amountMax, page, user_id: userFilter },
+          params: { search, status: statusFilter, customer_id: customerFilter, amount_min: amountMin, amount_max: amountMax, page, user_id: userFilter, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined },
         }),
         apiClient.get('/api/v1/customers', { params: { page: 1 } }),
         // カンバン・グラフ用に全件取得（ページなし・最大200件）
@@ -234,12 +237,18 @@ function DealsPage() {
       if (err.response?.status === 401) router.push('/login');
       else setError('商談データの取得に失敗しました');
     } finally { setLoading(false); }
-  }, [search, statusFilter, customerFilter, amountMin, amountMax, page, userFilter, router]);
+  }, [search, statusFilter, customerFilter, amountMin, amountMax, page, userFilter, sortField, sortOrder, router]);
 
   useEffect(() => { fetchDeals(); }, [fetchDeals]);
   useEffect(() => {
     updateUrl({ search, status: statusFilter, customer_id: customerFilter, amount_min: amountMin, amount_max: amountMax, page: String(page) });
   }, [search, statusFilter, customerFilter, amountMin, amountMax, page, updateUrl]);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) { setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); }
+    else { setSortField(field); setSortOrder('asc'); }
+    setPage(1);
+  };
 
   const handleSearch = () => { setSearch(searchInput); setPage(1); };
   const handleClear  = () => {
@@ -396,12 +405,12 @@ function DealsPage() {
                   <ColGroup />
                   <thead>
                     <tr>
-                      <th className="font-semibold text-gray-600 py-3 px-4 text-left">商談名</th>
+                      <SortableHeader label="商談名" field="title" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                       <th className="font-semibold text-gray-600 py-3 px-4 text-left">顧客</th>
-                      <th className="font-semibold text-gray-600 py-3 px-4 text-left">金額</th>
-                      <th className="font-semibold text-gray-600 py-3 px-4 text-left">ステータス</th>
+                      <SortableHeader label="金額" field="amount" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                      <SortableHeader label="ステータス" field="status" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                       <th className="font-semibold text-gray-600 py-3 px-4 text-left">成約確度</th>
-                      <th className="font-semibold text-gray-600 py-3 px-4 text-left">予定成約日</th>
+                      <SortableHeader label="予定成約日" field="expected_close_date" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                       <th className="font-semibold text-gray-600 py-3 px-4 text-center">操作</th>
                     </tr>
                   </thead>

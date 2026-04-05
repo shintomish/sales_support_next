@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/authStore';
 import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
+import SortableHeader from '@/components/SortableHeader';
 
 interface Activity {
   id: number; type: string; subject: string; activity_date: string;
@@ -56,6 +57,8 @@ function ActivitiesPage() {
   const [dateFrom, setDateFrom]             = useState(searchParams.get('date_from') ?? '');
   const [dateTo, setDateTo]                 = useState(searchParams.get('date_to') ?? '');
   const [page, setPage]       = useState(Number(searchParams.get('page') ?? '1'));
+  const [sortField, setSortField] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const { user } = useAuthStore();
   const [userFilter, setUserFilter] = useState<string>('all');
   useEffect(() => { setUserFilter(defaultUserFilter(user)); }, [user]);
@@ -75,7 +78,7 @@ function ActivitiesPage() {
       setError(null);
       const [actRes, cusRes] = await Promise.all([
         apiClient.get('/api/v1/activities', {
-          params: { search, type: typeFilter, customer_id: customerFilter, date_from: dateFrom, date_to: dateTo, page, user_id: userFilter },
+          params: { search, type: typeFilter, customer_id: customerFilter, date_from: dateFrom, date_to: dateTo, page, user_id: userFilter, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined },
         }),
         apiClient.get('/api/v1/customers', { params: { page: 1 } }),
       ]);
@@ -87,12 +90,18 @@ function ActivitiesPage() {
       if (err.response?.status === 401) router.push('/login');
       else setError('活動履歴の取得に失敗しました');
     } finally { setLoading(false); }
-  }, [search, typeFilter, customerFilter, dateFrom, dateTo, page, userFilter, router]);
+  }, [search, typeFilter, customerFilter, dateFrom, dateTo, page, userFilter, sortField, sortOrder, router]);
 
   useEffect(() => { fetchActivities(); }, [fetchActivities]);
   useEffect(() => {
     updateUrl({ search, type: typeFilter, customer_id: customerFilter, date_from: dateFrom, date_to: dateTo, page: String(page) });
   }, [search, typeFilter, customerFilter, dateFrom, dateTo, page, updateUrl]);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) { setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); }
+    else { setSortField(field); setSortOrder('asc'); }
+    setPage(1);
+  };
 
   const handleSearch = () => { setSearch(searchInput); setPage(1); };
   const handleClear  = () => {
@@ -182,9 +191,9 @@ function ActivitiesPage() {
               <ColGroup />
               <thead>
                 <tr>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">活動日</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">種別</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">件名</th>
+                  <SortableHeader label="活動日" field="activity_date" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                  <SortableHeader label="種別" field="type" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                  <SortableHeader label="件名" field="subject" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">顧客</th>
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">担当者</th>
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">関連商談</th>

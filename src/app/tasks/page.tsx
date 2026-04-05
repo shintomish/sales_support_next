@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/authStore';
 import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
+import SortableHeader from '@/components/SortableHeader';
 
 interface Task {
   id: number; title: string; priority: string; status: string;
@@ -75,6 +76,8 @@ function TasksPage() {
   const [userFilter, setUserFilter] = useState<string>('all');
   useEffect(() => { setUserFilter(defaultUserFilter(user)); }, [user]);
   const [page, setPage]       = useState(Number(searchParams.get('page') ?? '1'));
+  const [sortField, setSortField] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -90,7 +93,7 @@ function TasksPage() {
     try {
       setError(null);
       const res = await apiClient.get('/api/v1/tasks', {
-        params: { search, status: statusFilter, priority: priorityFilter, due_filter: dueFilter, page, user_id: userFilter },
+        params: { search, status: statusFilter, priority: priorityFilter, due_filter: dueFilter, page, user_id: userFilter, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined },
       });
       setTasks(res.data.data);
       setMeta(res.data.meta);
@@ -99,12 +102,18 @@ function TasksPage() {
       if (err.response?.status === 401) router.push('/login');
       else setError('タスクの取得に失敗しました');
     } finally { setLoading(false); }
-  }, [search, statusFilter, priorityFilter, dueFilter, page, userFilter, router]);
+  }, [search, statusFilter, priorityFilter, dueFilter, page, userFilter, sortField, sortOrder, router]);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
   useEffect(() => {
     updateUrl({ search, status: statusFilter, priority: priorityFilter, due_filter: dueFilter, page: String(page) });
   }, [search, statusFilter, priorityFilter, dueFilter, page, updateUrl]);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) { setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); }
+    else { setSortField(field); setSortOrder('asc'); }
+    setPage(1);
+  };
 
   const handleSearch = () => { setSearch(searchInput); setPage(1); };
   const handleClear  = () => {
@@ -208,11 +217,11 @@ function TasksPage() {
               <ColGroup />
               <thead>
                 <tr>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">優先度</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">タイトル</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">ステータス</th>
+                  <SortableHeader label="優先度" field="priority" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                  <SortableHeader label="タイトル" field="title" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                  <SortableHeader label="ステータス" field="status" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">顧客</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">期限日</th>
+                  <SortableHeader label="期限日" field="due_date" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">担当者</th>
                   <th className="font-semibold text-gray-600 py-3 px-4 text-center">操作</th>
                 </tr>

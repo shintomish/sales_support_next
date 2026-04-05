@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuthStore } from '@/store/authStore';
 import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
+import SortableHeader from '@/components/SortableHeader';
 
 interface BusinessCard {
   id: number;
@@ -50,11 +51,18 @@ export default function BusinessCardsPage() {
   const { user } = useAuthStore();
   const [userFilter, setUserFilter] = useState<string>('all');
   useEffect(() => { setUserFilter(defaultUserFilter(user)); }, [user]);
+  const [sortField, setSortField] = useState<string>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (field: string) => {
+    if (sortField === field) { setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); }
+    else { setSortField(field); setSortOrder('asc'); }
+  };
 
   const fetchCards = useCallback(async () => {
     try {
       setError(null);
-      const res = await apiClient.get('/api/v1/cards', { params: { user_id: userFilter } });
+      const res = await apiClient.get('/api/v1/cards', { params: { user_id: userFilter, sort_by: sortField, sort_order: sortOrder } });
       setCards(res.data.data);
       if (userFilter === 'all') setGrandTotal(res.data.data.length);
     } catch (err: any) {
@@ -66,7 +74,7 @@ export default function BusinessCardsPage() {
   }, [router]);
 
   useEffect(() => { fetchCards(); }, [fetchCards]);
-  useEffect(() => { fetchCards(); }, [userFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchCards(); }, [userFilter, sortField, sortOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3">
@@ -119,7 +127,7 @@ export default function BusinessCardsPage() {
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">役職</th>
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">連絡先</th>
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">ステータス</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">登録日</th>
+                  <SortableHeader label="登録日" field="created_at" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <th className="font-semibold text-gray-600 py-3 px-4 text-center">操作</th>
                 </tr>
               </thead>

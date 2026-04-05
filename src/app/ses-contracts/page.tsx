@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/authStore';
 import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
+import SortableHeader from '@/components/SortableHeader';
 
 // ── 型定義 ────────────────────────────────────────────────────
 interface SesContract {
@@ -291,6 +292,8 @@ function SesContractsPage() {
   const [summary, setSummary]         = useState<Summary | null>(null);
   const [meta, setMeta]               = useState<Meta | null>(null);
   const [grandTotal, setGrandTotal]   = useState<number | null>(null);
+  const [sortField, setSortField]     = useState<string>('');
+  const [sortOrder, setSortOrder]     = useState<'asc' | 'desc'>('asc');
   const [viewMode, setViewMode]       = useState<ViewMode>('list');
   const [columnGroup, setColumnGroup] = useState<ColumnGroup>('basic');
   const [search, setSearch]           = useState('');
@@ -304,11 +307,17 @@ function SesContractsPage() {
   const [error, setError]             = useState<string | null>(null);
   const [showImport, setShowImport]   = useState(false);
 
+  const handleSort = (field: string) => {
+    if (sortField === field) { setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); }
+    else { setSortField(field); setSortOrder('asc'); }
+    setPage(1);
+  };
+
   const fetchData = useCallback(async () => {
     try {
       setError(null);
       const [res, allRes, sumRes] = await Promise.all([
-        apiClient.get('/api/v1/ses-contracts', { params: { search, status: statusFilter, page, per_page: 50, user_id: userFilter } }),
+        apiClient.get('/api/v1/ses-contracts', { params: { search, status: statusFilter, page, per_page: 50, user_id: userFilter, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined } }),
         apiClient.get('/api/v1/ses-contracts', { params: { page: 1, per_page: 200 } }),
         apiClient.get('/api/v1/ses-contracts/summary'),
       ]);
@@ -321,7 +330,7 @@ function SesContractsPage() {
       if (err.response?.status === 401) router.push('/login');
       else setError('SES台帳の取得に失敗しました');
     } finally { setLoading(false); }
-  }, [search, statusFilter, page, userFilter, router]);
+  }, [search, statusFilter, page, userFilter, sortField, sortOrder, router]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -445,9 +454,14 @@ function SesContractsPage() {
                         <col style={{width:'70px'}} /><col style={{width:'50px'}} />
                       </colgroup>
                       <thead><tr>
-                        {['項番','氏名','変更種別','所属','顧客','エンド','案件名','ステータス','契約終了','残日数','操作'].map((h,i) => (
-                          <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left first:pl-4 text-xs">{h}</th>
+                        <SortableHeader label="項番" field="project_number" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 first:pl-4 text-xs" />
+                        {['氏名','変更種別','所属','顧客','エンド','案件名'].map(h => (
+                          <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">{h}</th>
                         ))}
+                        <SortableHeader label="ステータス" field="status" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
+                        <SortableHeader label="契約終了" field="contract_period_end" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
+                        <th className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">残日数</th>
+                        <th className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">操作</th>
                       </tr></thead>
                     </table>
                   </div>
@@ -620,8 +634,13 @@ function SesContractsPage() {
                         <col style={{width:'auto'}} />
                       </colgroup>
                       <thead><tr>
-                        {['項番','氏名','自社担当者','所属担当者','客先担当者','携帯','TEL','FAX','契約開始','契約期間開始','契約期間終了','期間末(所属)','勤務表受領','交通費','請求書','特記事項'].map(h => (
-                          <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left first:pl-4 text-xs">{h}</th>
+                        <SortableHeader label="項番" field="project_number" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 first:pl-4 text-xs" />
+                        {['氏名','自社担当者','所属担当者','客先担当者','携帯','TEL','FAX','契約開始','契約期間開始'].map(h => (
+                          <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">{h}</th>
+                        ))}
+                        <SortableHeader label="契約期間終了" field="contract_period_end" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
+                        {['期間末(所属)','勤務表受領','交通費','請求書','特記事項'].map(h => (
+                          <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">{h}</th>
                         ))}
                       </tr></thead>
                     </table>
