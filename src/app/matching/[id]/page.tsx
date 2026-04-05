@@ -4,6 +4,71 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 
+// ── 提案メールモーダル ────────────────────────────────
+interface ProposalDraft {
+  subject: string
+  body: string
+  to_address: string
+  to_name: string
+  engineer_name: string
+}
+
+function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () => void }) {
+  const [copied, setCopied] = useState(false)
+
+  const copyAll = () => {
+    const text = `件名: ${draft.subject}\n宛先: ${draft.to_name} <${draft.to_address}>\n\n${draft.body}`
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 560, boxShadow: '0 24px 60px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+        {/* ヘッダー */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>📧 提案メール草稿</p>
+            <p style={{ fontSize: 11, color: '#6b7280', margin: '2px 0 0' }}>{draft.engineer_name} の提案</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9ca3af' }}>✕</button>
+        </div>
+
+        {/* メタ情報 */}
+        <div style={{ padding: '12px 20px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb', fontSize: 12 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+            <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>宛先</span>
+            <span style={{ color: '#111827' }}>{draft.to_name} {'<'}{draft.to_address}{'>'}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>件名</span>
+            <span style={{ color: '#111827', fontWeight: 600 }}>{draft.subject}</span>
+          </div>
+        </div>
+
+        {/* 本文 */}
+        <div style={{ padding: '16px 20px', flex: 1, overflowY: 'auto' }}>
+          <pre style={{ fontSize: 13, color: '#374151', whiteSpace: 'pre-wrap', lineHeight: 1.7, fontFamily: 'sans-serif', margin: 0 }}>{draft.body}</pre>
+        </div>
+
+        {/* フッター */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: 13, color: '#6b7280' }}>
+            閉じる
+          </button>
+          <button
+            onClick={copyAll}
+            style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: copied ? '#16a34a' : '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, transition: 'background 0.2s' }}
+          >
+            {copied ? '✓ コピーしました' : '📋 クリップボードにコピー'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── 型定義 ──────────────────────────────────────────
 interface ProjectMail {
   id: number
@@ -138,16 +203,20 @@ function EngineerCard({
   eng,
   proposed,
   excluded,
+  generating,
   onPropose,
   onExclude,
   onDetail,
+  onGenerateProposal,
 }: {
   eng: MatchedEngineer
   proposed: boolean
   excluded: boolean
+  generating: boolean
   onPropose: () => void
   onExclude: () => void
   onDetail: () => void
+  onGenerateProposal: () => void
 }) {
   const color = rankColor(eng.score)
   const topSkills = eng.skills.slice(0, 5)
@@ -261,10 +330,28 @@ function EngineerCard({
             background: proposed ? '#16a34a' : '#fff',
             color: proposed ? '#fff' : '#16a34a',
             transition: 'all 0.15s',
-            borderRadius: '0 0 0 12px',
+            borderRadius: '0 0 0 0',
           }}
         >
           {proposed ? '✓ 提案済み' : '提案する'}
+        </button>
+        <button
+          onClick={onGenerateProposal}
+          disabled={generating}
+          style={{
+            flex: 1,
+            padding: '8px 0',
+            border: 'none',
+            borderRight: '1px solid #f3f4f6',
+            cursor: generating ? 'wait' : 'pointer',
+            fontSize: 12,
+            fontWeight: 600,
+            background: '#fff',
+            color: generating ? '#9ca3af' : '#2563eb',
+            transition: 'all 0.15s',
+          }}
+        >
+          {generating ? '生成中…' : '📧 提案メール'}
         </button>
         <button
           onClick={onExclude}
@@ -297,6 +384,8 @@ function RankGroup({
   onPropose,
   onExclude,
   onDetail,
+  generatingId,
+  onGenerateProposal,
 }: {
   rank: '◎' | '○' | '△'
   engineers: MatchedEngineer[]
@@ -305,6 +394,8 @@ function RankGroup({
   onPropose: (id: number) => void
   onExclude: (id: number) => void
   onDetail: (eng: MatchedEngineer) => void
+  generatingId: number | null
+  onGenerateProposal: (eng: MatchedEngineer) => void
 }) {
   const [open, setOpen] = useState(true)
   if (engineers.length === 0) return null
@@ -351,9 +442,11 @@ function RankGroup({
               eng={eng}
               proposed={proposed.has(eng.engineer_id)}
               excluded={excluded.has(eng.engineer_id)}
+              generating={generatingId === eng.engineer_id}
               onPropose={() => onPropose(eng.engineer_id)}
               onExclude={() => onExclude(eng.engineer_id)}
               onDetail={() => onDetail(eng)}
+              onGenerateProposal={() => onGenerateProposal(eng)}
             />
           ))}
         </div>
@@ -375,6 +468,8 @@ export default function MatchingPage() {
   const [proposed, setProposed] = useState<Set<number>>(new Set())
   const [excluded, setExcluded] = useState<Set<number>>(new Set())
   const [detailEng, setDetailEng] = useState<MatchedEngineer | null>(null)
+  const [proposalDraft, setProposalDraft] = useState<ProposalDraft | null>(null)
+  const [generatingId, setGeneratingId] = useState<number | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -398,6 +493,18 @@ export default function MatchingPage() {
       if (next.has(engId)) { next.delete(engId) } else { next.add(engId); setExcluded(ex => { const e2 = new Set(ex); e2.delete(engId); return e2 }) }
       return next
     })
+  }
+
+  const handleGenerateProposal = async (eng: MatchedEngineer) => {
+    setGeneratingId(eng.engineer_id)
+    try {
+      const res = await axios.post(`/api/v1/project-mails/${id}/generate-proposal`, { engineer_id: eng.engineer_id })
+      setProposalDraft({ ...res.data, engineer_name: eng.engineer_name })
+    } catch {
+      alert('メール生成に失敗しました')
+    } finally {
+      setGeneratingId(null)
+    }
   }
 
   const toggleExclude = (engId: number) => {
@@ -440,6 +547,8 @@ export default function MatchingPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
+      {/* 提案メールモーダル */}
+      {proposalDraft && <ProposalModal draft={proposalDraft} onClose={() => setProposalDraft(null)} />}
       {/* スコア内訳モーダル */}
       {detailEng && <BreakdownModal eng={detailEng} onClose={() => setDetailEng(null)} />}
 
@@ -524,6 +633,8 @@ export default function MatchingPage() {
                 onPropose={togglePropose}
                 onExclude={toggleExclude}
                 onDetail={setDetailEng}
+                generatingId={generatingId}
+                onGenerateProposal={handleGenerateProposal}
               />
             ))}
           </>
