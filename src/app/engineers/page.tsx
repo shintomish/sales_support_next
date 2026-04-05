@@ -214,8 +214,8 @@ export default function EngineersPage() {
                     <td className="px-4 py-3 text-xs text-gray-600">{fmtDate(e.profile?.available_from ?? null)}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {e.skills.slice(0, 3).map(s => (
-                          <span key={s.skill_id}
+                        {e.skills.slice(0, 3).map((s, i) => (
+                          <span key={s.skill_id ?? i}
                             className={`text-xs px-1.5 py-0.5 rounded-full ${SKILL_CATEGORY_COLOR[s.category ?? 'other'] ?? SKILL_CATEGORY_COLOR.other}`}>
                             {s.skill_name}
                           </span>
@@ -271,8 +271,8 @@ export default function EngineersPage() {
                         </p>
                       )}
                       <div className="flex flex-wrap gap-1">
-                        {e.skills.slice(0, 3).map(s => (
-                          <span key={s.skill_id}
+                        {e.skills.slice(0, 3).map((s, i) => (
+                          <span key={s.skill_id ?? i}
                             className={`text-xs px-1.5 py-0.5 rounded-full ${SKILL_CATEGORY_COLOR[s.category ?? 'other'] ?? SKILL_CATEGORY_COLOR.other}`}>
                             {s.skill_name}
                           </span>
@@ -327,8 +327,8 @@ function EngineerCard({ e, onClick }: { e: Engineer; onClick: () => void }) {
           {e.profile?.available_from && <span>📅 {fmtDate(e.profile.available_from)}〜</span>}
         </div>
         <div className="flex flex-wrap gap-1">
-          {e.skills.slice(0, 5).map(s => (
-            <span key={s.skill_id}
+          {e.skills.slice(0, 5).map((s, i) => (
+            <span key={s.skill_id ?? i}
               className={`text-xs px-2 py-0.5 rounded-full ${SKILL_CATEGORY_COLOR[s.category ?? 'other'] ?? SKILL_CATEGORY_COLOR.other}`}>
               {s.skill_name}
               {s.experience_years > 0 && <span className="ml-1 opacity-70">{s.experience_years}年</span>}

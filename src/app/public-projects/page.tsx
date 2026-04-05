@@ -229,8 +229,8 @@ export default function PublicProjectsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {p.required_skills.filter(s => s.is_required).slice(0, 3).map(s => (
-                          <span key={s.skill_id}
+                        {p.required_skills.filter(s => s.is_required).slice(0, 3).map((s, i) => (
+                          <span key={s.skill_id ?? i}
                             className={`text-xs px-1.5 py-0.5 rounded-full ${SKILL_COLOR[s.category ?? 'other'] ?? SKILL_COLOR.other}`}>
                             {s.skill_name}
                           </span>
@@ -285,8 +285,8 @@ export default function PublicProjectsPage() {
                         </p>
                       )}
                       <div className="flex flex-wrap gap-1">
-                        {p.required_skills.filter(s => s.is_required).slice(0, 3).map(s => (
-                          <span key={s.skill_id}
+                        {p.required_skills.filter(s => s.is_required).slice(0, 3).map((s, i) => (
+                          <span key={s.skill_id ?? i}
                             className={`text-xs px-1.5 py-0.5 rounded-full ${SKILL_COLOR[s.category ?? 'other'] ?? SKILL_COLOR.other}`}>
                             {s.skill_name}
                           </span>
@@ -355,8 +355,8 @@ function ProjectCard({ p, onClick, onFavorite }: {
           {p.remote_frequency && <span>🏠 {p.remote_frequency}</span>}
         </div>
         <div className="flex flex-wrap gap-1 mb-3">
-          {p.required_skills.slice(0, 4).map(s => (
-            <span key={s.skill_id}
+          {p.required_skills.slice(0, 4).map((s, i) => (
+            <span key={s.skill_id ?? i}
               className={`text-xs px-2 py-0.5 rounded-full ${
                 s.is_required
                   ? (SKILL_COLOR[s.category ?? 'other'] ?? SKILL_COLOR.other)

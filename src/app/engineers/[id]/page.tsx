@@ -261,8 +261,8 @@ export default function EngineerDetailPage() {
                     <p className="text-sm text-gray-400">未登録</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {engineer.skills.map(s => (
-                        <span key={s.skill_id} className={`text-xs px-2 py-1 rounded-full ${SKILL_COLOR[s.category ?? 'other'] ?? SKILL_COLOR.other}`}>
+                      {engineer.skills.map((s, i) => (
+                        <span key={s.skill_id ?? i} className={`text-xs px-2 py-1 rounded-full ${SKILL_COLOR[s.category ?? 'other'] ?? SKILL_COLOR.other}`}>
                           {s.skill_name} {s.experience_years > 0 && `(${s.experience_years}年)`}
                         </span>
                       ))}
@@ -364,7 +364,7 @@ export default function EngineerDetailPage() {
                   </div>
                   <div className="space-y-2">
                     {addedSkills.map((s, i) => (
-                      <div key={s.skill_id} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                      <div key={s.skill_id ?? i} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                         <span className={`text-xs px-2 py-0.5 rounded-full ${SKILL_COLOR[s.category ?? 'other'] ?? SKILL_COLOR.other}`}>{s.skill_name}</span>
                         <input type="number" min="0" max="50" step="0.5" className="w-14 border rounded px-1 py-0.5 text-xs" value={s.experience_years}
                           onChange={e => setAddedSkills(prev => prev.map((x, j) => j === i ? { ...x, experience_years: e.target.value } : x))} />

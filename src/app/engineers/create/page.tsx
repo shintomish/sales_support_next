@@ -213,7 +213,7 @@ export default function EngineerCreatePage() {
               ) : (
                 <div className="space-y-2">
                   {addedSkills.map((s, i) => (
-                    <div key={s.skill_id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div key={s.skill_id ?? i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                       <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${SKILL_CATEGORY_COLOR[s.category ?? 'other'] ?? SKILL_CATEGORY_COLOR.other}`}>
                         {s.skill_name}
                       </span>

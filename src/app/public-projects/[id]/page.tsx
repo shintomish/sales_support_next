@@ -221,8 +221,8 @@ export default function PublicProjectDetailPage() {
                 <p className="text-sm text-gray-400">スキル要件未設定</p>
               ) : (
                 <div className="space-y-2">
-                  {project.required_skills.map(s => (
-                    <div key={s.skill_id} className="flex items-center gap-2">
+                  {project.required_skills.map((s, i) => (
+                    <div key={s.skill_id ?? i} className="flex items-center gap-2">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${SKILL_COLOR[s.category ?? 'other'] ?? SKILL_COLOR.other}`}>
                         {s.skill_name}
                       </span>
