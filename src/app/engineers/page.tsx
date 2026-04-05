@@ -178,7 +178,7 @@ export default function EngineersPage() {
                   {['所属区分', '年齢', '稼働状況', '希望単価'].map(h => (
                     <th key={h} className="text-left text-xs font-medium text-gray-500 px-4 py-3">{h}</th>
                   ))}
-                  <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">稼働可能日</th>
+                  <SortableHeader label="稼働可能日" field="available_from" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
                   <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">スキル</th>
                 </tr>
               </thead>
