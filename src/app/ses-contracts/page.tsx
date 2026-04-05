@@ -55,6 +55,7 @@ interface SesContract {
   notes: string | null;
   days_until_expiry: number | null;
   sales_person: string | null;
+  assignees: { id: number; name: string }[];
   client_contact: string | null;
   client_mobile: string | null;
   client_phone: string | null;
@@ -638,7 +639,7 @@ function SesContractsPage() {
                             onClick={() => router.push(`/ses-contracts/${c.id}/edit`)}>
                             <td className="py-2.5 px-3 pl-4 text-gray-400 text-xs">{c.project_number ?? <Em />}</td>
                             <td className="px-3 font-semibold text-blue-600 text-xs truncate max-w-0">{c.engineer_name ?? <Em />}</td>
-                            <td className="px-3 text-xs text-gray-500 truncate max-w-0">{c.sales_person ?? <Em />}</td>
+                            <td className="px-3 text-xs text-gray-500 truncate max-w-0">{c.assignees?.length ? c.assignees.map(a => a.name).join('・') : (c.sales_person ?? <Em />)}</td>
                             <td className="px-3 text-xs text-gray-500 truncate max-w-0">{c.affiliation_contact ?? <Em />}</td>
                             <td className="px-3 text-xs text-gray-500 truncate max-w-0">{c.client_contact ?? <Em />}</td>
                             <td className="px-3 text-xs text-gray-500">{c.client_mobile ?? <Em />}</td>
