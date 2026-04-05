@@ -290,6 +290,7 @@ function SesContractsPage() {
   const [allContracts, setAllContracts] = useState<SesContract[]>([]);
   const [summary, setSummary]         = useState<Summary | null>(null);
   const [meta, setMeta]               = useState<Meta | null>(null);
+  const [grandTotal, setGrandTotal]   = useState<number | null>(null);
   const [viewMode, setViewMode]       = useState<ViewMode>('list');
   const [columnGroup, setColumnGroup] = useState<ColumnGroup>('basic');
   const [search, setSearch]           = useState('');
@@ -315,6 +316,7 @@ function SesContractsPage() {
       setMeta(res.data.meta);
       setAllContracts(allRes.data.data);
       setSummary(sumRes.data);
+      if (userFilter === 'all') setGrandTotal(res.data.meta.total);
     } catch (err: any) {
       if (err.response?.status === 401) router.push('/login');
       else setError('SES台帳の取得に失敗しました');
@@ -351,7 +353,9 @@ function SesContractsPage() {
       <div className="flex justify-between items-center mb-4 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">SES台帳</h1>
-          {meta && <p className="text-sm text-gray-400 mt-0.5">全 {meta.total} 件</p>}
+          {meta && <p className="text-sm text-gray-400 mt-0.5">
+            {userFilter !== 'all' && grandTotal !== null ? `${grandTotal}件中 ${meta.total}件` : `全 ${meta.total}件`}
+          </p>}
         </div>
         <div className="flex items-center gap-3">
           <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-gray-50 p-0.5 gap-0.5">

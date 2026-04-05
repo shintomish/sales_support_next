@@ -191,6 +191,7 @@ function DealsPage() {
   const [allDeals, setAllDeals]   = useState<Deal[]>([]); // カンバン用（全件）
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [meta, setMeta]           = useState<Meta | null>(null);
+  const [grandTotal, setGrandTotal] = useState<number | null>(null);
   const [viewMode, setViewMode]     = useState<'list' | 'kanban'>('list');
   const [searchInput, setSearchInput]       = useState(searchParams.get('search') ?? '');
   const [search, setSearch]                 = useState(searchParams.get('search') ?? '');
@@ -228,6 +229,7 @@ function DealsPage() {
       setMeta(res.data.meta);
       setCustomers(cRes.data.data);
       setAllDeals(allRes.data.data);
+      if (userFilter === 'all') setGrandTotal(res.data.meta.total);
     } catch (err: any) {
       if (err.response?.status === 401) router.push('/login');
       else setError('商談データの取得に失敗しました');
@@ -284,7 +286,10 @@ function DealsPage() {
           <h1 className="text-2xl font-bold text-gray-800">商談管理</h1>
           {meta && (
             <p className="text-sm text-gray-400 mt-0.5">
-              全 {meta.total} 件{hasFilter && ' （絞り込み中）'}
+              {userFilter !== 'all' && grandTotal !== null
+                ? `${grandTotal}件中 ${meta.total}件`
+                : `全 ${meta.total}件`}
+              {hasFilter && ' （絞り込み中）'}
             </p>
           )}
         </div>

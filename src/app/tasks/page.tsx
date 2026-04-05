@@ -65,6 +65,7 @@ function TasksPage() {
 
   const [tasks, setTasks]     = useState<Task[]>([]);
   const [meta, setMeta]       = useState<Meta | null>(null);
+  const [grandTotal, setGrandTotal] = useState<number | null>(null);
   const [searchInput, setSearchInput]         = useState(searchParams.get('search') ?? '');
   const [search, setSearch]                   = useState(searchParams.get('search') ?? '');
   const [statusFilter, setStatusFilter]       = useState(searchParams.get('status') ?? '');
@@ -93,6 +94,7 @@ function TasksPage() {
       });
       setTasks(res.data.data);
       setMeta(res.data.meta);
+      if (userFilter === 'all') setGrandTotal(res.data.meta.total);
     } catch (err: any) {
       if (err.response?.status === 401) router.push('/login');
       else setError('タスクの取得に失敗しました');
@@ -141,7 +143,10 @@ function TasksPage() {
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">タスク一覧</h1>
-          {meta && <p className="text-sm text-gray-400 mt-0.5">全 {meta.total} 件{hasFilter && ' （絞り込み中）'}</p>}
+          {meta && <p className="text-sm text-gray-400 mt-0.5">
+            {userFilter !== 'all' && grandTotal !== null ? `${grandTotal}件中 ${meta.total}件` : `全 ${meta.total}件`}
+            {hasFilter && ' （絞り込み中）'}
+          </p>}
         </div>
         <Button onClick={() => router.push('/tasks/create')} className="gap-1">
           <span className="text-base">＋</span> 新規登録

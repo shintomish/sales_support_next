@@ -43,6 +43,7 @@ const ColGroup = () => (
 
 export default function BusinessCardsPage() {
   const [cards, setCards]     = useState<BusinessCard[]>([]);
+  const [grandTotal, setGrandTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const router = useRouter();
@@ -55,6 +56,7 @@ export default function BusinessCardsPage() {
       setError(null);
       const res = await apiClient.get('/api/v1/cards', { params: { user_id: userFilter } });
       setCards(res.data.data);
+      if (userFilter === 'all') setGrandTotal(res.data.data.length);
     } catch (err: any) {
       if (err.response?.status === 401) router.push('/login');
       else setError('名刺の取得に失敗しました');
@@ -88,7 +90,9 @@ export default function BusinessCardsPage() {
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">名刺管理</h1>
-          <p className="text-sm text-gray-400 mt-0.5">全 {cards.length} 件</p>
+          <p className="text-sm text-gray-400 mt-0.5">
+            {userFilter !== 'all' && grandTotal !== null ? `${grandTotal}件中 ${cards.length}件` : `全 ${cards.length}件`}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <UserFilter value={userFilter} onChange={setUserFilter}

@@ -48,6 +48,7 @@ function ActivitiesPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [customers, setCustomers]   = useState<Customer[]>([]);
   const [meta, setMeta]             = useState<Meta | null>(null);
+  const [grandTotal, setGrandTotal] = useState<number | null>(null);
   const [searchInput, setSearchInput]       = useState(searchParams.get('search') ?? '');
   const [search, setSearch]                 = useState(searchParams.get('search') ?? '');
   const [typeFilter, setTypeFilter]         = useState(searchParams.get('type') ?? '');
@@ -81,6 +82,7 @@ function ActivitiesPage() {
       setActivities(actRes.data.data);
       setMeta(actRes.data.meta);
       setCustomers(cusRes.data.data);
+      if (userFilter === 'all') setGrandTotal(actRes.data.meta.total);
     } catch (err: any) {
       if (err.response?.status === 401) router.push('/login');
       else setError('活動履歴の取得に失敗しました');
@@ -129,7 +131,10 @@ function ActivitiesPage() {
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">活動履歴</h1>
-          {meta && <p className="text-sm text-gray-400 mt-0.5">全 {meta.total} 件{hasFilter && ' （絞り込み中）'}</p>}
+          {meta && <p className="text-sm text-gray-400 mt-0.5">
+            {userFilter !== 'all' && grandTotal !== null ? `${grandTotal}件中 ${meta.total}件` : `全 ${meta.total}件`}
+            {hasFilter && ' （絞り込み中）'}
+          </p>}
         </div>
         <Button onClick={() => router.push('/activities/create')} className="gap-1">
           <span className="text-base">＋</span> 新規登録
