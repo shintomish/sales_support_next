@@ -6,6 +6,8 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useAuthStore } from '@/store/authStore';
+import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
 
 
 interface Deal {
@@ -196,6 +198,9 @@ function DealsPage() {
   const [customerFilter, setCustomerFilter] = useState(searchParams.get('customer_id') ?? '');
   const [amountMin, setAmountMin]           = useState(searchParams.get('amount_min') ?? '');
   const [amountMax, setAmountMax]           = useState(searchParams.get('amount_max') ?? '');
+  const { user } = useAuthStore();
+  const [userFilter, setUserFilter] = useState<string>('all');
+  useEffect(() => { setUserFilter(defaultUserFilter(user)); }, [user]);
   const [page, setPage]       = useState(Number(searchParams.get('page') ?? '1'));
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
@@ -213,7 +218,7 @@ function DealsPage() {
       setError(null);
       const [res, cRes, allRes] = await Promise.all([
         apiClient.get('/api/v1/deals', {
-          params: { search, status: statusFilter, customer_id: customerFilter, amount_min: amountMin, amount_max: amountMax, page },
+          params: { search, status: statusFilter, customer_id: customerFilter, amount_min: amountMin, amount_max: amountMax, page, user_id: userFilter },
         }),
         apiClient.get('/api/v1/customers', { params: { page: 1 } }),
         // カンバン・グラフ用に全件取得（ページなし・最大200件）
@@ -227,7 +232,7 @@ function DealsPage() {
       if (err.response?.status === 401) router.push('/login');
       else setError('商談データの取得に失敗しました');
     } finally { setLoading(false); }
-  }, [search, statusFilter, customerFilter, amountMin, amountMax, page, router]);
+  }, [search, statusFilter, customerFilter, amountMin, amountMax, page, userFilter, router]);
 
   useEffect(() => { fetchDeals(); }, [fetchDeals]);
   useEffect(() => {
@@ -355,6 +360,7 @@ function DealsPage() {
                   <option value="">全顧客</option>
                   {customers.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
                 </select>
+                <UserFilter value={userFilter} onChange={v => { setUserFilter(v); setPage(1); }} className={selectCls} />
                 <Button onClick={handleSearch}>検索</Button>
                 {hasFilter && (
                   <Button variant="ghost" size="sm" onClick={handleClear} className="text-gray-400 hover:text-gray-600">✕ クリア</Button>

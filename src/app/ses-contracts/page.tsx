@@ -6,6 +6,8 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useAuthStore } from '@/store/authStore';
+import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
 
 // ── 型定義 ────────────────────────────────────────────────────
 interface SesContract {
@@ -292,6 +294,9 @@ function SesContractsPage() {
   const [search, setSearch]           = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const { user } = useAuthStore();
+  const [userFilter, setUserFilter] = useState<string>('all');
+  useEffect(() => { setUserFilter(defaultUserFilter(user)); }, [user]);
   const [page, setPage]               = useState(1);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
@@ -301,7 +306,7 @@ function SesContractsPage() {
     try {
       setError(null);
       const [res, allRes, sumRes] = await Promise.all([
-        apiClient.get('/api/v1/ses-contracts', { params: { search, status: statusFilter, page, per_page: 50 } }),
+        apiClient.get('/api/v1/ses-contracts', { params: { search, status: statusFilter, page, per_page: 50, user_id: userFilter } }),
         apiClient.get('/api/v1/ses-contracts', { params: { page: 1, per_page: 200 } }),
         apiClient.get('/api/v1/ses-contracts/summary'),
       ]);
@@ -313,7 +318,7 @@ function SesContractsPage() {
       if (err.response?.status === 401) router.push('/login');
       else setError('SES台帳の取得に失敗しました');
     } finally { setLoading(false); }
-  }, [search, statusFilter, page, router]);
+  }, [search, statusFilter, page, userFilter, router]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -400,6 +405,7 @@ function SesContractsPage() {
                   <option value="">全ステータス</option>
                   {SES_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
+                <UserFilter value={userFilter} onChange={v => { setUserFilter(v); setPage(1); }} className={selectCls} />
                 <Button onClick={() => { setSearch(searchInput); setPage(1); }}>検索</Button>
                 {(search || statusFilter) && (
                   <Button variant="ghost" size="sm"

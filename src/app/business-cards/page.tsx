@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useAuthStore } from '@/store/authStore';
+import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
 
 interface BusinessCard {
   id: number;
@@ -44,11 +46,14 @@ export default function BusinessCardsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const router = useRouter();
+  const { user } = useAuthStore();
+  const [userFilter, setUserFilter] = useState<string>('all');
+  useEffect(() => { setUserFilter(defaultUserFilter(user)); }, [user]);
 
   const fetchCards = useCallback(async () => {
     try {
       setError(null);
-      const res = await apiClient.get('/api/v1/cards');
+      const res = await apiClient.get('/api/v1/cards', { params: { user_id: userFilter } });
       setCards(res.data.data);
     } catch (err: any) {
       if (err.response?.status === 401) router.push('/login');
@@ -59,6 +64,7 @@ export default function BusinessCardsPage() {
   }, [router]);
 
   useEffect(() => { fetchCards(); }, [fetchCards]);
+  useEffect(() => { fetchCards(); }, [userFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3">
@@ -84,9 +90,13 @@ export default function BusinessCardsPage() {
           <h1 className="text-2xl font-bold text-gray-800">名刺管理</h1>
           <p className="text-sm text-gray-400 mt-0.5">全 {cards.length} 件</p>
         </div>
-        <Button onClick={() => router.push('/business-cards/create')} className="gap-1">
-          <span className="text-base">↑</span> アップロード
-        </Button>
+        <div className="flex items-center gap-2">
+          <UserFilter value={userFilter} onChange={setUserFilter}
+            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <Button onClick={() => router.push('/business-cards/create')} className="gap-1">
+            <span className="text-base">↑</span> アップロード
+          </Button>
+        </div>
       </div>
 
       {/* ── テーブル（ボディのみスクロール） ── */}

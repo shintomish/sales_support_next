@@ -6,6 +6,8 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useAuthStore } from '@/store/authStore';
+import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
 
 interface Activity {
   id: number; type: string; subject: string; activity_date: string;
@@ -53,6 +55,9 @@ function ActivitiesPage() {
   const [dateFrom, setDateFrom]             = useState(searchParams.get('date_from') ?? '');
   const [dateTo, setDateTo]                 = useState(searchParams.get('date_to') ?? '');
   const [page, setPage]       = useState(Number(searchParams.get('page') ?? '1'));
+  const { user } = useAuthStore();
+  const [userFilter, setUserFilter] = useState<string>('all');
+  useEffect(() => { setUserFilter(defaultUserFilter(user)); }, [user]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -69,7 +74,7 @@ function ActivitiesPage() {
       setError(null);
       const [actRes, cusRes] = await Promise.all([
         apiClient.get('/api/v1/activities', {
-          params: { search, type: typeFilter, customer_id: customerFilter, date_from: dateFrom, date_to: dateTo, page },
+          params: { search, type: typeFilter, customer_id: customerFilter, date_from: dateFrom, date_to: dateTo, page, user_id: userFilter },
         }),
         apiClient.get('/api/v1/customers', { params: { page: 1 } }),
       ]);
@@ -80,7 +85,7 @@ function ActivitiesPage() {
       if (err.response?.status === 401) router.push('/login');
       else setError('活動履歴の取得に失敗しました');
     } finally { setLoading(false); }
-  }, [search, typeFilter, customerFilter, dateFrom, dateTo, page, router]);
+  }, [search, typeFilter, customerFilter, dateFrom, dateTo, page, userFilter, router]);
 
   useEffect(() => { fetchActivities(); }, [fetchActivities]);
   useEffect(() => {
@@ -153,6 +158,7 @@ function ActivitiesPage() {
             <Input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }} className="w-36 bg-white" />
             <span className="text-gray-400 text-sm">〜</span>
             <Input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }} className="w-36 bg-white" />
+            <UserFilter value={userFilter} onChange={v => { setUserFilter(v); setPage(1); }} className={selectCls} />
             <Button onClick={handleSearch}>検索</Button>
             {hasFilter && (
               <Button variant="ghost" size="sm" onClick={handleClear} className="text-gray-400 hover:text-gray-600">✕ クリア</Button>

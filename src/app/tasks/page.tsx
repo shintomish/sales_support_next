@@ -6,6 +6,8 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useAuthStore } from '@/store/authStore';
+import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
 
 interface Task {
   id: number; title: string; priority: string; status: string;
@@ -68,6 +70,9 @@ function TasksPage() {
   const [statusFilter, setStatusFilter]       = useState(searchParams.get('status') ?? '');
   const [priorityFilter, setPriorityFilter]   = useState(searchParams.get('priority') ?? '');
   const [dueFilter, setDueFilter]             = useState(searchParams.get('due_filter') ?? '');
+  const { user } = useAuthStore();
+  const [userFilter, setUserFilter] = useState<string>('all');
+  useEffect(() => { setUserFilter(defaultUserFilter(user)); }, [user]);
   const [page, setPage]       = useState(Number(searchParams.get('page') ?? '1'));
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
@@ -84,7 +89,7 @@ function TasksPage() {
     try {
       setError(null);
       const res = await apiClient.get('/api/v1/tasks', {
-        params: { search, status: statusFilter, priority: priorityFilter, due_filter: dueFilter, page },
+        params: { search, status: statusFilter, priority: priorityFilter, due_filter: dueFilter, page, user_id: userFilter },
       });
       setTasks(res.data.data);
       setMeta(res.data.meta);
@@ -92,7 +97,7 @@ function TasksPage() {
       if (err.response?.status === 401) router.push('/login');
       else setError('タスクの取得に失敗しました');
     } finally { setLoading(false); }
-  }, [search, statusFilter, priorityFilter, dueFilter, page, router]);
+  }, [search, statusFilter, priorityFilter, dueFilter, page, userFilter, router]);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
   useEffect(() => {
@@ -162,6 +167,7 @@ function TasksPage() {
               <option value="">全優先度</option>
               {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
+            <UserFilter value={userFilter} onChange={v => { setUserFilter(v); setPage(1); }} className={selectCls} />
             <Button onClick={handleSearch}>検索</Button>
             {hasFilter && (
               <Button variant="ghost" size="sm" onClick={handleClear} className="text-gray-400 hover:text-gray-600">✕ クリア</Button>
