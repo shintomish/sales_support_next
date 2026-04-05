@@ -71,10 +71,9 @@ export default function BusinessCardsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, userFilter, sortField, sortOrder]);
 
   useEffect(() => { fetchCards(); }, [fetchCards]);
-  useEffect(() => { fetchCards(); }, [userFilter, sortField, sortOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3">
