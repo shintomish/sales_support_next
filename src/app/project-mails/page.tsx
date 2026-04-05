@@ -126,6 +126,9 @@ export default function ProjectMailsPage() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [showBody, setShowBody] = useState(false)
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [expandedItem, setExpandedItem] = useState<ProjectMail | null>(null)
+  const [expandLoading, setExpandLoading] = useState(false)
 
   const fetchList = useCallback(async () => {
     const sf = SCORE_FILTERS.find(f => f.value === scoreFilter) ?? SCORE_FILTERS[0]
@@ -151,6 +154,26 @@ export default function ProjectMailsPage() {
     setForm(res.data)
     setSaveMsg(null)
     setShowBody(false)
+  }
+
+  // 要確認モード: アコーディオン展開
+  const handleExpand = async (item: ProjectMail) => {
+    if (expandedId === item.id) { setExpandedId(null); setExpandedItem(null); return }
+    setExpandedId(item.id)
+    setExpandLoading(true)
+    try {
+      const res = await axios.get(`/api/v1/project-mails/${item.id}`)
+      setExpandedItem(res.data)
+    } finally { setExpandLoading(false) }
+  }
+
+  // 要確認モード: インラインステータス変更
+  const handleQuickStatus = async (id: number, status: string) => {
+    try {
+      await axios.patch(`/api/v1/project-mails/${id}/status`, { status })
+      fetchList()
+      if (expandedId === id) { setExpandedId(null); setExpandedItem(null) }
+    } catch { /* ignore */ }
   }
 
   // 一括スコアリング（新着未処理のみ）
@@ -259,6 +282,81 @@ export default function ProjectMailsPage() {
 
   const set = (key: keyof ProjectMail, val: unknown) => setForm(f => ({ ...f, [key]: val }))
   const arrToStr = (v: string[] | null | undefined) => (v ?? []).join(', ')
+
+  // ── 要確認モード（全幅1行1判断） ──────────────────────────
+  if (statusFilter === 'review') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* ヘッダー */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-10">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-semibold text-gray-900">要確認案件</h1>
+              {items && (
+                <span className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-300 px-2.5 py-0.5 rounded-full font-medium">
+                  {items.total}件
+                </span>
+              )}
+            </div>
+            <div className="flex gap-1.5">
+              <button onClick={handleScoreAll} disabled={scoring}
+                className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50">
+                {scoring ? '処理中...' : '新着取込'}
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* タブ切り替え */}
+            <div className="flex flex-wrap gap-1">
+              {STATUS_TABS.map(tab => (
+                <button key={tab.value}
+                  onClick={() => { setStatusFilter(tab.value); setPage(1); setExpandedId(null) }}
+                  className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                    statusFilter === tab.value ? tab.color + ' font-semibold' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                  }`}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <input type="text" placeholder="検索"
+              value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+              className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48" />
+          </div>
+          {scoreMsg && <p className="text-xs text-green-600 mt-2">{scoreMsg}</p>}
+        </div>
+
+        {/* リスト */}
+        <div className="max-w-4xl mx-auto px-6 py-4 space-y-2">
+          {items?.data.length === 0 && (
+            <div className="text-center py-16 text-gray-400">
+              <p className="text-4xl mb-3">✅</p>
+              <p className="text-sm">要確認案件はありません</p>
+            </div>
+          )}
+          {items?.data.map(item => (
+            <ReviewRow
+              key={item.id}
+              item={item}
+              expanded={expandedId === item.id}
+              expandedDetail={expandedId === item.id ? expandedItem : null}
+              expandLoading={expandedId === item.id && expandLoading}
+              onExpand={() => handleExpand(item)}
+              onQuickStatus={handleQuickStatus}
+            />
+          ))}
+          {items && items.last_page > 1 && (
+            <div className="flex items-center justify-center gap-4 pt-4">
+              <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
+                className="text-sm text-blue-600 disabled:text-gray-300">← 前へ</button>
+              <span className="text-sm text-gray-500">{page} / {items.last_page}</span>
+              <button disabled={page === items.last_page} onClick={() => setPage(p => p + 1)}
+                className="text-sm text-blue-600 disabled:text-gray-300">次へ →</button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -393,7 +491,7 @@ export default function ProjectMailsPage() {
                 {/* 判定理由 */}
                 <div className="flex flex-wrap gap-1 mt-1">
                   {(selected.score_reasons ?? []).map((r, i) => (
-                    <span key={i} className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">{r}</span>
+                    <ScoreReasonChip key={i} reason={r} />
                   ))}
                 </div>
               </div>
@@ -602,6 +700,191 @@ function FormRow({ label, children }: { label: string; children: React.ReactNode
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
       {children}
     </div>
+  )
+}
+
+// ── 要確認行コンポーネント ────────────────────────────────
+function ReviewRow({
+  item,
+  expanded,
+  expandedDetail,
+  expandLoading,
+  onExpand,
+  onQuickStatus,
+}: {
+  item: ProjectMail
+  expanded: boolean
+  expandedDetail: ProjectMail | null
+  expandLoading: boolean
+  onExpand: () => void
+  onQuickStatus: (id: number, status: string) => void
+}) {
+  const rank = scoreRank(item.score)
+  const skills = [...(item.required_skills ?? []), ...(item.preferred_skills ?? [])].slice(0, 4)
+
+  return (
+    <div className={`bg-white rounded-xl border transition-all ${expanded ? 'border-yellow-400 shadow-md' : 'border-gray-200 hover:border-gray-300'}`}>
+      {/* サマリー行 */}
+      <div
+        className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none"
+        onClick={onExpand}
+      >
+        {/* スコアバッジ */}
+        <span className={`flex-shrink-0 text-xs font-bold px-2 py-1 rounded-lg w-16 text-center ${rank.cls}`}>
+          {rank.label} {item.score}
+        </span>
+
+        {/* タイトル・スキル */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-800 truncate">
+            {item.title || item.email?.subject || '(タイトル未抽出)'}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="text-xs text-gray-500 truncate max-w-[160px]">
+              {item.customer_name || item.email?.from_name || item.email?.from_address || '—'}
+            </span>
+            {skills.map((s, i) => (
+              <span key={i} className="text-xs bg-blue-50 text-blue-600 border border-blue-100 rounded px-1.5 py-0.5">{s}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* 単価・場所 */}
+        <div className="hidden sm:flex flex-col items-end gap-0.5 flex-shrink-0 text-xs text-gray-500">
+          {item.unit_price_min
+            ? <span>💴 {item.unit_price_min}〜{item.unit_price_max ?? '?'}万</span>
+            : <span className="text-gray-300">単価なし</span>
+          }
+          {item.work_location && <span>📍 {item.work_location}</span>}
+        </div>
+
+        {/* 受信日時 */}
+        <span className="hidden md:block flex-shrink-0 text-xs text-gray-400 w-16 text-right">
+          {formatReceivedAt(item.received_at)}
+        </span>
+
+        {/* アクションボタン */}
+        <div className="flex gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+          <button
+            onClick={() => onQuickStatus(item.id, 'new')}
+            className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium whitespace-nowrap">
+            案件確定
+          </button>
+          <button
+            onClick={() => onQuickStatus(item.id, 'excluded')}
+            className="text-xs bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-300 font-medium">
+            非案件
+          </button>
+          <button
+            onClick={onExpand}
+            className="text-xs border border-gray-300 text-gray-500 px-2 py-1.5 rounded-lg hover:bg-gray-50">
+            {expanded ? '▲' : '▼'}
+          </button>
+        </div>
+      </div>
+
+      {/* 展開詳細 */}
+      {expanded && (
+        <div className="border-t border-yellow-200 bg-yellow-50/30 px-4 py-4 space-y-3">
+          {expandLoading ? (
+            <p className="text-sm text-gray-400 text-center py-4">読み込み中...</p>
+          ) : expandedDetail ? (
+            <>
+              {/* 判定理由 */}
+              {(expandedDetail.score_reasons ?? []).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-1.5">判定理由</p>
+                  <div className="flex flex-wrap gap-1">
+                    {expandedDetail.score_reasons.map((r, i) => (
+                      <ScoreReasonChip key={i} reason={r} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 抽出サマリー */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                {expandedDetail.required_skills && expandedDetail.required_skills.length > 0 && (
+                  <div><span className="text-gray-400">必須スキル</span><p className="font-medium text-gray-700">{expandedDetail.required_skills.join(', ')}</p></div>
+                )}
+                {expandedDetail.work_location && (
+                  <div><span className="text-gray-400">勤務地</span><p className="font-medium text-gray-700">{expandedDetail.work_location}{expandedDetail.remote_ok ? ' (リモート可)' : ''}</p></div>
+                )}
+                {(expandedDetail.unit_price_min || expandedDetail.unit_price_max) && (
+                  <div><span className="text-gray-400">単価</span><p className="font-medium text-gray-700">{expandedDetail.unit_price_min ?? '?'}〜{expandedDetail.unit_price_max ?? '?'}万</p></div>
+                )}
+                {expandedDetail.start_date && (
+                  <div><span className="text-gray-400">開始</span><p className="font-medium text-gray-700">{expandedDetail.start_date}</p></div>
+                )}
+              </div>
+
+              {/* 本文（キーワードハイライト） */}
+              {expandedDetail.email?.body_text && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-1.5">メール本文</p>
+                  <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto font-mono">
+                    {highlightBody(
+                      expandedDetail.email.body_text.slice(0, 1500),
+                      [...(expandedDetail.required_skills ?? []), ...(expandedDetail.preferred_skills ?? []), expandedDetail.work_location ?? ''].filter(Boolean)
+                    )}
+                    {expandedDetail.email.body_text.length > 1500 && <span className="text-gray-400">…（以下省略）</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* 詳細・判断ボタン */}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => onQuickStatus(item.id, 'new')}
+                  className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium">
+                  ✓ 案件確定
+                </button>
+                <button
+                  onClick={() => onQuickStatus(item.id, 'excluded')}
+                  className="text-sm bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-lg hover:bg-red-100 font-medium">
+                  ✗ 非案件
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ドメイン補正理由チップの色分けと表示テキスト変換
+function ScoreReasonChip({ reason }: { reason: string }) {
+  if (reason.startsWith('domain:')) {
+    // "domain:example.com:+20(85%/12件)"
+    const parts = reason.replace('domain:', '').split(':')
+    const domain = parts[0]
+    const detail = parts[1] ?? ''
+    const isPositive = detail.startsWith('+')
+    return (
+      <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
+        isPositive
+          ? 'bg-green-50 border-green-300 text-green-700'
+          : 'bg-red-50 border-red-300 text-red-700'
+      }`}>
+        🏢 {domain} {detail}
+      </span>
+    )
+  }
+  return (
+    <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">{reason}</span>
+  )
+}
+
+function highlightBody(text: string, keywords: string[]): React.ReactNode {
+  const kws = keywords.filter(k => k.length >= 2)
+  if (!kws.length) return text
+  const pattern = new RegExp(`(${kws.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi')
+  const parts = text.split(pattern)
+  return parts.map((part, i) =>
+    pattern.test(part)
+      ? <mark key={i} style={{ background: '#fef08a', borderRadius: 2, padding: '0 1px' }}>{part}</mark>
+      : part
   )
 }
 
