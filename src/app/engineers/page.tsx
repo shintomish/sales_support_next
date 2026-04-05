@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
+import SortableHeader from '@/components/SortableHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -70,20 +71,27 @@ export default function EngineersPage() {
   const [workStyle, setWorkStyle] = useState('');
   const [page, setPage]           = useState(1);
   const [viewMode, setViewMode]   = useState<ViewMode>('card');
+  const [sortField, setSortField] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const handleSort = (field: string) => {
+    if (sortField === field) { setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); }
+    else { setSortField(field); setSortOrder('asc'); }
+    setPage(1);
+  };
 
   const fetchEngineers = useCallback(async () => {
     setLoading(true);
     try {
       const perPage = viewMode === 'kanban' ? 200 : 20;
       const res = await apiClient.get('/api/v1/engineers', {
-        params: { search: search || undefined, work_style: workStyle || undefined, page, per_page: perPage },
+        params: { search: search || undefined, work_style: workStyle || undefined, page, per_page: perPage, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined },
       });
       setEngineers(res.data.data);
       setMeta(res.data.meta);
     } catch (err: any) {
       if (err.response?.status === 401) router.push('/login');
     } finally { setLoading(false); }
-  }, [search, workStyle, page, viewMode, router]);
+  }, [search, workStyle, page, viewMode, sortField, sortOrder, router]);
 
   useEffect(() => { fetchEngineers(); }, [fetchEngineers]);
 
@@ -165,9 +173,13 @@ export default function EngineersPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['氏名', '所属', '所属区分', '年齢', '稼働状況', '希望単価', '稼働可能日', 'スキル'].map(h => (
+                  <SortableHeader label="氏名" field="name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
+                  <SortableHeader label="所属" field="affiliation" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
+                  {['所属区分', '年齢', '稼働状況', '希望単価'].map(h => (
                     <th key={h} className="text-left text-xs font-medium text-gray-500 px-4 py-3">{h}</th>
                   ))}
+                  <SortableHeader label="稼働可能日" field="available_from" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
+                  <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">スキル</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">

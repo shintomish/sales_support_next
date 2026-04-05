@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
+import SortableHeader from '@/components/SortableHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -57,6 +58,13 @@ export default function PublicProjectsPage() {
   const [priceFilter, setPriceFilter] = useState('');
   const [page, setPage]               = useState(1);
   const [viewMode, setViewMode]       = useState<ViewMode>('card');
+  const [sortField, setSortField]     = useState<string>('');
+  const [sortOrder, setSortOrder]     = useState<'asc' | 'desc'>('asc');
+  const handleSort = (field: string) => {
+    if (sortField === field) { setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); }
+    else { setSortField(field); setSortOrder('asc'); }
+    setPage(1);
+  };
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
@@ -69,6 +77,8 @@ export default function PublicProjectsPage() {
           unit_price_min: priceFilter || undefined,
           page,
           per_page: perPage,
+          sort_by: sortField || undefined,
+          sort_order: sortField ? sortOrder : undefined,
         },
       });
       setProjects(res.data.data);
@@ -76,7 +86,7 @@ export default function PublicProjectsPage() {
     } catch (err: any) {
       if (err.response?.status === 401) router.push('/login');
     } finally { setLoading(false); }
-  }, [search, workStyle, priceFilter, page, viewMode, router]);
+  }, [search, workStyle, priceFilter, page, viewMode, sortField, sortOrder, router]);
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
@@ -174,7 +184,13 @@ export default function PublicProjectsPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['', '案件名', '顧客', 'ステータス', '単価', '勤務形態', '開始', 'スキル', '応募'].map(h => (
+                  <th className="text-left text-xs font-medium text-gray-500 px-4 py-3"></th>
+                  <SortableHeader label="案件名" field="title" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
+                  <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">顧客</th>
+                  <SortableHeader label="ステータス" field="status" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
+                  <SortableHeader label="単価" field="unit_price_min" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
+                  <SortableHeader label="勤務形態" field="work_style" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
+                  {['開始', 'スキル', '応募'].map(h => (
                     <th key={h} className="text-left text-xs font-medium text-gray-500 px-4 py-3">{h}</th>
                   ))}
                 </tr>

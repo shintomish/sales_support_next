@@ -222,7 +222,7 @@ function TasksPage() {
                   <SortableHeader label="ステータス" field="status" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">顧客</th>
                   <SortableHeader label="期限日" field="due_date" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">担当者</th>
+                  <SortableHeader label="担当者" field="assignee" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <th className="font-semibold text-gray-600 py-3 px-4 text-center">操作</th>
                 </tr>
               </thead>

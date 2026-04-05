@@ -455,9 +455,12 @@ function SesContractsPage() {
                       </colgroup>
                       <thead><tr>
                         <SortableHeader label="項番" field="project_number" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 first:pl-4 text-xs" />
-                        {['氏名','変更種別','所属','顧客','エンド','案件名'].map(h => (
+                        {['氏名','変更種別','所属'].map(h => (
                           <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">{h}</th>
                         ))}
+                        <SortableHeader label="顧客" field="customer_name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
+                        <th className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">エンド</th>
+                        <SortableHeader label="案件名" field="project_name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
                         <SortableHeader label="ステータス" field="status" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
                         <SortableHeader label="契約終了" field="contract_period_end" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
                         <th className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">残日数</th>
