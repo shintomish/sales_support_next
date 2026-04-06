@@ -389,7 +389,11 @@ export default function EngineerDetailPage() {
                         <span className="text-xs text-gray-400">年</span>
                         <select className="border rounded px-1 py-0.5 text-xs" value={s.proficiency_level}
                           onChange={e => setAddedSkills(prev => prev.map((x, j) => j === i ? { ...x, proficiency_level: e.target.value } : x))}>
-                          {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
+                          <option value="1">1: 入門</option>
+                          <option value="2">2: 基礎</option>
+                          <option value="3">3: 実務</option>
+                          <option value="4">4: 上級</option>
+                          <option value="5">5: エキスパート</option>
                         </select>
                         <button onClick={() => setAddedSkills(prev => prev.filter((_, j) => j !== i))} className="ml-auto text-gray-400 hover:text-red-500 text-xs">✕</button>
                       </div>
