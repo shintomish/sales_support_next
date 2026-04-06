@@ -65,6 +65,17 @@ export default function EngineerCreatePage() {
     setSkillOptions([]);
   };
 
+  const addNewSkill = async (name: string) => {
+    if (!name.trim()) return;
+    try {
+      const res = await apiClient.post('/api/v1/matching/skills', { name: name.trim(), category: 'other' });
+      const newSkill: SkillOption = res.data.data;
+      addSkill(newSkill);
+    } catch {
+      alert('スキルの追加に失敗しました');
+    }
+  };
+
   const updateSkill = (idx: number, field: 'experience_years' | 'proficiency_level', val: string) => {
     setAddedSkills(prev => prev.map((s, i) => i === idx ? { ...s, [field]: val } : s));
   };
@@ -190,7 +201,7 @@ export default function EngineerCreatePage() {
                   />
                   {skillSearching && <div className="w-5 h-5 mt-2 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />}
                 </div>
-                {skillOptions.length > 0 && (
+                {(skillOptions.length > 0 || skillQuery.trim()) && (
                   <div className="absolute z-10 top-full mt-1 w-full bg-white border border-gray-200 rounded-md shadow-md">
                     {skillOptions.map(opt => (
                       <button
@@ -204,6 +215,15 @@ export default function EngineerCreatePage() {
                         {opt.name}
                       </button>
                     ))}
+                    {skillQuery.trim() && !skillOptions.some(o => o.name.toLowerCase() === skillQuery.trim().toLowerCase()) && (
+                      <button
+                        onClick={() => addNewSkill(skillQuery)}
+                        className="w-full text-left px-4 py-2 text-sm hover:bg-green-50 text-green-700 border-t border-gray-100 flex items-center gap-2"
+                      >
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">新規</span>
+                        「{skillQuery.trim()}」を新しいスキルとして追加
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

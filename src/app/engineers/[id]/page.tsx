@@ -156,6 +156,16 @@ export default function EngineerDetailPage() {
     setSkillQuery(''); setSkillOptions([]);
   };
 
+  const addNewSkill = async (name: string) => {
+    if (!name.trim()) return;
+    try {
+      const res = await apiClient.post('/api/v1/matching/skills', { name: name.trim(), category: 'other' });
+      addSkill(res.data.data);
+    } catch {
+      alert('スキルの追加に失敗しました');
+    }
+  };
+
   const handleUpdate = async () => {
     if (!name.trim()) { setErrors({ name: '氏名は必須です' }); return; }
     setSaving(true); setErrors({});
@@ -352,13 +362,21 @@ export default function EngineerDetailPage() {
                       onChange={e => { setSkillQuery(e.target.value); searchSkills(e.target.value); }}
                       placeholder="スキルを検索..."
                     />
-                    {skillOptions.length > 0 && (
+                    {(skillOptions.length > 0 || skillQuery.trim()) && (
                       <div className="absolute z-10 top-full mt-1 w-full bg-white border border-gray-200 rounded-md shadow-md">
                         {skillOptions.map(opt => (
                           <button key={opt.id} onClick={() => addSkill(opt)} className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50">
                             {opt.name}
                           </button>
                         ))}
+                        {skillQuery.trim() && !skillOptions.some(o => o.name.toLowerCase() === skillQuery.trim().toLowerCase()) && (
+                          <button
+                            onClick={() => addNewSkill(skillQuery)}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-green-50 text-green-700 border-t border-gray-100"
+                          >
+                            ＋「{skillQuery.trim()}」を新しいスキルとして追加
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
