@@ -116,7 +116,7 @@ export default function EngineerCreatePage() {
   const SKILL_CATEGORY_COLOR: Record<string, string> = {
     language: 'bg-blue-100 text-blue-700', framework: 'bg-purple-100 text-purple-700',
     database: 'bg-green-100 text-green-700', infrastructure: 'bg-orange-100 text-orange-700',
-    other: 'bg-gray-100 text-gray-600',
+    other: 'bg-gray-300 text-gray-700',
   };
 
   const tabs: { key: Tab; label: string }[] = [

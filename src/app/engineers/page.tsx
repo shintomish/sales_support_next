@@ -56,7 +56,7 @@ const SKILL_CATEGORY_COLOR: Record<string, string> = {
   framework:      'bg-purple-100 text-purple-700',
   database:       'bg-green-100 text-green-700',
   infrastructure: 'bg-orange-100 text-orange-700',
-  other:          'bg-gray-100 text-gray-600',
+  other:          'bg-gray-300 text-gray-700',
 };
 const AFFILIATION_TYPE_LABEL: Record<string, string> = { self: '自社', bp: 'BP' };
 const fmtDate = (v: string | null) =>
