@@ -664,7 +664,12 @@ export default function ProjectMailsPage() {
                     <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans">
                       {highlightBody(
                         selected.email.body_text,
-                        extractKeywordsFromReasons(selected.score_reasons ?? [])
+                        [
+                          ...extractKeywordsFromReasons(selected.score_reasons ?? []),
+                          ...(selected.required_skills ?? []),
+                          ...(selected.preferred_skills ?? []),
+                          selected.work_location ?? '',
+                        ].filter(Boolean)
                       )}
                     </pre>
                   ) : selected.email?.body_html ? (
