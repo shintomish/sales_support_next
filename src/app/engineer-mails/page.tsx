@@ -397,8 +397,11 @@ export default function EngineerMailsPage() {
                   </span>
                 </div>
                 <p className="text-sm font-medium text-gray-800 truncate">
-                  {item.name || item.email?.subject || item.email?.from_name || '(件名なし)'}
+                  {item.name || item.email?.from_name || '(件名なし)'}
                 </p>
+                {item.email?.subject && (
+                  <p className="text-xs text-gray-600 truncate mt-0.5">{item.email.subject}</p>
+                )}
                 <div className="flex items-center gap-2 mt-0.5">
                   <p className="text-xs text-gray-500 truncate flex-1">
                     {item.email?.from_name || item.email?.from_address || '—'}
@@ -677,12 +680,15 @@ function ReviewRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-gray-800 truncate">
-              {item.name || item.email?.subject || item.email?.from_name || '(件名なし)'}
+              {item.name || item.email?.from_name || '(件名なし)'}
             </p>
             {item.has_attachment && (
               <span className="text-xs bg-teal-50 text-teal-600 border border-teal-200 rounded px-1.5 py-0.5 flex-shrink-0">📎</span>
             )}
           </div>
+          {item.email?.subject && (
+            <p className="text-xs text-gray-600 truncate mt-0.5">{item.email.subject}</p>
+          )}
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <span className="text-xs text-gray-500 truncate max-w-[160px]">
               {item.email?.from_name || item.email?.from_address || '—'}
