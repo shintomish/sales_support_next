@@ -322,6 +322,10 @@ export default function ProjectMailsPage() {
               value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
               className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48" />
           </div>
+          <ProcessingBar
+            active={scoring || rescoring}
+            label={scoring ? '新着取込中...' : rescoring ? '全件再スコア中...' : undefined}
+          />
           {scoreMsg && <p className="text-xs text-green-600 mt-2">{scoreMsg}</p>}
         </div>
 
@@ -388,6 +392,11 @@ export default function ProjectMailsPage() {
           <input type="text" placeholder="件名・顧客名・勤務地で検索"
             value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
             className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+
+          <ProcessingBar
+            active={scoring || rescoring || extracting}
+            label={scoring ? '新着取込中...' : rescoring ? '全件再スコア中...' : extracting ? '情報抽出中...' : undefined}
+          />
 
           {/* ステータスタブ */}
           <div className="flex flex-wrap gap-1">
@@ -693,6 +702,28 @@ export default function ProjectMailsPage() {
 }
 
 // ── サブコンポーネント ────────────────────────────────────
+
+function ProcessingBar({ active, label }: { active: boolean; label?: string }) {
+  if (!active) return null
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-0.5">
+        <span className="text-xs text-blue-600 animate-pulse">{label ?? '処理中...'}</span>
+      </div>
+      <div className="w-full h-1.5 bg-blue-100 rounded-full overflow-hidden">
+        <div className="h-full bg-blue-500 rounded-full animate-[progress_1.5s_ease-in-out_infinite]"
+          style={{ animation: 'indeterminate 1.5s ease-in-out infinite' }} />
+      </div>
+      <style>{`
+        @keyframes indeterminate {
+          0%   { transform: translateX(-100%) scaleX(0.3); }
+          50%  { transform: translateX(50%)   scaleX(0.5); }
+          100% { transform: translateX(300%)  scaleX(0.3); }
+        }
+      `}</style>
+    </div>
+  )
+}
 
 function Spinner({ size = 14 }: { size?: number }) {
   return (
