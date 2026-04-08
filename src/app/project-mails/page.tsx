@@ -888,7 +888,12 @@ function ScoreReasonChip({ reason }: { reason: string }) {
 
 function extractKeywordsFromReasons(reasons: string[]): string[] {
   return reasons
-    .filter(r => !r.startsWith('domain:') && r !== 'excluded' && r !== 'price_concrete')
+    .filter(r =>
+      !r.startsWith('domain:') &&
+      !r.startsWith('location:') &&  // 都市名は住所にも出るため除外（work_locationで代替）
+      r !== 'excluded' &&
+      r !== 'price_concrete'
+    )
     .flatMap(r => {
       const colonIdx = r.indexOf(':')
       if (colonIdx < 0) return []
