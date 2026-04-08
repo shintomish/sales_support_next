@@ -28,17 +28,22 @@ const SKILL_COLOR: Record<string, string> = {
   other: 'bg-gray-300 text-gray-700',
 };
 
+const GENDER_LABEL: Record<string, string> = {
+  male: '男性', female: '女性', other: 'その他', unanswered: '回答しない',
+};
+
 interface Engineer {
   id: number; name: string; name_kana: string | null; email: string | null; phone: string | null;
   affiliation: string | null; affiliation_contact: string | null;
-  age: number | null; nationality: string | null; affiliation_type: string | null;
+  age: number | null; gender: string | null; nationality: string | null;
+  nearest_station: string | null; affiliation_type: string | null;
   profile: {
     desired_unit_price_min: number | null; desired_unit_price_max: number | null;
     available_from: string | null; availability_status: string | null;
     past_client_count: number | null;
     work_style: string | null; preferred_location: string | null;
     self_introduction: string | null; github_url: string | null; portfolio_url: string | null;
-    is_public: boolean;
+    resume_file_path: string | null; is_public: boolean;
   } | null;
   skills: { skill_id: number; skill_name: string; category: string | null; experience_years: number; proficiency_level: number; }[];
 }
@@ -94,9 +99,11 @@ export default function EngineerDetailPage() {
   const [github, setGithub]         = useState('');
   const [portfolio, setPortfolio]   = useState('');
   const [isPublic, setIsPublic]     = useState(false);
-  const [age, setAge]                     = useState('');
-  const [nationality, setNationality]     = useState('');
-  const [affiliationType, setAffiliationType] = useState('');
+  const [age, setAge]                           = useState('');
+  const [gender, setGender]                     = useState('');
+  const [nationality, setNationality]           = useState('');
+  const [nearestStation, setNearestStation]     = useState('');
+  const [affiliationType, setAffiliationType]   = useState('');
   const [availabilityStatus, setAvailabilityStatus] = useState('available');
   const [pastClientCount, setPastClientCount] = useState('');
   const [addedSkills, setAddedSkills] = useState<SkillItem[]>([]);
@@ -122,7 +129,9 @@ export default function EngineerDetailPage() {
       setAffiliation(e.affiliation ?? '');
       setAffiliationContact(e.affiliation_contact ?? '');
       setAge(e.age?.toString() ?? '');
+      setGender(e.gender ?? '');
       setNationality(e.nationality ?? '');
+      setNearestStation(e.nearest_station ?? '');
       setAffiliationType(e.affiliation_type ?? '');
       setAvailabilityStatus(e.profile?.availability_status ?? 'available');
       setPastClientCount(e.profile?.past_client_count?.toString() ?? '');
@@ -179,7 +188,9 @@ export default function EngineerDetailPage() {
         phone: phone || null, affiliation: affiliation || null,
         affiliation_contact: affiliationContact || null,
         age: age ? Number(age) : null,
+        gender: gender || null,
         nationality: nationality || null,
+        nearest_station: nearestStation || null,
         affiliation_type: affiliationType || null,
         availability_status: availabilityStatus || 'available',
         past_client_count: pastClientCount ? Number(pastClientCount) : null,
@@ -214,7 +225,9 @@ export default function EngineerDetailPage() {
     if (engineer.affiliation_contact) lines.push(`所属担当者: ${engineer.affiliation_contact}`);
     if (engineer.affiliation_type)    lines.push(`所属区分: ${AFFILIATION_TYPE_LABEL[engineer.affiliation_type] ?? engineer.affiliation_type}`);
     if (engineer.age)                 lines.push(`年齢: ${engineer.age}歳`);
+    if (engineer.gender)              lines.push(`性別: ${GENDER_LABEL[engineer.gender] ?? engineer.gender}`);
     if (engineer.nationality)         lines.push(`国籍: ${engineer.nationality}`);
+    if (engineer.nearest_station)     lines.push(`最寄駅: ${engineer.nearest_station}`);
     if (p?.availability_status)       lines.push(`稼働状況: ${AVAILABILITY_LABEL[p.availability_status]?.label ?? p.availability_status}`);
     if (p?.available_from)            lines.push(`稼働可能日: ${fmtDate(p.available_from)}`);
     if (p?.desired_unit_price_min || p?.desired_unit_price_max)
@@ -288,7 +301,9 @@ export default function EngineerDetailPage() {
                   <div><p className="text-xs text-gray-400">所属</p><p>{engineer.affiliation ?? <Em />}</p></div>
                   <div><p className="text-xs text-gray-400">所属担当者</p><p>{engineer.affiliation_contact ?? <Em />}</p></div>
                   <div><p className="text-xs text-gray-400">年齢</p><p>{engineer.age ? `${engineer.age}歳` : <Em />}</p></div>
+                  <div><p className="text-xs text-gray-400">性別</p><p>{engineer.gender ? (GENDER_LABEL[engineer.gender] ?? engineer.gender) : <Em />}</p></div>
                   <div><p className="text-xs text-gray-400">国籍</p><p>{engineer.nationality ?? <Em />}</p></div>
+                  <div><p className="text-xs text-gray-400">最寄駅</p><p>{engineer.nearest_station ?? <Em />}</p></div>
                   <div>
                     <p className="text-xs text-gray-400">所属区分</p>
                     <p>{engineer.affiliation_type ? AFFILIATION_TYPE_LABEL[engineer.affiliation_type] ?? engineer.affiliation_type : <Em />}</p>
@@ -338,6 +353,20 @@ export default function EngineerDetailPage() {
                   {p?.portfolio_url && (
                     <div><p className="text-xs text-gray-400">ポートフォリオ</p><a href={p.portfolio_url} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline text-xs">{p.portfolio_url}</a></div>
                   )}
+                  {p?.resume_file_path && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-gray-400 mb-1">スキルシート</p>
+                      <a
+                        href={p.resume_file_path}
+                        target="_blank"
+                        rel="noreferrer"
+                        download
+                        className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-yellow-50 border border-yellow-300 text-yellow-800 hover:bg-yellow-100 transition-colors"
+                      >
+                        📄 {p.resume_file_path.split('/').pop()} をダウンロード
+                      </a>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </>
@@ -348,7 +377,7 @@ export default function EngineerDetailPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className={labelCls}>氏名 <span className="text-red-500">*</span></label>
+                    <label className={labelCls}>氏名（イニシャル） <span className="text-red-500">*</span></label>
                     <input className={inputCls} value={name} onChange={e => setName(e.target.value)} />
                     {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
                   </div>
@@ -368,8 +397,24 @@ export default function EngineerDetailPage() {
                     <input className={inputCls} type="number" min="18" max="80" value={age} onChange={e => setAge(e.target.value)} placeholder="35" />
                   </div>
                   <div>
+                    <label className={labelCls}>性別</label>
+                    <select className={inputCls} value={gender} onChange={e => setGender(e.target.value)}>
+                      <option value="">選択</option>
+                      <option value="male">男性</option>
+                      <option value="female">女性</option>
+                      <option value="other">その他</option>
+                      <option value="unanswered">回答しない</option>
+                    </select>
+                  </div>
+                  <div>
                     <label className={labelCls}>国籍</label>
                     <input className={inputCls} value={nationality} onChange={e => setNationality(e.target.value)} placeholder="日本" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>最寄駅</label>
+                    <input className={inputCls} value={nearestStation} onChange={e => setNearestStation(e.target.value)} placeholder="渋谷駅" />
                   </div>
                   <div>
                     <label className={labelCls}>所属区分</label>
