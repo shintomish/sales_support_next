@@ -668,7 +668,6 @@ export default function ProjectMailsPage() {
                           ...extractKeywordsFromReasons(selected.score_reasons ?? []),
                           ...(selected.required_skills ?? []),
                           ...(selected.preferred_skills ?? []),
-                          selected.work_location ?? '',
                         ].filter(Boolean)
                       )}
                     </pre>
@@ -835,7 +834,7 @@ function ReviewRow({
                   <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto font-mono">
                     {highlightBody(
                       expandedDetail.email.body_text.slice(0, 1500),
-                      [...(expandedDetail.required_skills ?? []), ...(expandedDetail.preferred_skills ?? []), expandedDetail.work_location ?? ''].filter(Boolean)
+                      [...(expandedDetail.required_skills ?? []), ...(expandedDetail.preferred_skills ?? [])].filter(Boolean)
                     )}
                     {expandedDetail.email.body_text.length > 1500 && <span className="text-gray-400">…（以下省略）</span>}
                   </div>
