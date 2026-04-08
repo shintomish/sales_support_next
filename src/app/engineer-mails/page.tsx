@@ -397,7 +397,7 @@ export default function EngineerMailsPage() {
                   </span>
                 </div>
                 <p className="text-sm font-medium text-gray-800 truncate">
-                  {item.name || item.email?.subject || '(名前未抽出)'}
+                  {item.name || item.email?.subject || item.email?.from_name || '(件名なし)'}
                 </p>
                 <div className="flex items-center gap-2 mt-0.5">
                   <p className="text-xs text-gray-500 truncate flex-1">
@@ -494,6 +494,14 @@ export default function EngineerMailsPage() {
                 <h2 className="text-sm font-semibold text-gray-700">抽出情報（編集可）</h2>
               </div>
               <div className="p-4 space-y-4">
+                {/* メール件名（読み取り専用） */}
+                {selected.email?.subject && (
+                  <div className="bg-gray-50 rounded-lg px-3 py-2">
+                    <p className="text-xs text-gray-400 mb-0.5">メール件名</p>
+                    <p className="text-sm text-gray-700 font-medium">{selected.email.subject}</p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <FormRow label="氏名">
                     <input value={form.name ?? ''} onChange={e => set('name', e.target.value || null)}
@@ -669,7 +677,7 @@ function ReviewRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-gray-800 truncate">
-              {item.name || item.email?.subject || '(名前未抽出)'}
+              {item.name || item.email?.subject || item.email?.from_name || '(件名なし)'}
             </p>
             {item.has_attachment && (
               <span className="text-xs bg-teal-50 text-teal-600 border border-teal-200 rounded px-1.5 py-0.5 flex-shrink-0">📎</span>
