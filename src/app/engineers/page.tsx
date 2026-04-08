@@ -38,7 +38,7 @@ interface Meta { current_page: number; last_page: number; total: number; }
 type ViewMode = 'card' | 'list' | 'kanban';
 
 const WORK_STYLE_LABEL: Record<string, string> = {
-  remote: 'フルリモート', office: '出社', hybrid: 'ハイブリッド',
+  remote: 'フルリモート', office: '出社', hybrid: '出社、リモートどちらも対応',
 };
 const AVAILABILITY_BADGE: Record<string, { label: string; cls: string }> = {
   available: { label: '空き',    cls: 'bg-green-100 text-green-700' },
@@ -137,7 +137,7 @@ export default function EngineersPage() {
         <select value={workStyle} onChange={e => { setWorkStyle(e.target.value); setPage(1); }} className={selectCls}>
           <option value="">勤務形態：すべて</option>
           <option value="remote">フルリモート</option>
-          <option value="hybrid">ハイブリッド</option>
+          <option value="hybrid">出社、リモートどちらも対応</option>
           <option value="office">出社</option>
         </select>
         <Button type="submit" variant="outline">検索</Button>

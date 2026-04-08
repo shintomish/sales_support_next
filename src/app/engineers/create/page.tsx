@@ -292,7 +292,7 @@ export default function EngineerCreatePage() {
                   <select className={inputCls} value={workStyle} onChange={e => setWorkStyle(e.target.value)}>
                     <option value="">選択してください</option>
                     <option value="remote">フルリモート</option>
-                    <option value="hybrid">ハイブリッド</option>
+                    <option value="hybrid">出社、リモートどちらも対応</option>
                     <option value="office">出社</option>
                   </select>
                 </div>

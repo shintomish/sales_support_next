@@ -12,7 +12,7 @@ const Em = () => <span className="text-gray-300 text-xs">—</span>;
 const fmtDate = (v: string | null) =>
   v ? new Date(v).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }) : null;
 
-const WORK_STYLE_LABEL: Record<string, string> = { remote: 'フルリモート', office: '出社', hybrid: 'ハイブリッド' };
+const WORK_STYLE_LABEL: Record<string, string> = { remote: 'フルリモート', office: '出社', hybrid: '出社、リモートどちらも対応' };
 const AVAILABILITY_LABEL: Record<string, { label: string; cls: string }> = {
   available:  { label: '空き',     cls: 'bg-green-100 text-green-700' },
   working:    { label: '稼働中',   cls: 'bg-orange-100 text-orange-700' },
@@ -451,7 +451,7 @@ export default function EngineerDetailPage() {
                       <select className={inputCls} value={workStyle} onChange={e => setWorkStyle(e.target.value)}>
                         <option value="">選択</option>
                         <option value="remote">フルリモート</option>
-                        <option value="hybrid">ハイブリッド</option>
+                        <option value="hybrid">出社、リモートどちらも対応</option>
                         <option value="office">出社</option>
                       </select>
                     </div>
