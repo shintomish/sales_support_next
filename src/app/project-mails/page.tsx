@@ -905,13 +905,30 @@ function extractKeywordsFromReasons(reasons: string[]): string[] {
 function highlightBody(text: string, keywords: string[]): React.ReactNode {
   const kws = keywords.filter(k => k.length >= 2)
   if (!kws.length) return text
-  const pattern = new RegExp(`(${kws.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi')
-  const parts = text.split(pattern)
-  return parts.map((part, i) =>
-    pattern.test(part)
-      ? <mark key={i} style={{ background: '#fef08a', borderRadius: 2, padding: '0 1px' }}>{part}</mark>
-      : part
-  )
+
+  // URL部分はハイライト対象外（cc.php → PHP 等の誤マッチを防ぐ）
+  const urlPattern = /https?:\/\/[^\s\u3000"'<>「」【】）)]+/g
+  const segments: { text: string; isUrl: boolean }[] = []
+  let lastIndex = 0
+  let urlMatch: RegExpExecArray | null
+  while ((urlMatch = urlPattern.exec(text)) !== null) {
+    if (urlMatch.index > lastIndex) segments.push({ text: text.slice(lastIndex, urlMatch.index), isUrl: false })
+    segments.push({ text: urlMatch[0], isUrl: true })
+    lastIndex = urlMatch.index + urlMatch[0].length
+  }
+  if (lastIndex < text.length) segments.push({ text: text.slice(lastIndex), isUrl: false })
+
+  const kwPattern = new RegExp(`(${kws.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi')
+
+  return segments.flatMap((seg, si) => {
+    if (seg.isUrl) return [seg.text]
+    const parts = seg.text.split(kwPattern)
+    return parts.map((part, pi) =>
+      kwPattern.test(part)
+        ? <mark key={`${si}-${pi}`} style={{ background: '#fef08a', borderRadius: 2, padding: '0 1px' }}>{part}</mark>
+        : part
+    )
+  })
 }
 
 // ── ユーティリティ ────────────────────────────────────────
