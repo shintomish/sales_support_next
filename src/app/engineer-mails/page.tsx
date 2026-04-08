@@ -165,8 +165,15 @@ export default function EngineerMailsPage() {
   const handleScoreAll = async () => {
     setScoring(true); setScoreMsg('')
     try {
-      const res = await axios.post('/api/v1/engineer-mails/score-all')
-      setScoreMsg(res.data.message)
+      let total = 0
+      while (true) {
+        const res = await axios.post('/api/v1/engineer-mails/score-all')
+        total += res.data.count ?? 0
+        const remaining = res.data.remaining ?? 0
+        setScoreMsg(`処理済: ${total}件 / 残り: ${remaining}件`)
+        if (remaining === 0 || res.data.count === 0) break
+      }
+      setScoreMsg(`完了: ${total}件をスコアリングしました`)
       fetchList()
     } catch { setScoreMsg('スコアリングに失敗しました') }
     finally { setScoring(false) }
