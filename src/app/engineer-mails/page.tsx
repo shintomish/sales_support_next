@@ -170,9 +170,12 @@ export default function EngineerMailsPage() {
         const res = await axios.post('/api/v1/engineer-mails/score-all')
         total += res.data.count ?? 0
         const remaining = res.data.remaining ?? 0
+        // バッチごとにUIを更新するためにmicrotaskを挟む
+        await new Promise(resolve => setTimeout(resolve, 0))
         setScoreMsg(`処理済: ${total}件 / 残り: ${remaining}件`)
         if (remaining === 0 || res.data.count === 0) break
       }
+      await new Promise(resolve => setTimeout(resolve, 0))
       setScoreMsg(`完了: ${total}件をスコアリングしました`)
       fetchList()
     } catch { setScoreMsg('スコアリングに失敗しました') }
@@ -295,9 +298,9 @@ export default function EngineerMailsPage() {
           </div>
           <ProcessingBar
             active={scoring || rescoring}
-            label={scoring ? '新着取込中...' : rescoring ? '全件再スコア中...' : undefined}
+            label={scoring ? (scoreMsg || '新着取込中...') : rescoring ? '全件再スコア中...' : undefined}
           />
-          {scoreMsg && <p className="text-xs text-green-600 mt-2">{scoreMsg}</p>}
+          {!scoring && scoreMsg && <p className="text-xs text-green-600 mt-2">{scoreMsg}</p>}
         </div>
 
         {/* リスト */}
@@ -354,7 +357,7 @@ export default function EngineerMailsPage() {
               </button>
             </div>
           </div>
-          {scoreMsg && <p className="text-xs text-green-600">{scoreMsg}</p>}
+          {!scoring && scoreMsg && <p className="text-xs text-green-600">{scoreMsg}</p>}
 
           <input type="text" placeholder="氏名・スキル・最寄り駅で検索"
             value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
@@ -362,7 +365,7 @@ export default function EngineerMailsPage() {
 
           <ProcessingBar
             active={scoring || rescoring}
-            label={scoring ? '新着取込中...' : rescoring ? '全件再スコア中...' : undefined}
+            label={scoring ? (scoreMsg || '新着取込中...') : rescoring ? '全件再スコア中...' : undefined}
           />
 
           {/* ステータスタブ */}
