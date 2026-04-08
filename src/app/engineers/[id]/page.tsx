@@ -73,6 +73,7 @@ export default function EngineerDetailPage() {
   const [editing, setEditing]     = useState(false);
   const [saving, setSaving]       = useState(false);
   const [errors, setErrors]       = useState<Record<string, string>>({});
+  const [copied, setCopied]       = useState(false);
 
   // 編集フォームステート
   const [name, setName]             = useState('');
@@ -198,6 +199,37 @@ export default function EngineerDetailPage() {
     } finally { setSaving(false); }
   };
 
+  const copyEngineerText = () => {
+    if (!engineer) return;
+    const p = engineer.profile;
+    const lines: string[] = [];
+    lines.push(`【技術者情報】`);
+    lines.push(`氏名: ${engineer.name}${engineer.name_kana ? ` (${engineer.name_kana})` : ''}`);
+    if (engineer.email)               lines.push(`メール: ${engineer.email}`);
+    if (engineer.phone)               lines.push(`電話: ${engineer.phone}`);
+    if (engineer.affiliation)         lines.push(`所属: ${engineer.affiliation}`);
+    if (engineer.affiliation_contact) lines.push(`所属担当者: ${engineer.affiliation_contact}`);
+    if (engineer.affiliation_type)    lines.push(`所属区分: ${AFFILIATION_TYPE_LABEL[engineer.affiliation_type] ?? engineer.affiliation_type}`);
+    if (engineer.age)                 lines.push(`年齢: ${engineer.age}歳`);
+    if (engineer.nationality)         lines.push(`国籍: ${engineer.nationality}`);
+    if (p?.availability_status)       lines.push(`稼働状況: ${AVAILABILITY_LABEL[p.availability_status]?.label ?? p.availability_status}`);
+    if (p?.available_from)            lines.push(`稼働可能日: ${fmtDate(p.available_from)}`);
+    if (p?.desired_unit_price_min || p?.desired_unit_price_max)
+                                      lines.push(`希望単価: ${p?.desired_unit_price_min ?? '?'}〜${p?.desired_unit_price_max ?? '?'}万円/月`);
+    if (p?.work_style)                lines.push(`勤務形態: ${WORK_STYLE_LABEL[p.work_style] ?? p.work_style}`);
+    if (p?.preferred_location)        lines.push(`希望勤務地: ${p.preferred_location}`);
+    if (engineer.skills.length > 0) {
+      const skillText = engineer.skills
+        .map(s => `${s.skill_name}${s.experience_years > 0 ? `(${s.experience_years}年)` : ''}`)
+        .join('、');
+      lines.push(`スキル: ${skillText}`);
+    }
+    if (p?.self_introduction)         lines.push(`\n自己PR:\n${p.self_introduction}`);
+    navigator.clipboard.writeText(lines.join('\n'));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleDelete = async () => {
     if (!confirm('この技術者を削除しますか？')) return;
     await apiClient.delete(`/api/v1/engineers/${id}`);
@@ -229,6 +261,12 @@ export default function EngineerDetailPage() {
           }
         </div>
         <div className="flex gap-2">
+          {!editing && (
+            <Button variant="outline" onClick={copyEngineerText}
+              style={{ background: copied ? '#16a34a' : '', color: copied ? '#fff' : '', borderColor: copied ? '#16a34a' : '', transition: 'all 0.2s' }}>
+              {copied ? '✓ コピーしました' : '📋 クリップボードにコピー'}
+            </Button>
+          )}
           {!editing && <Button onClick={() => setEditing(true)}>✏️ 編集</Button>}
           <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={handleDelete}>削除</Button>
         </div>
