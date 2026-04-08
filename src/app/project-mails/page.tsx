@@ -918,13 +918,18 @@ function highlightBody(text: string, keywords: string[]): React.ReactNode {
   }
   if (lastIndex < text.length) segments.push({ text: text.slice(lastIndex), isUrl: false })
 
-  const kwPattern = new RegExp(`(${kws.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi')
+  // 前後がアルファベット・数字・スラッシュ・ドットに隣接する場合はマッチしない
+  // （例: .go.jp / go.php のような URL 断片・パスへの誤マッチを防ぐ）
+  const kwPattern = new RegExp(
+    `(?<![a-zA-Z0-9/.])(${kws.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![a-zA-Z0-9/.])`,
+    'gi'
+  )
 
   return segments.flatMap((seg, si) => {
     if (seg.isUrl) return [seg.text]
     const parts = seg.text.split(kwPattern)
     return parts.map((part, pi) =>
-      kwPattern.test(part)
+      kws.some(k => k.toLowerCase() === part.toLowerCase())
         ? <mark key={`${si}-${pi}`} style={{ background: '#fef08a', borderRadius: 2, padding: '0 1px' }}>{part}</mark>
         : part
     )
