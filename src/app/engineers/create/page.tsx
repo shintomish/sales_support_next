@@ -28,6 +28,7 @@ export default function EngineerCreatePage() {
   const [phone, setPhone]             = useState('');
   const [affiliation, setAffiliation] = useState('');
   const [affiliationContact, setAffiliationContact] = useState('');
+  const [affiliationType, setAffiliationType] = useState('');
 
   // スキル
   const [skillQuery, setSkillQuery]         = useState('');
@@ -91,6 +92,7 @@ export default function EngineerCreatePage() {
         name, name_kana: nameKana || null, email: email || null,
         phone: phone || null, affiliation: affiliation || null,
         affiliation_contact: affiliationContact || null,
+        affiliation_type: affiliationType || null,
         desired_unit_price_min: priceMin ? Number(priceMin) : null,
         desired_unit_price_max: priceMax ? Number(priceMax) : null,
         available_from: availableFrom || null,
@@ -183,6 +185,20 @@ export default function EngineerCreatePage() {
                   <label className={labelCls}>所属担当者</label>
                   <input className={inputCls} value={affiliationContact} onChange={e => setAffiliationContact(e.target.value)} />
                 </div>
+              </div>
+              <div>
+                <label className={labelCls}>所属区分</label>
+                <select className={inputCls} value={affiliationType} onChange={e => setAffiliationType(e.target.value)}>
+                  <option value="">選択</option>
+                  <option value="self">自社正社員</option>
+                  <option value="first_sub">一社先正社員</option>
+                  <option value="bp">BP</option>
+                  <option value="bp_member">BP要員</option>
+                  <option value="contract">契約社員</option>
+                  <option value="freelance">個人事業主</option>
+                  <option value="joining">入社予定</option>
+                  <option value="hiring">採用予定</option>
+                </select>
               </div>
             </>
           )}

@@ -660,13 +660,18 @@ export default function ProjectMailsPage() {
               {showBody && (
                 <div className="p-4">
                   <p className="text-xs text-gray-400 mb-2">件名: {selected.email?.subject}</p>
-                  {selected.email?.body_html ? (
+                  {selected.email?.body_text ? (
+                    <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans">
+                      {highlightBody(
+                        selected.email.body_text,
+                        extractKeywordsFromReasons(selected.score_reasons ?? [])
+                      )}
+                    </pre>
+                  ) : selected.email?.body_html ? (
                     <div className="prose prose-sm max-w-none text-gray-800 text-sm"
                       dangerouslySetInnerHTML={{ __html: selected.email.body_html }} />
                   ) : (
-                    <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans">
-                      {selected.email?.body_text || '(本文なし)'}
-                    </pre>
+                    <p className="text-sm text-gray-400">(本文なし)</p>
                   )}
                 </div>
               )}
@@ -874,6 +879,17 @@ function ScoreReasonChip({ reason }: { reason: string }) {
   return (
     <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">{reason}</span>
   )
+}
+
+function extractKeywordsFromReasons(reasons: string[]): string[] {
+  return reasons
+    .filter(r => !r.startsWith('domain:') && r !== 'excluded' && r !== 'price_concrete')
+    .flatMap(r => {
+      const colonIdx = r.indexOf(':')
+      if (colonIdx < 0) return []
+      const kw = r.slice(colonIdx + 1)
+      return kw.length >= 2 ? [kw] : []
+    })
 }
 
 function highlightBody(text: string, keywords: string[]): React.ReactNode {

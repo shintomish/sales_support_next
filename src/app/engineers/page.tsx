@@ -58,7 +58,10 @@ const SKILL_CATEGORY_COLOR: Record<string, string> = {
   infrastructure: 'bg-orange-100 text-orange-700',
   other:          'bg-gray-300 text-gray-700',
 };
-const AFFILIATION_TYPE_LABEL: Record<string, string> = { self: '自社', bp: 'BP' };
+const AFFILIATION_TYPE_LABEL: Record<string, string> = {
+  self: '自社正社員', first_sub: '一社先正社員', bp: 'BP', bp_member: 'BP要員',
+  contract: '契約社員', freelance: '個人事業主', joining: '入社予定', hiring: '採用予定',
+};
 const fmtDate = (v: string | null) =>
   v ? new Date(v).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '—';
 

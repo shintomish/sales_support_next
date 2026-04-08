@@ -18,7 +18,10 @@ const AVAILABILITY_LABEL: Record<string, { label: string; cls: string }> = {
   working:    { label: '稼働中',   cls: 'bg-orange-100 text-orange-700' },
   scheduled:  { label: '◯月予定', cls: 'bg-blue-100 text-blue-700' },
 };
-const AFFILIATION_TYPE_LABEL: Record<string, string> = { self: '自社', bp: 'BP' };
+const AFFILIATION_TYPE_LABEL: Record<string, string> = {
+  self: '自社正社員', first_sub: '一社先正社員', bp: 'BP', bp_member: 'BP要員',
+  contract: '契約社員', freelance: '個人事業主', joining: '入社予定', hiring: '採用予定',
+};
 const SKILL_COLOR: Record<string, string> = {
   language: 'bg-blue-100 text-blue-700', framework: 'bg-purple-100 text-purple-700',
   database: 'bg-green-100 text-green-700', infrastructure: 'bg-orange-100 text-orange-700',
@@ -372,8 +375,14 @@ export default function EngineerDetailPage() {
                     <label className={labelCls}>所属区分</label>
                     <select className={inputCls} value={affiliationType} onChange={e => setAffiliationType(e.target.value)}>
                       <option value="">選択</option>
-                      <option value="self">自社</option>
+                      <option value="self">自社正社員</option>
+                      <option value="first_sub">一社先正社員</option>
                       <option value="bp">BP</option>
+                      <option value="bp_member">BP要員</option>
+                      <option value="contract">契約社員</option>
+                      <option value="freelance">個人事業主</option>
+                      <option value="joining">入社予定</option>
+                      <option value="hiring">採用予定</option>
                     </select>
                   </div>
                 </div>
