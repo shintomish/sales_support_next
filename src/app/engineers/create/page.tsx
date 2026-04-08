@@ -1,10 +1,22 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+
+// engineer-mails の日本語 affiliation_type → engineers の英語値
+const AFFILIATION_JP_TO_EN: Record<string, string> = {
+  '自社正社員': 'self',
+  '一社先正社員': 'first_sub',
+  'BP': 'bp',
+  'BP要員': 'bp_member',
+  '契約社員': 'contract',
+  '個人事業主': 'freelance',
+  '入社予定': 'joining',
+  '採用予定': 'hiring',
+};
 
 const inputCls = 'border border-gray-200 rounded-md px-3 py-2 text-sm bg-white w-full focus:outline-none focus:ring-2 focus:ring-blue-500';
 const labelCls = 'text-xs text-gray-500 mb-1 block';
@@ -21,7 +33,20 @@ const SKILL_CATEGORY_COLOR: Record<string, string> = {
 };
 
 export default function EngineerCreatePage() {
-  const router = useRouter();
+  const router     = useRouter();
+  const searchParams = useSearchParams();
+
+  // engineer-mails からの引き継ぎ情報
+  const fromPath      = searchParams.get('from')             ?? '/engineers';
+  const initName      = searchParams.get('name')             ?? '';
+  const initStation   = searchParams.get('nearest_station')  ?? '';
+  const initAvailable = searchParams.get('available_from')   ?? '';
+  const initAffJp     = searchParams.get('affiliation_type') ?? '';
+  const initAffType   = AFFILIATION_JP_TO_EN[initAffJp] ?? initAffJp;
+  const initAffiliation = searchParams.get('affiliation')    ?? '';
+  const initEmailAddr   = searchParams.get('email_address')  ?? '';
+  const initSkillsRaw   = searchParams.get('skills')         ?? '';
+
   const [tab, setTab]       = useState<Tab>('basic');
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -34,18 +59,18 @@ export default function EngineerCreatePage() {
   const [isDragging, setIsDragging]         = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 基本情報
-  const [name, setName]                           = useState('');
+  // 基本情報（engineer-mails からの引き継ぎ値で初期化）
+  const [name, setName]                           = useState(initName);
   const [nameKana, setNameKana]                   = useState('');
-  const [email, setEmail]                         = useState('');
+  const [email, setEmail]                         = useState(initEmailAddr);
   const [phone, setPhone]                         = useState('');
-  const [affiliation, setAffiliation]             = useState('');
+  const [affiliation, setAffiliation]             = useState(initAffiliation);
   const [affiliationContact, setAffiliationContact] = useState('');
-  const [affiliationType, setAffiliationType]     = useState('');
+  const [affiliationType, setAffiliationType]     = useState(initAffType);
   const [age, setAge]                             = useState('');
   const [gender, setGender]                       = useState('');
   const [nationality, setNationality]             = useState('');
-  const [nearestStation, setNearestStation]       = useState('');
+  const [nearestStation, setNearestStation]       = useState(initStation);
 
   // スキル
   const [skillQuery, setSkillQuery]         = useState('');
@@ -53,10 +78,10 @@ export default function EngineerCreatePage() {
   const [addedSkills, setAddedSkills]       = useState<SkillItem[]>([]);
   const [skillSearching, setSkillSearching] = useState(false);
 
-  // 希望条件
+  // 希望条件（稼働可能日は日付形式のみセット）
   const [priceMin, setPriceMin]           = useState('');
   const [priceMax, setPriceMax]           = useState('');
-  const [availableFrom, setAvailableFrom] = useState('');
+  const [availableFrom, setAvailableFrom] = useState(/^\d{4}-\d{2}-\d{2}$/.test(initAvailable) ? initAvailable : '');
   const [workStyle, setWorkStyle]         = useState('');
   const [location, setLocation]           = useState('');
   const [intro, setIntro]                 = useState('');
@@ -133,6 +158,41 @@ export default function EngineerCreatePage() {
     } finally { setSkillSearching(false); }
   }, []);
 
+  // engineer-mails から引き継いだスキルをマウント時に自動追加
+  useEffect(() => {
+    if (!initSkillsRaw) return;
+    const skillNames = initSkillsRaw.split(',').map(s => s.trim()).filter(Boolean);
+    if (skillNames.length === 0) return;
+
+    const autoAddSkills = async () => {
+      const results: SkillItem[] = [];
+      for (const skillName of skillNames) {
+        try {
+          // 既存スキルを検索（完全一致優先）
+          const res = await apiClient.get('/api/v1/matching/skills', { params: { search: skillName } });
+          const options: SkillOption[] = res.data.data ?? [];
+          const exact = options.find(o => o.name.toLowerCase() === skillName.toLowerCase());
+          if (exact) {
+            results.push({ skill_id: exact.id, skill_name: exact.name, category: exact.category, experience_years: '0', proficiency_level: '3' });
+          } else {
+            // 存在しない場合は新規作成
+            const created = await apiClient.post('/api/v1/matching/skills', { name: skillName, category: 'other' });
+            const newSkill = created.data.data;
+            results.push({ skill_id: newSkill.id, skill_name: newSkill.name, category: newSkill.category, experience_years: '0', proficiency_level: '3' });
+          }
+        } catch {
+          // 個別スキルの失敗は無視して続行
+        }
+      }
+      if (results.length > 0) {
+        setAddedSkills(results);
+      }
+    };
+
+    autoAddSkills();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const addSkill = (opt: SkillOption) => {
     if (addedSkills.some(s => s.skill_id === opt.id)) return;
     setAddedSkills(prev => [...prev, { skill_id: opt.id, skill_name: opt.name, category: opt.category, experience_years: '0', proficiency_level: '3' }]);
@@ -192,9 +252,28 @@ export default function EngineerCreatePage() {
   return (
     <div className="max-w-3xl mx-auto py-8 px-6">
       <div className="flex items-center gap-3 mb-6">
-        <Button variant="outline" onClick={() => router.push('/engineers')}>← 戻る</Button>
+        <Button variant="outline" onClick={() => router.push(fromPath)}>← 戻る</Button>
         <h1 className="text-2xl font-bold text-gray-800">技術者 新規登録</h1>
+        {initName && (
+          <span className="text-xs text-blue-600 bg-blue-50 border border-blue-200 px-2 py-1 rounded-full">
+            技術者メールから引き継ぎ
+          </span>
+        )}
       </div>
+
+      {/* 引き継ぎ情報のメモ */}
+      {initSkillsRaw && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+          <span className="font-medium">スキル自動追加済み：</span> {initSkillsRaw}
+          <span className="ml-2 text-blue-600">（スキルタブで経験年数・習熟度を確認してください）</span>
+        </div>
+      )}
+      {initAvailable && !/^\d{4}-\d{2}-\d{2}$/.test(initAvailable) && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+          <span className="font-medium">メール記載の稼働可能日：</span> {initAvailable}
+          <span className="ml-2 text-amber-600">（希望条件タブで日付を入力してください）</span>
+        </div>
+      )}
 
       {/* スキルシートアップロード（D&D対応） */}
       <div
@@ -465,7 +544,7 @@ export default function EngineerCreatePage() {
       </Card>
 
       <div className="flex justify-end gap-3 mt-6">
-        <Button variant="outline" onClick={() => router.push('/engineers')}>キャンセル</Button>
+        <Button variant="outline" onClick={() => router.push(fromPath)}>キャンセル</Button>
         <Button onClick={handleSubmit} disabled={saving}>{saving ? '保存中...' : '登録する'}</Button>
       </div>
     </div>

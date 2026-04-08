@@ -245,14 +245,40 @@ export default function EngineerMailsPage() {
     setForm(f => ({ ...f, skills: (f.skills ?? []).filter(s => s !== skill) }))
   }
 
+  // 添付ファイルダウンロード
+  const handleDownload = async (att: EmailAttachment) => {
+    if (!selected) return
+    try {
+      const res = await axios.get(
+        `/api/v1/engineer-mails/${selected.id}/attachment/${att.id}`,
+        { responseType: 'blob' }
+      )
+      const url = URL.createObjectURL(res.data)
+      const a   = document.createElement('a')
+      a.href     = url
+      a.download = att.filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('ダウンロードに失敗しました')
+    }
+  }
+
   // 技術者として登録ボタン
   const handleRegister = () => {
     if (!selected) return
     const params = new URLSearchParams()
-    if (selected.name)             params.set('name', selected.name)
-    if (selected.nearest_station)  params.set('nearest_station', selected.nearest_station)
-    if (selected.available_from)   params.set('available_from', selected.available_from)
-    if (selected.affiliation_type) params.set('affiliation_type', selected.affiliation_type)
+    // 基本情報
+    if (selected.name)                params.set('name', selected.name)
+    if (selected.nearest_station)     params.set('nearest_station', selected.nearest_station)
+    if (selected.affiliation_type)    params.set('affiliation_type', selected.affiliation_type)
+    if (selected.email?.from_name)    params.set('affiliation', selected.email.from_name)
+    if (selected.email?.from_address) params.set('email_address', selected.email.from_address)
+    // スキル
+    if (selected.skills?.length)      params.set('skills', selected.skills.join(','))
+    // 希望条件
+    if (selected.available_from)      params.set('available_from', selected.available_from)
+    params.set('from', '/engineer-mails')
     router.push(`/engineers/create?${params.toString()}`)
   }
 
@@ -599,14 +625,12 @@ export default function EngineerMailsPage() {
                           <p className="text-xs text-gray-400">{Math.round(att.size / 1024)} KB</p>
                         )}
                       </div>
-                      {att.storage_path ? (
-                        <a href={att.storage_path} target="_blank" rel="noopener noreferrer"
-                          className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg hover:bg-teal-700 flex-shrink-0">
-                          ダウンロード
-                        </a>
-                      ) : (
-                        <span className="text-xs text-gray-400 flex-shrink-0">未保存</span>
-                      )}
+                      <button
+                        onClick={() => handleDownload(att)}
+                        className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg hover:bg-teal-700 flex-shrink-0"
+                      >
+                        ダウンロード
+                      </button>
                     </div>
                   ))}
                 </div>
