@@ -13,6 +13,7 @@ type EmailAttachment = {
   filename: string
   mime_type: string | null
   size: number | null
+  storage_path: string | null
 }
 
 type Email = {
@@ -573,17 +574,29 @@ export default function EngineerMailsPage() {
             </div>
 
             {/* 添付ファイル */}
-            {selected.email?.attachments && selected.email.attachments.length > 0 && (
+            {selected?.email?.attachments && selected.email.attachments.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
                   <h2 className="text-sm font-semibold text-gray-700">添付ファイル</h2>
                 </div>
-                <div className="p-4 space-y-1">
+                <div className="p-4 space-y-2">
                   {selected.email.attachments.map(att => (
-                    <div key={att.id} className="flex items-center gap-2 text-sm text-gray-700">
-                      <span className="text-gray-400">📎</span>
-                      <span>{att.filename}</span>
-                      {att.size && <span className="text-xs text-gray-400">({Math.round(att.size / 1024)}KB)</span>}
+                    <div key={att.id} className="flex items-center gap-3 p-2 rounded-lg border border-gray-100 bg-gray-50">
+                      <span className="text-lg">📎</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-800 truncate">{att.filename}</p>
+                        {att.size && (
+                          <p className="text-xs text-gray-400">{Math.round(att.size / 1024)} KB</p>
+                        )}
+                      </div>
+                      {att.storage_path ? (
+                        <a href={att.storage_path} target="_blank" rel="noopener noreferrer"
+                          className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg hover:bg-teal-700 flex-shrink-0">
+                          ダウンロード
+                        </a>
+                      ) : (
+                        <span className="text-xs text-gray-400 flex-shrink-0">未保存</span>
+                      )}
                     </div>
                   ))}
                 </div>
