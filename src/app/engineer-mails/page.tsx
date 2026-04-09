@@ -832,7 +832,15 @@ function ReviewRow({
               {/* 本文（キーワードハイライト） */}
               {(expandedDetail.email?.body_text || expandedDetail.email?.body_html) && (() => {
                 const raw = expandedDetail.email!.body_text
-                  ?? expandedDetail.email!.body_html!.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+                  ?? expandedDetail.email!.body_html!
+                    .replace(/<br\s*\/?>/gi, '\n')
+                    .replace(/<\/p>/gi, '\n')
+                    .replace(/<\/div>/gi, '\n')
+                    .replace(/<[^>]*>/g, '')
+                    .replace(/&nbsp;/g, ' ')
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
                 const body = raw.slice(0, 1500)
                 return (
                   <div>
