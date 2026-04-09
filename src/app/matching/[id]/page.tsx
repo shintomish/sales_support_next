@@ -11,16 +11,37 @@ interface ProposalDraft {
   to_address: string
   to_name: string
   engineer_name: string
+  project_mail_id: number
 }
 
 function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () => void }) {
   const [copied, setCopied] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
 
   const copyAll = () => {
     const text = `件名: ${draft.subject}\n宛先: ${draft.to_name} <${draft.to_address}>\n\n${draft.body}`
     navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleSend = async () => {
+    if (!confirm(`${draft.to_address} に送信しますか？`)) return
+    setSending(true)
+    try {
+      await axios.post(`/api/v1/project-mails/${draft.project_mail_id}/send-proposal`, {
+        to: draft.to_address,
+        subject: draft.subject,
+        body: draft.body,
+      })
+      setSent(true)
+      setTimeout(() => onClose(), 1500)
+    } catch {
+      alert('送信に失敗しました')
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -59,9 +80,16 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
           </button>
           <button
             onClick={copyAll}
-            style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: copied ? '#16a34a' : '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, transition: 'background 0.2s' }}
+            style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: copied ? '#16a34a' : '#e5e7eb', color: copied ? '#fff' : '#374151', cursor: 'pointer', fontSize: 13, fontWeight: 600, transition: 'background 0.2s' }}
           >
-            {copied ? '✓ コピーしました' : '📋 クリップボードにコピー'}
+            {copied ? '✓ コピーしました' : '📋 コピー'}
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={sending || sent}
+            style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: sent ? '#16a34a' : sending ? '#93c5fd' : '#2563eb', color: '#fff', cursor: sending || sent ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, transition: 'background 0.2s' }}
+          >
+            {sent ? '✓ 送信しました' : sending ? '送信中...' : '📤 送信'}
           </button>
         </div>
       </div>
@@ -499,7 +527,7 @@ export default function MatchingPage() {
     setGeneratingId(eng.engineer_id)
     try {
       const res = await axios.post(`/api/v1/project-mails/${id}/generate-proposal`, { engineer_id: eng.engineer_id })
-      setProposalDraft({ ...res.data, engineer_name: eng.engineer_name })
+      setProposalDraft({ ...res.data, engineer_name: eng.engineer_name, project_mail_id: Number(id) })
     } catch {
       alert('メール生成に失敗しました')
     } finally {
