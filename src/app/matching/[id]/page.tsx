@@ -261,6 +261,7 @@ interface MatchedEngineer {
   engineer_name: string
   email: string | null
   affiliation: string | null
+  affiliation_contact: string | null
   affiliation_type: string | null
   age: number | null
   score: number
@@ -678,9 +679,10 @@ export default function MatchingPage() {
 
   const buildBulkDefaults = () => {
     const selected = engineers.filter(e => checked.has(e.engineer_id))
-    const recipients = selected
-      .filter(e => e.email)
-      .map(e => ({ to: e.email!, name: e.affiliation ?? e.engineer_name }))
+    const recipients = selected.map(e => ({
+      to:   e.email ?? '',
+      name: [e.affiliation, e.affiliation_contact].filter(Boolean).join(' ') || e.engineer_name,
+    }))
     const subject = `【技術者ご紹介】${mail?.title ?? ''}`
     const engineerLines = selected.map(e => {
       const skills = e.skills.slice(0, 5).map(s => s.name).join('／')
