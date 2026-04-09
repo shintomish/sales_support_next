@@ -826,24 +826,20 @@ function ReviewRow({
               )}
 
               {/* 本文（キーワードハイライト） */}
-              {(expandedDetail.email?.body_text || expandedDetail.email?.body_html) && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-1.5">メール本文</p>
-                  <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto font-mono">
-                    {expandedDetail.email.body_text ? (
-                      <>
-                        {highlightBody(
-                          expandedDetail.email.body_text.slice(0, 1500),
-                          expandedDetail.skills ?? []
-                        )}
-                        {expandedDetail.email.body_text.length > 1500 && <span className="text-gray-400">…（以下省略）</span>}
-                      </>
-                    ) : (
-                      <div className="whitespace-normal" dangerouslySetInnerHTML={{ __html: expandedDetail.email!.body_html!.slice(0, 3000) }} />
-                    )}
+              {(expandedDetail.email?.body_text || expandedDetail.email?.body_html) && (() => {
+                const raw = expandedDetail.email!.body_text
+                  ?? expandedDetail.email!.body_html!.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+                const body = raw.slice(0, 1500)
+                return (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-1.5">メール本文</p>
+                    <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto font-mono">
+                      {highlightBody(body, expandedDetail.skills ?? [])}
+                      {raw.length > 1500 && <span className="text-gray-400">…（以下省略）</span>}
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {/* 判断ボタン */}
               <div className="flex gap-2 pt-1">
