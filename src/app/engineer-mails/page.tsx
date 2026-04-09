@@ -279,6 +279,7 @@ export default function EngineerMailsPage() {
     // 希望条件
     if (selected.available_from)      params.set('available_from', selected.available_from)
     params.set('from', '/engineer-mails')
+    params.set('engineer_mail_id', String(selected.id))
     router.push(`/engineers/create?${params.toString()}`)
   }
 

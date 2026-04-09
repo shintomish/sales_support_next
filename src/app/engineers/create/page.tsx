@@ -37,7 +37,8 @@ export default function EngineerCreatePage() {
   const searchParams = useSearchParams();
 
   // engineer-mails からの引き継ぎ情報
-  const fromPath      = searchParams.get('from')             ?? '/engineers';
+  const fromPath        = searchParams.get('from')             ?? '/engineers';
+  const engineerMailId  = searchParams.get('engineer_mail_id') ?? null;
   const initName      = searchParams.get('name')             ?? '';
   const initStation   = searchParams.get('nearest_station')  ?? '';
   const initAvailable = searchParams.get('available_from')   ?? '';
@@ -236,7 +237,15 @@ export default function EngineerCreatePage() {
           proficiency_level: Number(s.proficiency_level),
         })),
       });
-      router.push('/engineers');
+      // 技術者メールから遷移した場合、ステータスを「登録済」に自動変更
+      if (engineerMailId) {
+        try {
+          await apiClient.put(`/api/v1/engineer-mails/${engineerMailId}/status`, { status: 'registered' });
+        } catch {
+          // ステータス更新失敗は無視して登録完了を優先
+        }
+      }
+      router.push(fromPath);
     } catch (err: any) {
       if (err.response?.data?.errors) setErrors(err.response.data.errors);
       else alert('保存に失敗しました');
