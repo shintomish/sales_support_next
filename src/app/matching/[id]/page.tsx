@@ -897,7 +897,8 @@ export default function MatchingPage() {
           </button>
           <button
             onClick={() => setShowBulkSend(true)}
-            style={{ fontSize: 12, background: checked.size > 0 ? '#f59e0b' : '#78716c', border: 'none', color: '#fff', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}
+            disabled={checked.size === 0}
+            style={{ fontSize: 12, background: checked.size > 0 ? '#f59e0b' : '#d1d5db', border: 'none', color: checked.size > 0 ? '#fff' : '#9ca3af', borderRadius: 6, padding: '5px 12px', cursor: checked.size > 0 ? 'pointer' : 'not-allowed', fontWeight: 600, flexShrink: 0 }}
           >
             📤 まとめて提案{checked.size > 0 ? `（${checked.size}名）` : ''}
           </button>
