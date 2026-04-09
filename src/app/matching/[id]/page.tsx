@@ -4,6 +4,135 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 
+// ── 一斉配信モーダル ──────────────────────────────────
+function BulkSendModal({ projectMailId, onClose }: { projectMailId: number; onClose: () => void }) {
+  const [recipients, setRecipients] = useState<{ to: string; name: string }[]>([{ to: '', name: '' }])
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState<{ sent: number; failed: string[] } | null>(null)
+
+  const addRecipient = () => setRecipients(prev => [...prev, { to: '', name: '' }])
+  const removeRecipient = (i: number) => setRecipients(prev => prev.filter((_, idx) => idx !== i))
+  const updateRecipient = (i: number, field: 'to' | 'name', value: string) => {
+    setRecipients(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r))
+  }
+
+  const handleSend = async () => {
+    const valid = recipients.filter(r => r.to.trim())
+    if (!valid.length) { alert('宛先を1件以上入力してください'); return }
+    if (!subject.trim()) { alert('件名を入力してください'); return }
+    if (!body.trim()) { alert('本文を入力してください'); return }
+    if (!confirm(`${valid.length}件に一斉送信します。よろしいですか？`)) return
+    setSending(true)
+    try {
+      const res = await axios.post(`/api/v1/project-mails/${projectMailId}/send-bulk`, {
+        recipients: valid,
+        subject,
+        body,
+      })
+      setResult({ sent: res.data.sent, failed: res.data.failed ?? [] })
+    } catch {
+      alert('送信に失敗しました')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const inputStyle = { width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' as const }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 620, boxShadow: '0 24px 60px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+        {/* ヘッダー */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>📤 一斉配信</p>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9ca3af' }}>✕</button>
+        </div>
+
+        <div style={{ padding: '16px 20px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* 宛先 */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>宛先</label>
+              <button onClick={addRecipient} style={{ fontSize: 12, color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer' }}>＋ 追加</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {recipients.map((r, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="会社名・担当者名"
+                    value={r.name}
+                    onChange={e => updateRecipient(i, 'name', e.target.value)}
+                    style={{ ...inputStyle, width: '40%' }}
+                  />
+                  <input
+                    type="email"
+                    placeholder="メールアドレス"
+                    value={r.to}
+                    onChange={e => updateRecipient(i, 'to', e.target.value)}
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  {recipients.length > 1 && (
+                    <button onClick={() => removeRecipient(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}>✕</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 件名 */}
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>件名</label>
+            <input type="text" value={subject} onChange={e => setSubject(e.target.value)} placeholder="件名を入力" style={inputStyle} />
+          </div>
+
+          {/* 本文 */}
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>本文</label>
+            <textarea
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              placeholder="本文を入力"
+              rows={10}
+              style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
+            />
+          </div>
+
+          {/* 送信結果 */}
+          {result && (
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: result.failed.length ? '#fef9c3' : '#f0fdf4', border: `1px solid ${result.failed.length ? '#fde047' : '#86efac'}` }}>
+              <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px', color: result.failed.length ? '#92400e' : '#166534' }}>
+                ✓ {result.sent}件送信完了{result.failed.length > 0 && `（失敗 ${result.failed.length}件）`}
+              </p>
+              {result.failed.length > 0 && (
+                <p style={{ fontSize: 12, color: '#92400e', margin: 0 }}>失敗: {result.failed.join(', ')}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* フッター */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: 13, color: '#6b7280' }}>
+            閉じる
+          </button>
+          {!result && (
+            <button
+              onClick={handleSend}
+              disabled={sending}
+              style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: sending ? '#93c5fd' : '#2563eb', color: '#fff', cursor: sending ? 'default' : 'pointer', fontSize: 13, fontWeight: 600 }}
+            >
+              {sending ? '送信中...' : `📤 一斉送信（${recipients.filter(r => r.to.trim()).length}件）`}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── 提案メールモーダル ────────────────────────────────
 interface ProposalDraft {
   subject: string
@@ -498,6 +627,7 @@ export default function MatchingPage() {
   const [detailEng, setDetailEng] = useState<MatchedEngineer | null>(null)
   const [proposalDraft, setProposalDraft] = useState<ProposalDraft | null>(null)
   const [generatingId, setGeneratingId] = useState<number | null>(null)
+  const [showBulkSend, setShowBulkSend] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -575,6 +705,8 @@ export default function MatchingPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
+      {/* 一斉配信モーダル */}
+      {showBulkSend && <BulkSendModal projectMailId={Number(id)} onClose={() => setShowBulkSend(false)} />}
       {/* 提案メールモーダル */}
       {proposalDraft && <ProposalModal draft={proposalDraft} onClose={() => setProposalDraft(null)} />}
       {/* スコア内訳モーダル */}
@@ -600,6 +732,12 @@ export default function MatchingPage() {
           <h1 style={{ fontSize: 15, fontWeight: 700, flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
             {mail.title ?? `案件 #${id}`}
           </h1>
+          <button
+            onClick={() => setShowBulkSend(true)}
+            style={{ fontSize: 12, background: '#f59e0b', border: 'none', color: '#fff', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}
+          >
+            📤 一斉配信
+          </button>
           <span style={{ fontSize: 13, background: 'rgba(255,255,255,0.15)', borderRadius: 6, padding: '3px 10px', flexShrink: 0 }}>
             候補 {visibleCount}名
             {proposedCount > 0 && <span style={{ marginLeft: 6, color: '#86efac' }}>提案 {proposedCount}名</span>}
