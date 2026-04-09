@@ -58,7 +58,7 @@ function BulkSendModal({
         {/* ヘッダー */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>📤 一斉配信</p>
+            <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>📤 まとめて提案</p>
             <p style={{ fontSize: 11, color: '#6b7280', margin: '2px 0 0' }}>{engineerCount}名をまとめて提案</p>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9ca3af' }}>✕</button>
@@ -884,7 +884,7 @@ export default function MatchingPage() {
             onClick={() => setShowBulkSend(true)}
             style={{ fontSize: 12, background: checked.size > 0 ? '#f59e0b' : '#78716c', border: 'none', color: '#fff', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}
           >
-            📤 一斉配信{checked.size > 0 ? `（${checked.size}名）` : ''}
+            📤 まとめて提案{checked.size > 0 ? `（${checked.size}名）` : ''}
           </button>
           <span style={{ fontSize: 13, background: 'rgba(255,255,255,0.15)', borderRadius: 6, padding: '3px 10px', flexShrink: 0 }}>
             候補 {visibleEngineers.length}名
