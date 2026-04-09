@@ -17,35 +17,8 @@ const EMPTY: EmailBodyTemplate = {
   name: '', name_en: '', department: '', position: '', email: '', mobile: '',
 };
 
-export default function EmailTemplatePage() {
-  const [form, setForm] = useState<EmailBodyTemplate>(EMPTY);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    axios.get('/api/v1/email-body-templates/me')
-      .then(res => { if (res.data) setForm({ ...EMPTY, ...res.data }); })
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await axios.put('/api/v1/email-body-templates/me', form);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch {
-      alert('保存に失敗しました');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const preview = `【メール本文イメージ】
-
-●● 様
+function buildPreview(form: EmailBodyTemplate) {
+  return `●● 様
 
 いつも大変お世話になっております。
 株式会社アイゼン・ソリューションの${form.name || '（氏名）'}です。
@@ -69,6 +42,42 @@ _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 
 　URL:https://www.aizen-sol.co.jp
 _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`;
+}
+
+export default function EmailTemplatePage() {
+  const [form, setForm] = useState<EmailBodyTemplate>(EMPTY);
+  const [previewText, setPreviewText] = useState(buildPreview(EMPTY));
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    axios.get('/api/v1/email-body-templates/me')
+      .then(res => {
+        if (res.data) {
+          const loaded = { ...EMPTY, ...res.data };
+          setForm(loaded);
+          setPreviewText(buildPreview(loaded));
+        }
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const syncPreview = () => setPreviewText(buildPreview(form));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await axios.put('/api/v1/email-body-templates/me', form);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      alert('保存に失敗しました');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) return <div className="p-8 text-gray-500">読み込み中...</div>;
 
@@ -151,12 +160,24 @@ _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`;
           </button>
         </form>
 
-        {/* プレビュー */}
-        <div>
-          <p className="text-sm font-medium text-gray-700 mb-2">プレビュー</p>
-          <pre className="bg-gray-50 border border-gray-200 rounded-md p-4 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
-            {preview}
-          </pre>
+        {/* プレビュー（編集可能） */}
+        <div className="flex flex-col">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-medium text-gray-700">プレビュー（直接編集可能）</p>
+            <button
+              type="button"
+              onClick={syncPreview}
+              className="text-xs text-blue-600 hover:text-blue-800 underline"
+            >
+              ↩ フォームから反映
+            </button>
+          </div>
+          <textarea
+            value={previewText}
+            onChange={e => setPreviewText(e.target.value)}
+            className="flex-1 bg-gray-50 border border-gray-200 rounded-md p-4 text-xs text-gray-700 leading-relaxed font-mono resize-none"
+            style={{ minHeight: 420 }}
+          />
         </div>
       </div>
     </div>
