@@ -200,22 +200,34 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
   const [copied, setCopied] = useState(false)
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [toName, setToName] = useState(draft.to_name)
+  const [toAddress, setToAddress] = useState(draft.to_address)
   const [body, setBody] = useState(draft.body)
   const [subject, setSubject] = useState(draft.subject)
 
+  const handleToNameChange = (name: string) => {
+    setToName(name)
+    // 本文の挨拶行（1行目）を更新
+    setBody(prev => {
+      const lines = prev.split('\n')
+      lines[0] = name ? `${name} 様` : '●● 様'
+      return lines.join('\n')
+    })
+  }
+
   const copyAll = () => {
-    const text = `件名: ${subject}\n宛先: ${draft.to_name} <${draft.to_address}>\n\n${body}`
+    const text = `件名: ${subject}\n宛先: ${toName} <${toAddress}>\n\n${body}`
     navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
   const handleSend = async () => {
-    if (!confirm(`${draft.to_address} に送信しますか？`)) return
+    if (!confirm(`${toAddress} に送信しますか？`)) return
     setSending(true)
     try {
       await axios.post(`/api/v1/project-mails/${draft.project_mail_id}/send-proposal`, {
-        to: draft.to_address,
+        to: toAddress,
         subject,
         body,
       })
@@ -242,9 +254,25 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
 
         {/* メタ情報 */}
         <div style={{ padding: '12px 20px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb', fontSize: 12 }}>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-            <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>宛先</span>
-            <span style={{ color: '#111827' }}>{draft.to_name} {'<'}{draft.to_address}{'>'}</span>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+            <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>宛先名</span>
+            <input
+              type="text"
+              value={toName}
+              onChange={e => handleToNameChange(e.target.value)}
+              placeholder="担当者名"
+              style={{ flex: 1, fontSize: 12, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4 }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+            <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>送信先</span>
+            <input
+              type="email"
+              value={toAddress}
+              onChange={e => setToAddress(e.target.value)}
+              placeholder="example@example.com"
+              style={{ flex: 1, fontSize: 12, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4 }}
+            />
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>件名</span>
