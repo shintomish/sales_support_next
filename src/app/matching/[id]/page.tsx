@@ -227,7 +227,7 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
   }
 
   const handleSend = async () => {
-    if (!confirm(`${toAddress} に送信しますか？`)) return
+    if (!confirm(`${toName || toAddress} に送信しますか？`)) return
     setSending(true)
     try {
       await axios.post(`/api/v1/project-mails/${draft.project_mail_id}/send-proposal`, {
