@@ -39,6 +39,7 @@ export default function Sidebar() {
     { label: 'タスク管理',     path: '/tasks',          icon: '☑',   badge: overdueCount, sesOnly: false },
     { label: '名刺管理',       path: '/business-cards', icon: '🪪',  badge: 0,            sesOnly: false },
     { label: 'メール',         path: '/emails',         icon: '✉️',  badge: unreadEmails, sesOnly: false },
+    { label: 'メール署名設定', path: '/settings/email-template', icon: '✍️', badge: 0, sesOnly: false },
   ];
 
   const menuItems = allMenuItems.filter(

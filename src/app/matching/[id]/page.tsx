@@ -148,6 +148,45 @@ function BulkSendModal({
 }
 
 // ── 提案メールモーダル ────────────────────────────────
+interface EmailBodyTemplate {
+  name: string
+  name_en: string
+  department: string
+  position: string
+  email: string
+  mobile: string
+}
+
+function buildEmailBody(
+  greeting: string,
+  mainContent: string,
+  tpl: EmailBodyTemplate | null,
+): string {
+  const intro = tpl
+    ? `いつも大変お世話になっております。\n株式会社アイゼン・ソリューションの${tpl.name}です。`
+    : `いつも大変お世話になっております。`
+
+  const sig = tpl
+    ? `_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+　　株式会社アイゼン・ソリューション
+　${tpl.department ?? ''}
+　${tpl.position ?? ''}
+　${tpl.name}${tpl.name_en ? `（${tpl.name_en}）` : ''}
+
+　〒332-0017
+　埼玉県川口市栄町3-12-11 コスモ川口栄町2F
+　Tel：048-253-3922　Fax：048-271-9355
+
+　E-Mail：${tpl.email ?? ''}
+　Mobile：${tpl.mobile ?? ''}
+
+　URL:https://www.aizen-sol.co.jp
+_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
+    : ''
+
+  return `${greeting}\n\n${intro}\n\n${mainContent}\n\nお忙しいところ大変恐れ入りますが、ご検討いただけますと幸いでございます。\n何卒よろしくお願いいたします。\n${sig}`
+}
+
 interface ProposalDraft {
   subject: string
   body: string
@@ -674,6 +713,7 @@ export default function MatchingPage() {
   const [generatingId, setGeneratingId] = useState<number | null>(null)
   const [showBulkSend, setShowBulkSend] = useState(false)
   const [checked, setChecked] = useState<Set<number>>(new Set())
+  const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
 
   const visibleEngineers = engineers.filter(e => !excluded.has(e.engineer_id))
   const allChecked = visibleEngineers.length > 0 && visibleEngineers.every(e => checked.has(e.engineer_id))
@@ -692,6 +732,9 @@ export default function MatchingPage() {
 
   useEffect(() => {
     if (!id) return
+    axios.get('/api/v1/email-body-templates/me').then(res => {
+      if (res.data) setEmailTemplate(res.data)
+    }).catch(() => {})
     Promise.all([
       axios.get(`/api/v1/project-mails/${id}`),
       axios.get(`/api/v1/project-mails/${id}/matched-engineers`),
@@ -718,7 +761,9 @@ export default function MatchingPage() {
     setGeneratingId(eng.engineer_id)
     try {
       const res = await axios.post(`/api/v1/project-mails/${id}/generate-proposal`, { engineer_id: eng.engineer_id })
-      setProposalDraft({ ...res.data, engineer_name: eng.engineer_name, project_mail_id: Number(id) })
+      const greeting = `${res.data.to_name ? res.data.to_name + ' 様' : '●● 様'}`
+      const wrappedBody = buildEmailBody(greeting, res.data.body, emailTemplate)
+      setProposalDraft({ ...res.data, subject: `【技術者ご紹介】${mail?.title ?? ''}`, body: wrappedBody, engineer_name: eng.engineer_name, project_mail_id: Number(id) })
     } catch {
       alert('メール生成に失敗しました')
     } finally {
@@ -771,7 +816,7 @@ export default function MatchingPage() {
         const selected = engineers.filter(e => checked.has(e.engineer_id))
         const initRecipients = selected.map(e => ({
           to:   e.affiliation_email ?? e.email ?? '',
-          name: [e.affiliation, e.affiliation_contact].filter(Boolean).join(' ') || e.engineer_name,
+          name: ([e.affiliation, e.affiliation_contact].filter(Boolean).join(' ') || e.engineer_name) + ' 様',
         }))
         const initSubject = `【技術者ご紹介】${mail?.title ?? ''}`
         const engineerLines = selected.map(e => {
@@ -779,7 +824,8 @@ export default function MatchingPage() {
           const avail = e.availability_status === 'available' ? '稼働可' : e.availability_status === 'scheduled' ? '稼働予定' : e.availability_status === 'working' ? '稼働中' : ''
           return `・${e.engineer_name}（${e.age ? `${e.age}歳` : ''}${e.affiliation ? `／${e.affiliation}` : ''}）\n　スキル：${skills || '—'}　稼働：${avail || '—'}`
         }).join('\n')
-        const initBody = `営業ご担当者様\n\nいつもお世話になっております。\n株式会社アイゼン・ソリューション SES営業担当でございます。\n\nこの度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。\n\n【ご紹介エンジニア（${selected.length}名）】\n${engineerLines}\n\n各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。\nまた、面談のご調整も随時承っております。\n\nお忙しいところ大変恐れ入りますが、ご検討いただけますと幸いでございます。\n何卒よろしくお願いいたします。\n\n─────────────────────────\n株式会社アイゼン・ソリューション　SES営業部\n─────────────────────────`
+        const mainContent = `この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。\n\n【ご紹介エンジニア（${selected.length}名）】\n${engineerLines}\n\n各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。\nまた、面談のご調整も随時承っております。`
+        const initBody = buildEmailBody('営業ご担当者様', mainContent, emailTemplate)
         return <BulkSendModal projectMailId={Number(id)} initialRecipients={initRecipients} initialSubject={initSubject} initialBody={initBody} onClose={() => setShowBulkSend(false)} />
       })()}
       {/* 提案メールモーダル */}
