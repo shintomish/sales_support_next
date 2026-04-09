@@ -712,7 +712,8 @@ function ReviewRow({
   onQuickStatus: (id: number, status: string) => void
 }) {
   const rank = scoreRank(item.score)
-  const skills = (item.skills ?? []).slice(0, 4)
+  const skills = (item.skills ?? []).slice(0, 6)
+  const extraSkills = Math.max(0, (item.skills ?? []).length - 6)
 
   return (
     <div className={`bg-white rounded-xl border transition-all ${expanded ? 'border-yellow-400 shadow-md' : 'border-gray-200 hover:border-gray-300'}`}>
@@ -743,6 +744,9 @@ function ReviewRow({
             {skills.map((s, i) => (
               <span key={i} className="text-xs bg-teal-50 text-teal-600 border border-teal-100 rounded px-1.5 py-0.5">{s}</span>
             ))}
+            {extraSkills > 0 && (
+              <span className="text-xs text-gray-400">+{extraSkills}</span>
+            )}
           </div>
         </div>
 
