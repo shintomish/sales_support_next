@@ -42,7 +42,6 @@ function BulkSendModal({
         body,
       })
       setSent(true)
-      setTimeout(() => onClose(), 1500)
     } catch {
       alert('送信に失敗しました')
     } finally {
@@ -227,6 +226,22 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
     } finally {
       setSending(false)
     }
+  }
+
+  if (sent) {
+    return (
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 400, boxShadow: '0 24px 60px rgba(0,0,0,0.3)', padding: '40px 32px', textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+          <p style={{ fontSize: 16, fontWeight: 700, color: '#111827', margin: '0 0 8px' }}>送信しました</p>
+          <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 4px' }}>{toName || toAddress}</p>
+          <p style={{ fontSize: 12, color: '#9ca3af', margin: '0 0 24px' }}>{subject}</p>
+          <button onClick={onClose} style={{ padding: '10px 32px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            閉じる
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
