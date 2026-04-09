@@ -7,45 +7,42 @@ import axios from '@/lib/axios'
 // ── 一斉配信モーダル ──────────────────────────────────
 function BulkSendModal({
   projectMailId,
-  initialRecipients,
+  initialToName,
+  initialTo,
   initialSubject,
   initialBody,
+  engineerCount,
   onClose,
 }: {
   projectMailId: number
-  initialRecipients: { to: string; name: string }[]
+  initialToName: string
+  initialTo: string
   initialSubject: string
   initialBody: string
+  engineerCount: number
   onClose: () => void
 }) {
-  const [recipients, setRecipients] = useState<{ to: string; name: string }[]>(
-    initialRecipients.length > 0 ? initialRecipients : [{ to: '', name: '' }]
-  )
+  const [toName, setToName] = useState(initialToName)
+  const [to, setTo] = useState(initialTo)
   const [subject, setSubject] = useState(initialSubject)
   const [body, setBody] = useState(initialBody)
   const [sending, setSending] = useState(false)
-  const [result, setResult] = useState<{ sent: number; failed: string[] } | null>(null)
-
-  const addRecipient = () => setRecipients(prev => [...prev, { to: '', name: '' }])
-  const removeRecipient = (i: number) => setRecipients(prev => prev.filter((_, idx) => idx !== i))
-  const updateRecipient = (i: number, field: 'to' | 'name', value: string) => {
-    setRecipients(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r))
-  }
+  const [sent, setSent] = useState(false)
 
   const handleSend = async () => {
-    const valid = recipients.filter(r => r.to.trim())
-    if (!valid.length) { alert('宛先を1件以上入力してください'); return }
+    if (!to.trim()) { alert('送信先メールアドレスを入力してください'); return }
     if (!subject.trim()) { alert('件名を入力してください'); return }
     if (!body.trim()) { alert('本文を入力してください'); return }
-    if (!confirm(`${valid.length}件に一斉送信します。よろしいですか？`)) return
+    if (!confirm(`${toName || to} に送信しますか？`)) return
     setSending(true)
     try {
-      const res = await axios.post(`/api/v1/project-mails/${projectMailId}/send-bulk`, {
-        recipients: valid,
+      await axios.post(`/api/v1/project-mails/${projectMailId}/send-proposal`, {
+        to,
         subject,
         body,
       })
-      setResult({ sent: res.data.sent, failed: res.data.failed ?? [] })
+      setSent(true)
+      setTimeout(() => onClose(), 1500)
     } catch {
       alert('送信に失敗しました')
     } finally {
@@ -60,46 +57,45 @@ function BulkSendModal({
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 620, boxShadow: '0 24px 60px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
         {/* ヘッダー */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>📤 一斉配信</p>
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>📤 一斉配信</p>
+            <p style={{ fontSize: 11, color: '#6b7280', margin: '2px 0 0' }}>{engineerCount}名をまとめて提案</p>
+          </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9ca3af' }}>✕</button>
         </div>
 
-        <div style={{ padding: '16px 20px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* 宛先 */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>宛先</label>
-              <button onClick={addRecipient} style={{ fontSize: 12, color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer' }}>＋ 追加</button>
+        <div style={{ padding: '16px 20px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* 宛先（1件） */}
+          <div style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', fontSize: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span style={{ color: '#6b7280', width: 44, flexShrink: 0 }}>宛先名</span>
+              <input
+                type="text"
+                value={toName}
+                onChange={e => setToName(e.target.value)}
+                placeholder="担当者名"
+                style={{ flex: 1, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+              />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {recipients.map((r, i) => (
-                <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    placeholder="会社名・担当者名"
-                    value={r.name}
-                    onChange={e => updateRecipient(i, 'name', e.target.value)}
-                    style={{ ...inputStyle, width: '40%' }}
-                  />
-                  <input
-                    type="email"
-                    placeholder="メールアドレス"
-                    value={r.to}
-                    onChange={e => updateRecipient(i, 'to', e.target.value)}
-                    style={{ ...inputStyle, flex: 1 }}
-                  />
-                  {recipients.length > 1 && (
-                    <button onClick={() => removeRecipient(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}>✕</button>
-                  )}
-                </div>
-              ))}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span style={{ color: '#6b7280', width: 44, flexShrink: 0 }}>送信先</span>
+              <input
+                type="email"
+                value={to}
+                onChange={e => setTo(e.target.value)}
+                placeholder="example@example.com"
+                style={{ flex: 1, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+              />
             </div>
-          </div>
-
-          {/* 件名 */}
-          <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>件名</label>
-            <input type="text" value={subject} onChange={e => setSubject(e.target.value)} placeholder="件名を入力" style={inputStyle} />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span style={{ color: '#6b7280', width: 44, flexShrink: 0 }}>件名</span>
+              <input
+                type="text"
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                style={{ flex: 1, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+              />
+            </div>
           </div>
 
           {/* 本文 */}
@@ -108,23 +104,10 @@ function BulkSendModal({
             <textarea
               value={body}
               onChange={e => setBody(e.target.value)}
-              placeholder="本文を入力"
-              rows={10}
+              rows={12}
               style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
             />
           </div>
-
-          {/* 送信結果 */}
-          {result && (
-            <div style={{ padding: '10px 14px', borderRadius: 8, background: result.failed.length ? '#fef9c3' : '#f0fdf4', border: `1px solid ${result.failed.length ? '#fde047' : '#86efac'}` }}>
-              <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px', color: result.failed.length ? '#92400e' : '#166534' }}>
-                ✓ {result.sent}件送信完了{result.failed.length > 0 && `（失敗 ${result.failed.length}件）`}
-              </p>
-              {result.failed.length > 0 && (
-                <p style={{ fontSize: 12, color: '#92400e', margin: 0 }}>失敗: {result.failed.join(', ')}</p>
-              )}
-            </div>
-          )}
         </div>
 
         {/* フッター */}
@@ -132,15 +115,13 @@ function BulkSendModal({
           <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: 13, color: '#6b7280' }}>
             閉じる
           </button>
-          {!result && (
-            <button
-              onClick={handleSend}
-              disabled={sending}
-              style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: sending ? '#93c5fd' : '#2563eb', color: '#fff', cursor: sending ? 'default' : 'pointer', fontSize: 13, fontWeight: 600 }}
-            >
-              {sending ? '送信中...' : `📤 一斉送信（${recipients.filter(r => r.to.trim()).length}件）`}
-            </button>
-          )}
+          <button
+            onClick={handleSend}
+            disabled={sending || sent}
+            style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: sent ? '#16a34a' : sending ? '#93c5fd' : '#2563eb', color: '#fff', cursor: sending || sent ? 'default' : 'pointer', fontSize: 13, fontWeight: 600 }}
+          >
+            {sent ? '✓ 送信しました' : sending ? '送信中...' : `📤 送信`}
+          </button>
         </div>
       </div>
     </div>
@@ -331,6 +312,7 @@ interface ProjectMail {
   id: number
   title: string | null
   customer_name: string | null
+  sales_contact: string | null
   required_skills: string[]
   preferred_skills: string[]
   work_location: string | null
@@ -340,6 +322,7 @@ interface ProjectMail {
   start_date: string | null
   age_limit: string | null
   supply_chain: number | null
+  email: { from_address: string | null; from_name: string | null } | null
 }
 
 interface MatchedEngineer {
@@ -850,19 +833,21 @@ export default function MatchingPage() {
       {/* 一斉配信モーダル */}
       {showBulkSend && (()=>{
         const selected = engineers.filter(e => checked.has(e.engineer_id))
-        const initRecipients = selected.map(e => ({
-          to:   e.affiliation_email ?? e.email ?? '',
-          name: ([e.affiliation, e.affiliation_contact].filter(Boolean).join(' ') || e.engineer_name) + ' 様',
-        }))
+        // 宛先は案件メールの送信元（案件をくれた相手）
+        const initToName = (mail?.sales_contact || mail?.email?.from_name || '') + ' 様'
+        const initTo     = mail?.email?.from_address ?? ''
         const initSubject = `【技術者ご紹介】${mail?.title ?? ''}`
+        const greeting   = mail?.sales_contact || mail?.email?.from_name
+          ? `${mail.sales_contact || mail.email?.from_name} 様`
+          : '営業ご担当者様'
         const engineerLines = selected.map(e => {
           const skills = e.skills.slice(0, 5).map(s => s.name).join('／')
           const avail = e.availability_status === 'available' ? '稼働可' : e.availability_status === 'scheduled' ? '稼働予定' : e.availability_status === 'working' ? '稼働中' : ''
           return `・${e.engineer_name}（${e.age ? `${e.age}歳` : ''}${e.affiliation ? `／${e.affiliation}` : ''}）\n　スキル：${skills || '—'}　稼働：${avail || '—'}`
         }).join('\n')
         const mainContent = `この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。\n\n【ご紹介エンジニア（${selected.length}名）】\n${engineerLines}\n\n各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。\nまた、面談のご調整も随時承っております。`
-        const initBody = buildEmailBody('営業ご担当者様', mainContent, emailTemplate)
-        return <BulkSendModal projectMailId={Number(id)} initialRecipients={initRecipients} initialSubject={initSubject} initialBody={initBody} onClose={() => setShowBulkSend(false)} />
+        const initBody = buildEmailBody(greeting, mainContent, emailTemplate)
+        return <BulkSendModal projectMailId={Number(id)} initialToName={initToName} initialTo={initTo} initialSubject={initSubject} initialBody={initBody} engineerCount={selected.length} onClose={() => setShowBulkSend(false)} />
       })()}
       {/* 提案メールモーダル */}
       {proposalDraft && <ProposalModal draft={proposalDraft} onClose={() => setProposalDraft(null)} />}
