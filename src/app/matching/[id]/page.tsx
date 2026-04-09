@@ -5,10 +5,24 @@ import { useParams, useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 
 // ── 一斉配信モーダル ──────────────────────────────────
-function BulkSendModal({ projectMailId, onClose }: { projectMailId: number; onClose: () => void }) {
-  const [recipients, setRecipients] = useState<{ to: string; name: string }[]>([{ to: '', name: '' }])
-  const [subject, setSubject] = useState('')
-  const [body, setBody] = useState('')
+function BulkSendModal({
+  projectMailId,
+  initialRecipients,
+  initialSubject,
+  initialBody,
+  onClose,
+}: {
+  projectMailId: number
+  initialRecipients: { to: string; name: string }[]
+  initialSubject: string
+  initialBody: string
+  onClose: () => void
+}) {
+  const [recipients, setRecipients] = useState<{ to: string; name: string }[]>(
+    initialRecipients.length > 0 ? initialRecipients : [{ to: '', name: '' }]
+  )
+  const [subject, setSubject] = useState(initialSubject)
+  const [body, setBody] = useState(initialBody)
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState<{ sent: number; failed: string[] } | null>(null)
 
@@ -245,6 +259,7 @@ interface ProjectMail {
 interface MatchedEngineer {
   engineer_id: number
   engineer_name: string
+  email: string | null
   affiliation: string | null
   affiliation_type: string | null
   age: number | null
@@ -360,18 +375,22 @@ function EngineerCard({
   eng,
   proposed,
   excluded,
+  checked,
   generating,
   onPropose,
   onExclude,
+  onCheck,
   onDetail,
   onGenerateProposal,
 }: {
   eng: MatchedEngineer
   proposed: boolean
   excluded: boolean
+  checked: boolean
   generating: boolean
   onPropose: () => void
   onExclude: () => void
+  onCheck: () => void
   onDetail: () => void
   onGenerateProposal: () => void
 }) {
@@ -390,8 +409,15 @@ function EngineerCard({
       flexDirection: 'column',
       overflow: 'hidden',
     }}>
-      {/* カードヘッダー: スコアバッジ + 名前 */}
+      {/* カードヘッダー: チェックボックス + スコアバッジ + 名前 */}
       <div style={{ background: color.bg, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onCheck}
+          onClick={e => e.stopPropagation()}
+          style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0, accentColor: color.border }}
+        />
         <button
           onClick={onDetail}
           title="スコア内訳を見る"
@@ -538,8 +564,10 @@ function RankGroup({
   engineers,
   proposed,
   excluded,
+  checked,
   onPropose,
   onExclude,
+  onCheck,
   onDetail,
   generatingId,
   onGenerateProposal,
@@ -548,8 +576,10 @@ function RankGroup({
   engineers: MatchedEngineer[]
   proposed: Set<number>
   excluded: Set<number>
+  checked: Set<number>
   onPropose: (id: number) => void
   onExclude: (id: number) => void
+  onCheck: (id: number) => void
   onDetail: (eng: MatchedEngineer) => void
   generatingId: number | null
   onGenerateProposal: (eng: MatchedEngineer) => void
@@ -599,9 +629,11 @@ function RankGroup({
               eng={eng}
               proposed={proposed.has(eng.engineer_id)}
               excluded={excluded.has(eng.engineer_id)}
+              checked={checked.has(eng.engineer_id)}
               generating={generatingId === eng.engineer_id}
               onPropose={() => onPropose(eng.engineer_id)}
               onExclude={() => onExclude(eng.engineer_id)}
+              onCheck={() => onCheck(eng.engineer_id)}
               onDetail={() => onDetail(eng)}
               onGenerateProposal={() => onGenerateProposal(eng)}
             />
@@ -628,6 +660,56 @@ export default function MatchingPage() {
   const [proposalDraft, setProposalDraft] = useState<ProposalDraft | null>(null)
   const [generatingId, setGeneratingId] = useState<number | null>(null)
   const [showBulkSend, setShowBulkSend] = useState(false)
+  const [checked, setChecked] = useState<Set<number>>(new Set())
+
+  const visibleEngineers = engineers.filter(e => !excluded.has(e.engineer_id))
+  const allChecked = visibleEngineers.length > 0 && visibleEngineers.every(e => checked.has(e.engineer_id))
+
+  const toggleCheck = (engId: number) => {
+    setChecked(prev => { const n = new Set(prev); n.has(engId) ? n.delete(engId) : n.add(engId); return n })
+  }
+  const toggleCheckAll = () => {
+    if (allChecked) {
+      setChecked(new Set())
+    } else {
+      setChecked(new Set(visibleEngineers.map(e => e.engineer_id)))
+    }
+  }
+
+  const buildBulkDefaults = () => {
+    const selected = engineers.filter(e => checked.has(e.engineer_id))
+    const recipients = selected
+      .filter(e => e.email)
+      .map(e => ({ to: e.email!, name: e.affiliation ?? e.engineer_name }))
+    const subject = `【技術者ご紹介】${mail?.title ?? ''}`
+    const engineerLines = selected.map(e => {
+      const skills = e.skills.slice(0, 5).map(s => s.name).join('／')
+      const avail = e.availability_status === 'available' ? '稼働可'
+        : e.availability_status === 'scheduled' ? '稼働予定'
+        : e.availability_status === 'working' ? '稼働中' : ''
+      return `・${e.engineer_name}（${e.age ? `${e.age}歳` : ''}${e.affiliation ? `／${e.affiliation}` : ''}）\n　スキル：${skills || '—'}　稼働：${avail || '—'}`
+    }).join('\n')
+    const body = `営業ご担当者様
+
+いつもお世話になっております。
+株式会社アイゼン・ソリューション SES営業担当でございます。
+
+この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。
+
+【ご紹介エンジニア（${selected.length}名）】
+${engineerLines}
+
+各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。
+また、面談のご調整も随時承っております。
+
+お忙しいところ大変恐れ入りますが、ご検討いただけますと幸いでございます。
+何卒よろしくお願いいたします。
+
+─────────────────────────
+株式会社アイゼン・ソリューション　SES営業部
+─────────────────────────`
+    return { recipients, subject, body }
+  }
 
   useEffect(() => {
     if (!id) return
@@ -701,12 +783,12 @@ export default function MatchingPage() {
   }
 
   const proposedCount = proposed.size
-  const visibleCount = engineers.filter(e => !excluded.has(e.engineer_id)).length
+
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
       {/* 一斉配信モーダル */}
-      {showBulkSend && <BulkSendModal projectMailId={Number(id)} onClose={() => setShowBulkSend(false)} />}
+      {showBulkSend && (() => { const d = buildBulkDefaults(); return <BulkSendModal projectMailId={Number(id)} initialRecipients={d.recipients} initialSubject={d.subject} initialBody={d.body} onClose={() => setShowBulkSend(false)} /> })()}
       {/* 提案メールモーダル */}
       {proposalDraft && <ProposalModal draft={proposalDraft} onClose={() => setProposalDraft(null)} />}
       {/* スコア内訳モーダル */}
@@ -733,13 +815,19 @@ export default function MatchingPage() {
             {mail.title ?? `案件 #${id}`}
           </h1>
           <button
-            onClick={() => setShowBulkSend(true)}
-            style={{ fontSize: 12, background: '#f59e0b', border: 'none', color: '#fff', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}
+            onClick={toggleCheckAll}
+            style={{ fontSize: 12, background: allChecked ? '#6b7280' : 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}
           >
-            📤 一斉配信
+            {allChecked ? '☑ 全解除' : '☐ 全選択'}
+          </button>
+          <button
+            onClick={() => setShowBulkSend(true)}
+            style={{ fontSize: 12, background: checked.size > 0 ? '#f59e0b' : '#78716c', border: 'none', color: '#fff', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}
+          >
+            📤 一斉配信{checked.size > 0 ? `（${checked.size}名）` : ''}
           </button>
           <span style={{ fontSize: 13, background: 'rgba(255,255,255,0.15)', borderRadius: 6, padding: '3px 10px', flexShrink: 0 }}>
-            候補 {visibleCount}名
+            候補 {visibleEngineers.length}名
             {proposedCount > 0 && <span style={{ marginLeft: 6, color: '#86efac' }}>提案 {proposedCount}名</span>}
           </span>
         </div>
@@ -796,8 +884,10 @@ export default function MatchingPage() {
                 engineers={grouped[rank]}
                 proposed={proposed}
                 excluded={excluded}
+                checked={checked}
                 onPropose={togglePropose}
                 onExclude={toggleExclude}
+                onCheck={toggleCheck}
                 onDetail={setDetailEng}
                 generatingId={generatingId}
                 onGenerateProposal={handleGenerateProposal}
