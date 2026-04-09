@@ -42,6 +42,7 @@ function BulkSendModal({
         body,
       })
       setSent(true)
+      setTimeout(() => onClose(), 2000)
     } catch {
       alert('送信に失敗しました')
     } finally {
@@ -236,6 +237,7 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
         body,
       })
       setSent(true)
+      setTimeout(() => onClose(), 2000)
       setTimeout(() => onClose(), 1500)
     } catch {
       alert('送信に失敗しました')
