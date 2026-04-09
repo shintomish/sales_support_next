@@ -161,9 +161,11 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
   const [copied, setCopied] = useState(false)
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [body, setBody] = useState(draft.body)
+  const [subject, setSubject] = useState(draft.subject)
 
   const copyAll = () => {
-    const text = `件名: ${draft.subject}\n宛先: ${draft.to_name} <${draft.to_address}>\n\n${draft.body}`
+    const text = `件名: ${subject}\n宛先: ${draft.to_name} <${draft.to_address}>\n\n${body}`
     navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -175,8 +177,8 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
     try {
       await axios.post(`/api/v1/project-mails/${draft.project_mail_id}/send-proposal`, {
         to: draft.to_address,
-        subject: draft.subject,
-        body: draft.body,
+        subject,
+        body,
       })
       setSent(true)
       setTimeout(() => onClose(), 1500)
@@ -201,19 +203,28 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
 
         {/* メタ情報 */}
         <div style={{ padding: '12px 20px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb', fontSize: 12 }}>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
             <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>宛先</span>
             <span style={{ color: '#111827' }}>{draft.to_name} {'<'}{draft.to_address}{'>'}</span>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>件名</span>
-            <span style={{ color: '#111827', fontWeight: 600 }}>{draft.subject}</span>
+            <input
+              type="text"
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              style={{ flex: 1, fontSize: 12, fontWeight: 600, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4 }}
+            />
           </div>
         </div>
 
         {/* 本文 */}
         <div style={{ padding: '16px 20px', flex: 1, overflowY: 'auto' }}>
-          <pre style={{ fontSize: 13, color: '#374151', whiteSpace: 'pre-wrap', lineHeight: 1.7, fontFamily: 'sans-serif', margin: 0 }}>{draft.body}</pre>
+          <textarea
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            style={{ width: '100%', fontSize: 13, color: '#374151', lineHeight: 1.7, fontFamily: 'sans-serif', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', resize: 'vertical', minHeight: 280, boxSizing: 'border-box' }}
+          />
         </div>
 
         {/* フッター */}
@@ -677,41 +688,6 @@ export default function MatchingPage() {
     }
   }
 
-  const buildBulkDefaults = () => {
-    const selected = engineers.filter(e => checked.has(e.engineer_id))
-    const recipients = selected.map(e => ({
-      to:   e.email ?? '',
-      name: [e.affiliation, e.affiliation_contact].filter(Boolean).join(' ') || e.engineer_name,
-    }))
-    const subject = `【技術者ご紹介】${mail?.title ?? ''}`
-    const engineerLines = selected.map(e => {
-      const skills = e.skills.slice(0, 5).map(s => s.name).join('／')
-      const avail = e.availability_status === 'available' ? '稼働可'
-        : e.availability_status === 'scheduled' ? '稼働予定'
-        : e.availability_status === 'working' ? '稼働中' : ''
-      return `・${e.engineer_name}（${e.age ? `${e.age}歳` : ''}${e.affiliation ? `／${e.affiliation}` : ''}）\n　スキル：${skills || '—'}　稼働：${avail || '—'}`
-    }).join('\n')
-    const body = `営業ご担当者様
-
-いつもお世話になっております。
-株式会社アイゼン・ソリューション SES営業担当でございます。
-
-この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。
-
-【ご紹介エンジニア（${selected.length}名）】
-${engineerLines}
-
-各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。
-また、面談のご調整も随時承っております。
-
-お忙しいところ大変恐れ入りますが、ご検討いただけますと幸いでございます。
-何卒よろしくお願いいたします。
-
-─────────────────────────
-株式会社アイゼン・ソリューション　SES営業部
-─────────────────────────`
-    return { recipients, subject, body }
-  }
 
   useEffect(() => {
     if (!id) return
@@ -790,7 +766,21 @@ ${engineerLines}
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
       {/* 一斉配信モーダル */}
-      {showBulkSend && (() => { const d = buildBulkDefaults(); return <BulkSendModal projectMailId={Number(id)} initialRecipients={d.recipients} initialSubject={d.subject} initialBody={d.body} onClose={() => setShowBulkSend(false)} /> })()}
+      {showBulkSend && (()=>{
+        const selected = engineers.filter(e => checked.has(e.engineer_id))
+        const initRecipients = selected.map(e => ({
+          to:   e.email ?? '',
+          name: [e.affiliation, e.affiliation_contact].filter(Boolean).join(' ') || e.engineer_name,
+        }))
+        const initSubject = `【技術者ご紹介】${mail?.title ?? ''}`
+        const engineerLines = selected.map(e => {
+          const skills = e.skills.slice(0, 5).map(s => s.name).join('／')
+          const avail = e.availability_status === 'available' ? '稼働可' : e.availability_status === 'scheduled' ? '稼働予定' : e.availability_status === 'working' ? '稼働中' : ''
+          return `・${e.engineer_name}（${e.age ? `${e.age}歳` : ''}${e.affiliation ? `／${e.affiliation}` : ''}）\n　スキル：${skills || '—'}　稼働：${avail || '—'}`
+        }).join('\n')
+        const initBody = `営業ご担当者様\n\nいつもお世話になっております。\n株式会社アイゼン・ソリューション SES営業担当でございます。\n\nこの度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。\n\n【ご紹介エンジニア（${selected.length}名）】\n${engineerLines}\n\n各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。\nまた、面談のご調整も随時承っております。\n\nお忙しいところ大変恐れ入りますが、ご検討いただけますと幸いでございます。\n何卒よろしくお願いいたします。\n\n─────────────────────────\n株式会社アイゼン・ソリューション　SES営業部\n─────────────────────────`
+        return <BulkSendModal projectMailId={Number(id)} initialRecipients={initRecipients} initialSubject={initSubject} initialBody={initBody} onClose={() => setShowBulkSend(false)} />
+      })()}
       {/* 提案メールモーダル */}
       {proposalDraft && <ProposalModal draft={proposalDraft} onClose={() => setProposalDraft(null)} />}
       {/* スコア内訳モーダル */}
