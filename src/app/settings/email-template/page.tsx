@@ -57,7 +57,8 @@ export default function EmailTemplatePage() {
         if (res.data) {
           const loaded = { ...EMPTY, ...res.data };
           setForm(loaded);
-          setPreviewText(buildPreview(loaded));
+          // body_text が保存済みならそちらを優先、なければフォームから生成
+          setPreviewText(res.data.body_text || buildPreview(loaded));
         }
       })
       .finally(() => setLoading(false));
@@ -69,7 +70,7 @@ export default function EmailTemplatePage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await axios.put('/api/v1/email-body-templates/me', form);
+      await axios.put('/api/v1/email-body-templates/me', { ...form, body_text: previewText });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {

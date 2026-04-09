@@ -155,6 +155,7 @@ interface EmailBodyTemplate {
   position: string
   email: string
   mobile: string
+  body_text?: string | null
 }
 
 function buildEmailBody(
@@ -162,6 +163,13 @@ function buildEmailBody(
   mainContent: string,
   tpl: EmailBodyTemplate | null,
 ): string {
+  // body_text（設定ページで保存済みのテンプレート）があればそちらを優先
+  if (tpl?.body_text) {
+    return tpl.body_text
+      .replace(/^.*?様\s*/u, `${greeting}\n\n`)   // 1行目の「●● 様」を実際の宛先に置換
+      .replace('（本文）', mainContent)
+  }
+
   const intro = tpl
     ? `いつも大変お世話になっております。\n株式会社アイゼン・ソリューションの${tpl.name}です。`
     : `いつも大変お世話になっております。`
