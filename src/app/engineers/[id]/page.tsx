@@ -34,7 +34,7 @@ const GENDER_LABEL: Record<string, string> = {
 
 interface Engineer {
   id: number; name: string; name_kana: string | null; email: string | null; phone: string | null;
-  affiliation: string | null; affiliation_contact: string | null;
+  affiliation: string | null; affiliation_contact: string | null; affiliation_email: string | null;
   age: number | null; gender: string | null; nationality: string | null;
   nearest_station: string | null; affiliation_type: string | null;
   profile: {
@@ -90,6 +90,7 @@ export default function EngineerDetailPage() {
   const [phone, setPhone]           = useState('');
   const [affiliation, setAffiliation] = useState('');
   const [affiliationContact, setAffiliationContact] = useState('');
+  const [affiliationEmail, setAffiliationEmail]     = useState('');
   const [priceMin, setPriceMin]     = useState('');
   const [priceMax, setPriceMax]     = useState('');
   const [availableFrom, setAvailableFrom] = useState('');
@@ -128,6 +129,7 @@ export default function EngineerDetailPage() {
       setPhone(e.phone ?? '');
       setAffiliation(e.affiliation ?? '');
       setAffiliationContact(e.affiliation_contact ?? '');
+      setAffiliationEmail(e.affiliation_email ?? '');
       setAge(e.age?.toString() ?? '');
       setGender(e.gender ?? '');
       setNationality(e.nationality ?? '');
@@ -187,6 +189,7 @@ export default function EngineerDetailPage() {
         name, name_kana: nameKana || null, email: email || null,
         phone: phone || null, affiliation: affiliation || null,
         affiliation_contact: affiliationContact || null,
+        affiliation_email: affiliationEmail || null,
         age: age ? Number(age) : null,
         gender: gender || null,
         nationality: nationality || null,
@@ -300,6 +303,7 @@ export default function EngineerDetailPage() {
                   <div><p className="text-xs text-gray-400">電話</p><p>{engineer.phone ?? <Em />}</p></div>
                   <div><p className="text-xs text-gray-400">所属</p><p>{engineer.affiliation ?? <Em />}</p></div>
                   <div><p className="text-xs text-gray-400">所属担当者</p><p>{engineer.affiliation_contact ?? <Em />}</p></div>
+                  <div><p className="text-xs text-gray-400">所属会社メール</p><p>{engineer.affiliation_email ?? <Em />}</p></div>
                   <div><p className="text-xs text-gray-400">年齢</p><p>{engineer.age ? `${engineer.age}歳` : <Em />}</p></div>
                   <div><p className="text-xs text-gray-400">性別</p><p>{engineer.gender ? (GENDER_LABEL[engineer.gender] ?? engineer.gender) : <Em />}</p></div>
                   <div><p className="text-xs text-gray-400">国籍</p><p>{engineer.nationality ?? <Em />}</p></div>
@@ -390,6 +394,9 @@ export default function EngineerDetailPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className={labelCls}>所属</label><input className={inputCls} value={affiliation} onChange={e => setAffiliation(e.target.value)} /></div>
                   <div><label className={labelCls}>所属担当者</label><input className={inputCls} value={affiliationContact} onChange={e => setAffiliationContact(e.target.value)} /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className={labelCls}>所属会社メール</label><input className={inputCls} type="email" value={affiliationEmail} onChange={e => setAffiliationEmail(e.target.value)} placeholder="info@example.co.jp" /></div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div>

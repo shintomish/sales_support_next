@@ -67,6 +67,7 @@ export default function EngineerCreatePage() {
   const [phone, setPhone]                         = useState('');
   const [affiliation, setAffiliation]             = useState(initAffiliation);
   const [affiliationContact, setAffiliationContact] = useState('');
+  const [affiliationEmail, setAffiliationEmail]     = useState('');
   const [affiliationType, setAffiliationType]     = useState(initAffType);
   const [age, setAge]                             = useState('');
   const [gender, setGender]                       = useState('');
@@ -216,6 +217,7 @@ export default function EngineerCreatePage() {
         name, name_kana: nameKana || null, email: email || null,
         phone: phone || null, affiliation: affiliation || null,
         affiliation_contact: affiliationContact || null,
+        affiliation_email: affiliationEmail || null,
         affiliation_type: affiliationType || null,
         age: age ? Number(age) : null,
         gender: gender || null,
@@ -381,6 +383,10 @@ export default function EngineerCreatePage() {
                 <div>
                   <label className={labelCls}>所属担当者</label>
                   <input className={inputCls} value={affiliationContact} onChange={e => setAffiliationContact(e.target.value)} />
+                </div>
+                <div>
+                  <label className={labelCls}>所属会社メール</label>
+                  <input className={inputCls} type="email" value={affiliationEmail} onChange={e => setAffiliationEmail(e.target.value)} placeholder="info@example.co.jp" />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">

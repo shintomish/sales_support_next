@@ -273,6 +273,7 @@ interface MatchedEngineer {
   email: string | null
   affiliation: string | null
   affiliation_contact: string | null
+  affiliation_email: string | null
   affiliation_type: string | null
   age: number | null
   score: number
@@ -769,7 +770,7 @@ export default function MatchingPage() {
       {showBulkSend && (()=>{
         const selected = engineers.filter(e => checked.has(e.engineer_id))
         const initRecipients = selected.map(e => ({
-          to:   e.email ?? '',
+          to:   e.affiliation_email ?? e.email ?? '',
           name: [e.affiliation, e.affiliation_contact].filter(Boolean).join(' ') || e.engineer_name,
         }))
         const initSubject = `【技術者ご紹介】${mail?.title ?? ''}`
