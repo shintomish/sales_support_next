@@ -584,7 +584,7 @@ export default function DeliveriesPage() {
 
       {/* ── 新規配信タブ ────────────────────────────────── */}
       {tab === 'send' && (
-        <div className="max-w-2xl">
+        <div className="max-w-2xl overflow-hidden">
           {sendResult && (
             <div className={`mb-4 px-4 py-3 rounded text-sm ${
               sendResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
@@ -602,15 +602,19 @@ export default function DeliveriesPage() {
               <select
                 value={sendForm.project_mail_id}
                 onChange={e => setSendForm(f => ({ ...f, project_mail_id: e.target.value }))}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                className="w-full max-w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
               >
                 <option value="">選択しない</option>
-                {projectMails.map(pm => (
-                  <option key={pm.id} value={pm.id}>
-                    {pm.title ?? `案件 #${pm.id}`}
-                    {pm.customer_name ? ` ／ ${pm.customer_name}` : ''}
-                  </option>
-                ))}
+                {projectMails.map(pm => {
+                  const title = pm.title ?? `案件 #${pm.id}`
+                  const customer = pm.customer_name ? ` ／ ${pm.customer_name}` : ''
+                  const label = `${title}${customer}`
+                  return (
+                    <option key={pm.id} value={pm.id}>
+                      {label.length > 40 ? label.slice(0, 40) + '…' : label}
+                    </option>
+                  )
+                })}
               </select>
             </div>
 
