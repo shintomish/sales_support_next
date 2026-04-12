@@ -662,6 +662,174 @@ function EngineerCard({
   )
 }
 
+// ── 技術者行（リスト表示用） ──────────────────────────
+function EngineerRow({
+  eng,
+  proposed,
+  excluded,
+  checked,
+  generating,
+  onPropose,
+  onExclude,
+  onCheck,
+  onDetail,
+  onGenerateProposal,
+}: {
+  eng: MatchedEngineer
+  proposed: boolean
+  excluded: boolean
+  checked: boolean
+  generating: boolean
+  onPropose: () => void
+  onExclude: () => void
+  onCheck: () => void
+  onDetail: () => void
+  onGenerateProposal: () => void
+}) {
+  const color = rankColor(eng.score)
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      padding: '8px 12px',
+      background: excluded ? '#f9fafb' : '#fff',
+      borderBottom: '1px solid #f3f4f6',
+      opacity: excluded ? 0.55 : 1,
+      transition: 'opacity 0.2s',
+    }}>
+      {/* チェックボックス */}
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onCheck}
+        onClick={e => e.stopPropagation()}
+        style={{ width: 15, height: 15, flexShrink: 0, accentColor: color.border, cursor: 'pointer' }}
+      />
+
+      {/* スコアバッジ */}
+      <button
+        onClick={onDetail}
+        title="スコア内訳を見る"
+        style={{
+          flexShrink: 0,
+          width: 44,
+          height: 44,
+          borderRadius: 8,
+          border: `2px solid ${color.border}`,
+          background: color.bg,
+          cursor: 'pointer',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <span style={{ fontSize: 11, fontWeight: 800, color: color.text, lineHeight: 1 }}>{rankLabel(eng.score)}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: color.text, lineHeight: 1.3 }}>{eng.score}</span>
+      </button>
+
+      {/* 名前・所属 */}
+      <div style={{ width: 160, flexShrink: 0 }}>
+        <p style={{ fontWeight: 700, fontSize: 13, color: '#111827', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {eng.engineer_name}
+        </p>
+        <p style={{ fontSize: 11, color: '#6b7280', margin: '1px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {eng.age ? `${eng.age}歳` : ''}{eng.age && eng.affiliation ? '　' : ''}{eng.affiliation ?? ''}
+        </p>
+      </div>
+
+      {/* 稼働状況 */}
+      <div style={{ width: 110, flexShrink: 0 }}>
+        {eng.availability_status ? (
+          <p style={{ fontSize: 11, margin: 0, color: eng.availability_status === 'available' ? '#16a34a' : '#d97706', fontWeight: 600 }}>
+            ● {AVAILABILITY_LABEL[eng.availability_status] ?? eng.availability_status}
+          </p>
+        ) : null}
+        {eng.available_from && (
+          <p style={{ fontSize: 11, color: '#9ca3af', margin: '1px 0 0' }}>{formatDate(eng.available_from)}〜</p>
+        )}
+      </div>
+
+      {/* 単価 */}
+      <div style={{ width: 80, flexShrink: 0, fontSize: 11, color: '#6b7280' }}>
+        {priceStr(eng.desired_unit_price_min, eng.desired_unit_price_max) ?? '—'}
+      </div>
+
+      {/* スキルタグ（最大4件） */}
+      <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: 3, minWidth: 0 }}>
+        {eng.skills.slice(0, 4).map((s, i) => (
+          <span key={i} style={{
+            fontSize: 10,
+            background: '#eff6ff',
+            color: '#1d4ed8',
+            border: '1px solid #bfdbfe',
+            borderRadius: 4,
+            padding: '1px 5px',
+            whiteSpace: 'nowrap',
+          }}>
+            {s.name}{s.experience_years ? ` ${s.experience_years}y` : ''}
+          </span>
+        ))}
+        {eng.skills.length > 4 && (
+          <span style={{ fontSize: 10, color: '#9ca3af', alignSelf: 'center' }}>+{eng.skills.length - 4}</span>
+        )}
+      </div>
+
+      {/* アクションボタン */}
+      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+        <button
+          onClick={onPropose}
+          style={{
+            padding: '5px 10px',
+            border: 'none',
+            borderRadius: 6,
+            cursor: 'pointer',
+            fontSize: 11,
+            fontWeight: 600,
+            background: proposed ? '#16a34a' : '#f0fdf4',
+            color: proposed ? '#fff' : '#16a34a',
+          }}
+        >
+          {proposed ? '✓ 提案済み' : '提案する'}
+        </button>
+        <button
+          onClick={onGenerateProposal}
+          disabled={generating}
+          style={{
+            padding: '5px 10px',
+            border: 'none',
+            borderRadius: 6,
+            cursor: generating ? 'wait' : 'pointer',
+            fontSize: 11,
+            fontWeight: 600,
+            background: '#eff6ff',
+            color: generating ? '#9ca3af' : '#2563eb',
+          }}
+        >
+          {generating ? '生成中…' : '📧 メール'}
+        </button>
+        <button
+          onClick={onExclude}
+          style={{
+            padding: '5px 10px',
+            border: 'none',
+            borderRadius: 6,
+            cursor: 'pointer',
+            fontSize: 11,
+            fontWeight: 600,
+            background: excluded ? '#6b7280' : '#f3f4f6',
+            color: excluded ? '#fff' : '#9ca3af',
+          }}
+        >
+          {excluded ? '除外済み' : '除外'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── ランクグループ ────────────────────────────────────
 function RankGroup({
   rank,
@@ -675,6 +843,7 @@ function RankGroup({
   onDetail,
   generatingId,
   onGenerateProposal,
+  viewMode,
 }: {
   rank: '◎' | '○' | '△'
   engineers: MatchedEngineer[]
@@ -687,6 +856,7 @@ function RankGroup({
   onDetail: (eng: MatchedEngineer) => void
   generatingId: number | null
   onGenerateProposal: (eng: MatchedEngineer) => void
+  viewMode: 'card' | 'list'
 }) {
   const [open, setOpen] = useState(true)
   if (engineers.length === 0) return null
@@ -726,23 +896,43 @@ function RankGroup({
         <span style={{ marginLeft: 'auto', color: '#9ca3af', fontSize: 14 }}>{open ? '▲' : '▼'}</span>
       </button>
       {open && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-          {engineers.map(eng => (
-            <EngineerCard
-              key={eng.engineer_id}
-              eng={eng}
-              proposed={proposed.has(eng.engineer_id)}
-              excluded={excluded.has(eng.engineer_id)}
-              checked={checked.has(eng.engineer_id)}
-              generating={generatingId === eng.engineer_id}
-              onPropose={() => onPropose(eng.engineer_id)}
-              onExclude={() => onExclude(eng.engineer_id)}
-              onCheck={() => onCheck(eng.engineer_id)}
-              onDetail={() => onDetail(eng)}
-              onGenerateProposal={() => onGenerateProposal(eng)}
-            />
-          ))}
-        </div>
+        viewMode === 'card' ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+            {engineers.map(eng => (
+              <EngineerCard
+                key={eng.engineer_id}
+                eng={eng}
+                proposed={proposed.has(eng.engineer_id)}
+                excluded={excluded.has(eng.engineer_id)}
+                checked={checked.has(eng.engineer_id)}
+                generating={generatingId === eng.engineer_id}
+                onPropose={() => onPropose(eng.engineer_id)}
+                onExclude={() => onExclude(eng.engineer_id)}
+                onCheck={() => onCheck(eng.engineer_id)}
+                onDetail={() => onDetail(eng)}
+                onGenerateProposal={() => onGenerateProposal(eng)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
+            {engineers.map(eng => (
+              <EngineerRow
+                key={eng.engineer_id}
+                eng={eng}
+                proposed={proposed.has(eng.engineer_id)}
+                excluded={excluded.has(eng.engineer_id)}
+                checked={checked.has(eng.engineer_id)}
+                generating={generatingId === eng.engineer_id}
+                onPropose={() => onPropose(eng.engineer_id)}
+                onExclude={() => onExclude(eng.engineer_id)}
+                onCheck={() => onCheck(eng.engineer_id)}
+                onDetail={() => onDetail(eng)}
+                onGenerateProposal={() => onGenerateProposal(eng)}
+              />
+            ))}
+          </div>
+        )
       )}
     </div>
   )
@@ -766,6 +956,7 @@ export default function MatchingPage() {
   const [showBulkSend, setShowBulkSend] = useState(false)
   const [checked, setChecked] = useState<Set<number>>(new Set())
   const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('card')
 
   const visibleEngineers = engineers.filter(e => !excluded.has(e.engineer_id))
   const allChecked = visibleEngineers.length > 0 && visibleEngineers.every(e => checked.has(e.engineer_id))
@@ -907,6 +1098,23 @@ export default function MatchingPage() {
           <h1 style={{ fontSize: 15, fontWeight: 700, flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
             {mail.title ?? `案件 #${id}`}
           </h1>
+          {/* カード/リスト切替 */}
+          <div style={{ display: 'flex', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+            <button
+              onClick={() => setViewMode('card')}
+              title="カード表示"
+              style={{ padding: '5px 10px', border: 'none', cursor: 'pointer', fontSize: 14, background: viewMode === 'card' ? 'rgba(255,255,255,0.35)' : 'transparent', color: '#fff', fontWeight: viewMode === 'card' ? 700 : 400 }}
+            >
+              ⊞
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              title="リスト表示"
+              style={{ padding: '5px 10px', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 14, background: viewMode === 'list' ? 'rgba(255,255,255,0.35)' : 'transparent', color: '#fff', fontWeight: viewMode === 'list' ? 700 : 400 }}
+            >
+              ≡
+            </button>
+          </div>
           <button
             onClick={toggleCheckAll}
             style={{ fontSize: 12, background: allChecked ? '#6b7280' : 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}
@@ -985,6 +1193,7 @@ export default function MatchingPage() {
                 onDetail={setDetailEng}
                 generatingId={generatingId}
                 onGenerateProposal={handleGenerateProposal}
+                viewMode={viewMode}
               />
             ))}
           </>
