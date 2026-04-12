@@ -249,8 +249,12 @@ const SEND_TYPE_COLOR: Record<string, string> = {
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return '—'
-  const d = new Date(iso)
-  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return new Date(iso).toLocaleString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+    hour12: false,
+  }).replace(/\//g, '/').replace(',', '')
 }
 
 // ── 行コンポーネント ──────────────────────────────────────

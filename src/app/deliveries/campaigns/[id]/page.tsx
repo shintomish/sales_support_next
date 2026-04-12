@@ -124,7 +124,7 @@ function ReplyModal({ h, campaignSubject, onClose }: { h: SendHistory; campaignS
           </div>
           <div className="flex gap-2">
             <span className="w-14 text-gray-400 shrink-0">受信日時</span>
-            <span>{h.replied_at ? new Date(h.replied_at).toLocaleString('ja-JP') : '—'}</span>
+            <span>{h.replied_at ? new Date(h.replied_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}</span>
           </div>
         </div>
 
@@ -248,7 +248,7 @@ export default function CampaignDetailPage() {
           <div>
             <span className="text-gray-500">送信日時</span>
             <p className="font-medium text-gray-800 mt-0.5">
-              {displayCampaign?.sent_at ? new Date(displayCampaign.sent_at).toLocaleString('ja-JP') : '-'}
+              {displayCampaign?.sent_at ? new Date(displayCampaign.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}
             </p>
           </div>
           <div>
@@ -363,7 +363,7 @@ export default function CampaignDetailPage() {
                         <span className="group-hover:underline truncate max-w-[280px]">{h.reply_subject}</span>
                       </button>
                       <p className="text-xs text-gray-400 mt-0.5 pl-6">
-                        {new Date(h.replied_at).toLocaleString('ja-JP')}
+                        {new Date(h.replied_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                       </p>
                     </div>
                   ) : (
