@@ -51,6 +51,31 @@ type Paginated = {
   total: number
 }
 
+type MatchedProject = {
+  project_id: number
+  project_title: string
+  match_score: number
+  matched_count: number
+  total_skills: number
+  required_skills: { name: string; is_required: boolean; matched: boolean }[]
+  unit_price_min: number | null
+  unit_price_max: number | null
+  work_style: string | null
+  to_email: string
+  sales_contact: string
+}
+
+type ProposalModal = {
+  project: MatchedProject
+  to: string
+  subject: string
+  body: string
+  generating: boolean
+  sending: boolean
+  sent: boolean
+  error: string
+}
+
 // ── 定数 ─────────────────────────────────────────────────
 
 const STATUS_TABS = [
@@ -117,6 +142,11 @@ export default function EngineerMailsPage() {
   const [expandedItem, setExpandedItem] = useState<EngineerMail | null>(null)
   const [expandLoading, setExpandLoading] = useState(false)
 
+  // マッチ案件・提案送信
+  const [matchedProjects, setMatchedProjects] = useState<MatchedProject[]>([])
+  const [matchLoading, setMatchLoading] = useState(false)
+  const [proposalModal, setProposalModal] = useState<ProposalModal | null>(null)
+
   const fetchList = useCallback(async () => {
     const res = await axios.get('/api/v1/engineer-mails', {
       params: {
@@ -139,6 +169,44 @@ export default function EngineerMailsPage() {
     setSkillInput('')
     setSaveMsg(null)
     setShowBody(false)
+    setMatchedProjects([])
+    setProposalModal(null)
+    // マッチ案件を非同期取得
+    setMatchLoading(true)
+    try {
+      const mres = await axios.get(`/api/v1/engineer-mails/${item.id}/matched-projects`)
+      setMatchedProjects(mres.data.data ?? [])
+    } catch { /* silent */ } finally {
+      setMatchLoading(false)
+    }
+  }
+
+  // 提案文生成
+  const handleGenerate = async (project: MatchedProject) => {
+    setProposalModal({ project, to: project.to_email, subject: '', body: '', generating: true, sending: false, sent: false, error: '' })
+    try {
+      const res = await axios.post(`/api/v1/engineer-mails/${selected!.id}/generate-proposal`, { project_id: project.project_id })
+      setProposalModal(m => m ? { ...m, subject: res.data.subject, body: res.data.body, generating: false } : m)
+    } catch {
+      setProposalModal(m => m ? { ...m, generating: false, error: '文章生成に失敗しました' } : m)
+    }
+  }
+
+  // 提案メール送信
+  const handleSendProposal = async () => {
+    if (!proposalModal || !selected) return
+    setProposalModal(m => m ? { ...m, sending: true, error: '' } : m)
+    try {
+      await axios.post(`/api/v1/engineer-mails/${selected.id}/send-proposal`, {
+        project_id: proposalModal.project.project_id,
+        to:         proposalModal.to,
+        subject:    proposalModal.subject,
+        body:       proposalModal.body,
+      })
+      setProposalModal(m => m ? { ...m, sending: false, sent: true } : m)
+    } catch {
+      setProposalModal(m => m ? { ...m, sending: false, error: '送信に失敗しました' } : m)
+    }
   }
 
   // 要確認モード: アコーディオン展開
@@ -638,6 +706,45 @@ export default function EngineerMailsPage() {
               </div>
             )}
 
+            {/* マッチ案件 */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-700">マッチ案件</span>
+                {matchLoading && <span className="text-xs text-gray-400 animate-pulse">取得中...</span>}
+              </div>
+              {!matchLoading && matchedProjects.length === 0 && (
+                <p className="text-sm text-gray-400 px-4 py-3">マッチする案件はありません</p>
+              )}
+              {matchedProjects.map(proj => (
+                <div key={proj.project_id} className="px-4 py-3 border-b border-gray-100 last:border-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{proj.project_title}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${proj.match_score >= 70 ? 'bg-emerald-100 text-emerald-700' : proj.match_score >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {proj.match_score}%
+                        </span>
+                        {proj.unit_price_min && (
+                          <span className="text-xs text-gray-500">{proj.unit_price_min}〜{proj.unit_price_max ?? '?'}万円</span>
+                        )}
+                        {proj.work_style && <span className="text-xs text-gray-400">{proj.work_style}</span>}
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {proj.required_skills.slice(0, 5).map((s, i) => (
+                          <span key={i} className={`text-xs px-1.5 py-0.5 rounded border ${s.matched ? 'bg-teal-50 text-teal-600 border-teal-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>{s.name}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleGenerate(proj)}
+                      className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 font-medium flex-shrink-0 whitespace-nowrap">
+                      提案送信
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
             {/* 元メール */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <button onClick={() => setShowBody(v => !v)}
@@ -672,6 +779,77 @@ export default function EngineerMailsPage() {
           </div>
         )}
       </div>
+
+      {/* 提案送信モーダル */}
+      {proposalModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">提案メール送信</p>
+                <p className="text-xs text-gray-500 truncate mt-0.5">{proposalModal.project.project_title}</p>
+              </div>
+              <button onClick={() => setProposalModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              {proposalModal.generating ? (
+                <p className="text-sm text-gray-500 text-center py-8 animate-pulse">AIが提案文を生成中...</p>
+              ) : proposalModal.sent ? (
+                <div className="text-center py-8">
+                  <p className="text-2xl mb-2">✅</p>
+                  <p className="text-sm font-medium text-gray-700">送信しました</p>
+                  <button onClick={() => setProposalModal(null)} className="mt-4 text-sm text-teal-600 hover:underline">閉じる</button>
+                </div>
+              ) : (
+                <>
+                  {proposalModal.error && (
+                    <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{proposalModal.error}</p>
+                  )}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">宛先メール</label>
+                    <input
+                      type="email"
+                      value={proposalModal.to}
+                      onChange={e => setProposalModal(m => m ? { ...m, to: e.target.value } : m)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                      placeholder="送信先メールアドレス"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">件名</label>
+                    <input
+                      type="text"
+                      value={proposalModal.subject}
+                      onChange={e => setProposalModal(m => m ? { ...m, subject: e.target.value } : m)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">本文</label>
+                    <textarea
+                      value={proposalModal.body}
+                      onChange={e => setProposalModal(m => m ? { ...m, body: e.target.value } : m)}
+                      rows={10}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono"
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      onClick={handleSendProposal}
+                      disabled={proposalModal.sending || !proposalModal.to || !proposalModal.subject || !proposalModal.body}
+                      className="flex-1 bg-purple-600 text-white py-2.5 rounded-xl font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                      {proposalModal.sending ? '送信中...' : '送信する'}
+                    </button>
+                    <button onClick={() => setProposalModal(null)} className="px-6 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
+                      キャンセル
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
