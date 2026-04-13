@@ -38,6 +38,7 @@ function BulkSendModal({
     try {
       await axios.post(`/api/v1/project-mails/${projectMailId}/send-proposal`, {
         to,
+        to_name: toName,
         subject,
         body,
       })
@@ -233,6 +234,7 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
     try {
       await axios.post(`/api/v1/project-mails/${draft.project_mail_id}/send-proposal`, {
         to: toAddress,
+        to_name: toName,
         subject,
         body,
       })

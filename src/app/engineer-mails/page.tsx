@@ -270,6 +270,7 @@ export default function EngineerMailsPage() {
       const formData = new FormData()
       formData.append('project_id', String(proposalModal.project.project_id))
       formData.append('to',         proposalModal.to)
+      formData.append('to_name',    proposalModal.toName ?? '')
       formData.append('subject',    proposalModal.subject)
       formData.append('body',       proposalModal.body)
       proposalModal.attachments.forEach(f => formData.append('attachments[]', f))

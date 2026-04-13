@@ -205,6 +205,21 @@ export default function DeliveriesPage() {
     fetchAddresses()
   }
 
+  // ── 名前インライン編集 ────────────────────────────────
+  const [editingNameId, setEditingNameId] = useState<number | null>(null)
+  const [editingNameValue, setEditingNameValue] = useState('')
+
+  const startEditName = (addr: DeliveryAddress) => {
+    setEditingNameId(addr.id)
+    setEditingNameValue(addr.name ?? '')
+  }
+
+  const saveEditName = async (addr: DeliveryAddress) => {
+    await axios.patch(`/api/v1/delivery-addresses/${addr.id}`, { name: editingNameValue })
+    setEditingNameId(null)
+    fetchAddresses()
+  }
+
   // ── 配信実行 ─────────────────────────────────────────
   const handleSend = async () => {
     if (!sendForm.subject || !sendForm.body) return
@@ -371,7 +386,26 @@ export default function DeliveriesPage() {
               <tbody className="divide-y divide-gray-100">
                 {addresses?.data.map((addr, idx) => (
                   <tr key={addr.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
-                    <td className="px-4 py-3 text-gray-800">{addr.name ?? '-'}</td>
+                    <td className="px-4 py-3 text-gray-800">
+                      {editingNameId === addr.id ? (
+                        <input
+                          autoFocus
+                          value={editingNameValue}
+                          onChange={e => setEditingNameValue(e.target.value)}
+                          onBlur={() => saveEditName(addr)}
+                          onKeyDown={e => { if (e.key === 'Enter') saveEditName(addr); if (e.key === 'Escape') setEditingNameId(null) }}
+                          className="border border-blue-400 rounded px-1 py-0.5 text-sm w-full"
+                        />
+                      ) : (
+                        <span
+                          onClick={() => startEditName(addr)}
+                          className="cursor-pointer hover:text-blue-600 hover:underline"
+                          title="クリックで編集"
+                        >
+                          {addr.name ?? '-'}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{addr.email}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{addr.occupation ?? '-'}</td>
                     <td className="px-4 py-3 text-center">
