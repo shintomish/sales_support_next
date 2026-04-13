@@ -228,14 +228,14 @@ export default function EmailsPage() {
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox"
                 checked={categoryFilter === 'project'}
-                onChange={e => { setCategoryFilter(e.target.checked ? 'project' : ''); setPage(1) }}
+                onChange={e => { setCategoryFilter(e.target.checked ? 'project' : ''); setPage(1); setSelectedEmail(null) }}
                 className="rounded accent-blue-500" />
               <span className="text-blue-700">案件</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox"
                 checked={categoryFilter === 'engineer'}
-                onChange={e => { setCategoryFilter(e.target.checked ? 'engineer' : ''); setPage(1) }}
+                onChange={e => { setCategoryFilter(e.target.checked ? 'engineer' : ''); setPage(1); setSelectedEmail(null) }}
                 className="rounded accent-purple-500" />
               <span className="text-purple-700">技術者</span>
             </label>
