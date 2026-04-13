@@ -34,6 +34,9 @@ type EngineerMail = {
   score_reasons: string[]
   engine: string
   name: string | null
+  age: number | null
+  unit_price_min: number | null
+  unit_price_max: number | null
   affiliation_type: string | null
   available_from: string | null
   nearest_station: string | null
@@ -74,6 +77,49 @@ type ProposalModal = {
   sending: boolean
   sent: boolean
   error: string
+}
+
+type EmailBodyTemplate = {
+  name: string
+  name_en: string | null
+  department: string | null
+  position: string | null
+  email: string | null
+  mobile: string | null
+  body_text?: string | null
+}
+
+function buildEmailBody(
+  greeting: string,
+  mainContent: string,
+  tpl: EmailBodyTemplate | null,
+): string {
+  if (tpl?.body_text) {
+    return tpl.body_text
+      .replace(/^.*?様\s*/u, `${greeting}\n\n`)
+      .replace('（本文）', mainContent)
+  }
+  const intro = tpl
+    ? `いつも大変お世話になっております。\n株式会社アイゼン・ソリューションの${tpl.name}です。`
+    : `いつも大変お世話になっております。`
+  const sig = tpl
+    ? `_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+　　株式会社アイゼン・ソリューション
+　${tpl.department ?? ''}
+　${tpl.position ?? ''}
+　${tpl.name}${tpl.name_en ? `（${tpl.name_en}）` : ''}
+
+　〒332-0017
+　埼玉県川口市栄町3-12-11 コスモ川口栄町2F
+　Tel：048-253-3922　Fax：048-271-9355
+
+　E-Mail：${tpl.email ?? ''}
+　Mobile：${tpl.mobile ?? ''}
+
+　URL:https://www.aizen-sol.co.jp
+_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
+    : ''
+  return `${greeting}\n\n${intro}\n\n${mainContent}\n\nお忙しいところ大変恐れ入りますが、ご検討いただけますと幸いでございます。\n何卒よろしくお願いいたします。\n${sig}`
 }
 
 // ── 定数 ─────────────────────────────────────────────────
@@ -146,6 +192,13 @@ export default function EngineerMailsPage() {
   const [matchedProjects, setMatchedProjects] = useState<MatchedProject[]>([])
   const [matchLoading, setMatchLoading] = useState(false)
   const [proposalModal, setProposalModal] = useState<ProposalModal | null>(null)
+  const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
+
+  useEffect(() => {
+    axios.get('/api/v1/email-body-templates/me').then(res => {
+      if (res.data) setEmailTemplate(res.data)
+    }).catch(() => {})
+  }, [])
 
   const fetchList = useCallback(async () => {
     const res = await axios.get('/api/v1/engineer-mails', {
@@ -186,7 +239,9 @@ export default function EngineerMailsPage() {
     setProposalModal({ project, to: project.to_email, subject: '', body: '', generating: true, sending: false, sent: false, error: '' })
     try {
       const res = await axios.post(`/api/v1/engineer-mails/${selected!.id}/generate-proposal`, { project_id: project.project_id })
-      setProposalModal(m => m ? { ...m, subject: res.data.subject, body: res.data.body, generating: false } : m)
+      const greeting = project.sales_contact ? `${project.sales_contact} 様` : '●● 様'
+      const wrappedBody = buildEmailBody(greeting, res.data.body, emailTemplate)
+      setProposalModal(m => m ? { ...m, subject: res.data.subject, body: wrappedBody, generating: false } : m)
     } catch {
       setProposalModal(m => m ? { ...m, generating: false, error: '文章生成に失敗しました' } : m)
     }
@@ -278,6 +333,8 @@ export default function EngineerMailsPage() {
         available_from:   form.available_from,
         nearest_station:  form.nearest_station,
         skills:           form.skills ?? [],
+        unit_price_min:   form.unit_price_min ?? null,
+        unit_price_max:   form.unit_price_max ?? null,
       })
       setSelected(res.data)
       setForm(res.data)
@@ -379,7 +436,7 @@ export default function EngineerMailsPage() {
             <div className="flex flex-wrap gap-1">
               {STATUS_TABS.map(tab => (
                 <button key={tab.value}
-                  onClick={() => { setStatusFilter(tab.value); setPage(1); setExpandedId(null) }}
+                  onClick={() => { setStatusFilter(tab.value); setPage(1); setExpandedId(null); setSelected(null) }}
                   className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
                     statusFilter === tab.value ? tab.color + ' font-semibold' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
                   }`}>
@@ -467,7 +524,7 @@ export default function EngineerMailsPage() {
           <div className="flex flex-wrap gap-1">
             {STATUS_TABS.map(tab => (
               <button key={tab.value}
-                onClick={() => { setStatusFilter(tab.value); setPage(1) }}
+                onClick={() => { setStatusFilter(tab.value); setPage(1); setSelected(null) }}
                 className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
                   statusFilter === tab.value
                     ? tab.color + ' font-semibold'
@@ -637,6 +694,33 @@ export default function EngineerMailsPage() {
                   </FormRow>
                 </div>
 
+                <div className="grid grid-cols-2 gap-4">
+                  <FormRow label="希望単価（下限）">
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={form.unit_price_min ?? ''}
+                        onChange={e => set('unit_price_min', e.target.value ? Number(e.target.value) : null)}
+                        className="form-input"
+                        placeholder="60"
+                      />
+                      <span className="text-xs text-gray-500 flex-shrink-0">万円</span>
+                    </div>
+                  </FormRow>
+                  <FormRow label="希望単価（上限）">
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={form.unit_price_max ?? ''}
+                        onChange={e => set('unit_price_max', e.target.value ? Number(e.target.value) : null)}
+                        className="form-input"
+                        placeholder="80"
+                      />
+                      <span className="text-xs text-gray-500 flex-shrink-0">万円</span>
+                    </div>
+                  </FormRow>
+                </div>
+
                 <FormRow label="スキル">
                   <div className="space-y-2">
                     <div className="flex flex-wrap gap-1 min-h-[28px]">
@@ -709,11 +793,18 @@ export default function EngineerMailsPage() {
             {/* マッチ案件 */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                <span className="text-sm font-semibold text-gray-700">マッチ案件</span>
+                <div>
+                  <span className="text-sm font-semibold text-gray-700">マッチ案件</span>
+                  {(selected.unit_price_min || selected.unit_price_max) && (
+                    <span className="ml-2 text-xs text-blue-600 font-medium">
+                      技術者希望: {selected.unit_price_min ? Math.round(selected.unit_price_min) : '?'}〜{selected.unit_price_max ? Math.round(selected.unit_price_max) : '?'}万円
+                    </span>
+                  )}
+                </div>
                 {matchLoading && <span className="text-xs text-gray-400 animate-pulse">取得中...</span>}
               </div>
               {!matchLoading && matchedProjects.length === 0 && (
-                <p className="text-sm text-gray-400 px-4 py-3">マッチする案件はありません</p>
+                <p className="text-sm text-gray-400 px-4 py-3">単価条件に合う案件はありません</p>
               )}
               {matchedProjects.map(proj => (
                 <div key={proj.project_id} className="px-4 py-3 border-b border-gray-100 last:border-0">
@@ -724,8 +815,8 @@ export default function EngineerMailsPage() {
                         <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${proj.match_score >= 70 ? 'bg-emerald-100 text-emerald-700' : proj.match_score >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>
                           {proj.match_score}%
                         </span>
-                        {proj.unit_price_min && (
-                          <span className="text-xs text-gray-500">{proj.unit_price_min}〜{proj.unit_price_max ?? '?'}万円</span>
+                        {proj.unit_price_max != null && (
+                          <span className="text-xs text-emerald-600 font-medium">案件: 〜{Math.round(proj.unit_price_max)}万円</span>
                         )}
                         {proj.work_style && <span className="text-xs text-gray-400">{proj.work_style}</span>}
                       </div>
