@@ -7,7 +7,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { supabase } from '@/lib/supabase'
 
-// ── 型定義 ─────────────────────────────────────────────────
+// ── 型定義 ────────────────────────────────────────────────
 
 type Attachment = {
   id: number
