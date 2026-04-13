@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 import { formatDistanceToNow } from 'date-fns'
@@ -195,6 +195,8 @@ export default function EngineerMailsPage() {
   const [matchLoading, setMatchLoading] = useState(false)
   const [proposalModal, setProposalModal] = useState<ProposalModal | null>(null)
   const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
+  const [dropOver, setDropOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     axios.get('/api/v1/email-body-templates/me').then(res => {
@@ -954,14 +956,38 @@ export default function EngineerMailsPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">添付ファイル</label>
-                    <input
-                      type="file"
-                      multiple
-                      onChange={e => setProposalModal(m => m ? { ...m, attachments: Array.from(e.target.files ?? []) } : m)}
-                      className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"
-                    />
+                    <div
+                      onDragOver={e => { e.preventDefault(); setDropOver(true) }}
+                      onDragLeave={() => setDropOver(false)}
+                      onDrop={e => {
+                        e.preventDefault()
+                        setDropOver(false)
+                        const dropped = Array.from(e.dataTransfer.files)
+                        if (dropped.length > 0) setProposalModal(m => m ? { ...m, attachments: [...m.attachments, ...dropped] } : m)
+                      }}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition-colors ${dropOver ? 'border-purple-400 bg-purple-50' : 'border-gray-200 hover:border-purple-300 hover:bg-gray-50'}`}
+                    >
+                      <p className="text-xs text-gray-400">ここにファイルをドロップ、またはクリックして選択</p>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={e => setProposalModal(m => m ? { ...m, attachments: [...m.attachments, ...Array.from(e.target.files ?? [])] } : m)}
+                      />
+                    </div>
                     {proposalModal.attachments.length > 0 && (
-                      <p className="text-xs text-gray-400 mt-1">{proposalModal.attachments.length}件選択中: {proposalModal.attachments.map(f => f.name).join(', ')}</p>
+                      <ul className="mt-2 space-y-1">
+                        {proposalModal.attachments.map((f, i) => (
+                          <li key={i} className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-1.5">
+                            <span className="truncate">{f.name}</span>
+                            <button
+                              onClick={() => setProposalModal(m => m ? { ...m, attachments: m.attachments.filter((_, j) => j !== i) } : m)}
+                              className="ml-2 text-gray-400 hover:text-red-500 flex-shrink-0">×</button>
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
                   <div className="flex gap-3 pt-1">
