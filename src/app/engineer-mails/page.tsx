@@ -71,8 +71,10 @@ type MatchedProject = {
 type ProposalModal = {
   project: MatchedProject
   to: string
+  toName: string
   subject: string
   body: string
+  attachments: File[]
   generating: boolean
   sending: boolean
   sent: boolean
@@ -236,10 +238,11 @@ export default function EngineerMailsPage() {
 
   // 提案文生成
   const handleGenerate = async (project: MatchedProject) => {
-    setProposalModal({ project, to: project.to_email, subject: '', body: '', generating: true, sending: false, sent: false, error: '' })
+    const toName = project.sales_contact ?? ''
+    setProposalModal({ project, to: project.to_email, toName, subject: '', body: '', attachments: [], generating: true, sending: false, sent: false, error: '' })
     try {
       const res = await axios.post(`/api/v1/engineer-mails/${selected!.id}/generate-proposal`, { project_id: project.project_id })
-      const greeting = project.sales_contact ? `${project.sales_contact} 様` : '●● 様'
+      const greeting = toName ? `${toName} 様` : '●● 様'
       const wrappedBody = buildEmailBody(greeting, res.data.body, emailTemplate)
       setProposalModal(m => m ? { ...m, subject: res.data.subject, body: wrappedBody, generating: false } : m)
     } catch {
@@ -247,16 +250,29 @@ export default function EngineerMailsPage() {
     }
   }
 
+  // 担当者名変更 → 本文冒頭の宛名を書き換え
+  const handleToNameChange = (newName: string) => {
+    setProposalModal(m => {
+      if (!m) return m
+      const newGreeting = newName ? `${newName} 様` : '●● 様'
+      const newBody = newGreeting + m.body.substring(m.body.indexOf('\n'))
+      return { ...m, toName: newName, body: newBody }
+    })
+  }
+
   // 提案メール送信
   const handleSendProposal = async () => {
     if (!proposalModal || !selected) return
     setProposalModal(m => m ? { ...m, sending: true, error: '' } : m)
     try {
-      await axios.post(`/api/v1/engineer-mails/${selected.id}/send-proposal`, {
-        project_id: proposalModal.project.project_id,
-        to:         proposalModal.to,
-        subject:    proposalModal.subject,
-        body:       proposalModal.body,
+      const formData = new FormData()
+      formData.append('project_id', String(proposalModal.project.project_id))
+      formData.append('to',         proposalModal.to)
+      formData.append('subject',    proposalModal.subject)
+      formData.append('body',       proposalModal.body)
+      proposalModal.attachments.forEach(f => formData.append('attachments[]', f))
+      await axios.post(`/api/v1/engineer-mails/${selected.id}/send-proposal`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
       setProposalModal(m => m ? { ...m, sending: false, sent: true } : m)
     } catch {
@@ -896,15 +912,27 @@ export default function EngineerMailsPage() {
                   {proposalModal.error && (
                     <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{proposalModal.error}</p>
                   )}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">宛先メール</label>
-                    <input
-                      type="email"
-                      value={proposalModal.to}
-                      onChange={e => setProposalModal(m => m ? { ...m, to: e.target.value } : m)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-                      placeholder="送信先メールアドレス"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">担当者名（宛名）</label>
+                      <input
+                        type="text"
+                        value={proposalModal.toName}
+                        onChange={e => handleToNameChange(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                        placeholder="山田 太郎"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">宛先メール</label>
+                      <input
+                        type="email"
+                        value={proposalModal.to}
+                        onChange={e => setProposalModal(m => m ? { ...m, to: e.target.value } : m)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                        placeholder="送信先メールアドレス"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">件名</label>
@@ -923,6 +951,18 @@ export default function EngineerMailsPage() {
                       rows={10}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">添付ファイル</label>
+                    <input
+                      type="file"
+                      multiple
+                      onChange={e => setProposalModal(m => m ? { ...m, attachments: Array.from(e.target.files ?? []) } : m)}
+                      className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"
+                    />
+                    {proposalModal.attachments.length > 0 && (
+                      <p className="text-xs text-gray-400 mt-1">{proposalModal.attachments.length}件選択中: {proposalModal.attachments.map(f => f.name).join(', ')}</p>
+                    )}
                   </div>
                   <div className="flex gap-3 pt-1">
                     <button
