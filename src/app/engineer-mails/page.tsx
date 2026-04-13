@@ -955,7 +955,12 @@ export default function EngineerMailsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">添付ファイル</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      添付ファイル
+                      {proposalModal.attachments.length > 0 && (
+                        <span className="ml-1.5 text-purple-600">{proposalModal.attachments.length}件</span>
+                      )}
+                    </label>
                     <div
                       onDragOver={e => { e.preventDefault(); setDropOver(true) }}
                       onDragLeave={() => setDropOver(false)}
@@ -966,27 +971,30 @@ export default function EngineerMailsPage() {
                         if (dropped.length > 0) setProposalModal(m => m ? { ...m, attachments: [...m.attachments, ...dropped] } : m)
                       }}
                       onClick={() => fileInputRef.current?.click()}
-                      className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition-colors ${dropOver ? 'border-purple-400 bg-purple-50' : 'border-gray-200 hover:border-purple-300 hover:bg-gray-50'}`}
+                      className={`border-2 border-dashed rounded-xl px-4 py-4 text-center cursor-pointer transition-colors ${dropOver ? 'border-purple-400 bg-purple-50' : 'border-gray-200 hover:border-purple-300 hover:bg-gray-50'}`}
                     >
-                      <p className="text-xs text-gray-400">ここにファイルをドロップ、またはクリックして選択</p>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        className="hidden"
+                      <p className="text-lg mb-1">📎</p>
+                      <p className="text-xs text-gray-400">ドロップ、またはクリックして選択</p>
+                      <input ref={fileInputRef} type="file" multiple className="hidden"
                         onChange={e => setProposalModal(m => m ? { ...m, attachments: [...m.attachments, ...Array.from(e.target.files ?? [])] } : m)}
                       />
                     </div>
                     {proposalModal.attachments.length > 0 && (
-                      <ul className="mt-2 space-y-1">
-                        {proposalModal.attachments.map((f, i) => (
-                          <li key={i} className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-1.5">
-                            <span className="truncate">{f.name}</span>
-                            <button
-                              onClick={() => setProposalModal(m => m ? { ...m, attachments: m.attachments.filter((_, j) => j !== i) } : m)}
-                              className="ml-2 text-gray-400 hover:text-red-500 flex-shrink-0">×</button>
-                          </li>
-                        ))}
+                      <ul className="mt-2 space-y-1.5">
+                        {proposalModal.attachments.map((f, i) => {
+                          const ext = f.name.split('.').pop()?.toUpperCase() ?? 'FILE'
+                          const kb = f.size ? (f.size < 1024 * 1024 ? `${Math.round(f.size / 1024)} KB` : `${(f.size / 1024 / 1024).toFixed(1)} MB`) : ''
+                          return (
+                            <li key={i} className="flex items-center gap-2.5 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                              <span className="text-xs font-bold text-white bg-purple-400 rounded px-1.5 py-0.5 flex-shrink-0">{ext}</span>
+                              <span className="text-xs text-gray-700 flex-1 truncate">{f.name}</span>
+                              {kb && <span className="text-xs text-gray-400 flex-shrink-0">{kb}</span>}
+                              <button
+                                onClick={e => { e.stopPropagation(); setProposalModal(m => m ? { ...m, attachments: m.attachments.filter((_, j) => j !== i) } : m) }}
+                                className="text-gray-300 hover:text-red-400 flex-shrink-0 text-base leading-none">×</button>
+                            </li>
+                          )
+                        })}
                       </ul>
                     )}
                   </div>
