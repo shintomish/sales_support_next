@@ -295,7 +295,7 @@ export default function ProjectMailsPage() {
         <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-10">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              <h1 className="text-lg font-semibold text-gray-900">要確認案件</h1>
+              <h1 className="text-lg font-semibold text-gray-900">要確認案件メール</h1>
               {items && (
                 <span className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-300 px-2.5 py-0.5 rounded-full font-medium">
                   {items.total}件
@@ -339,7 +339,7 @@ export default function ProjectMailsPage() {
           {items?.data.length === 0 && (
             <div className="text-center py-16 text-gray-400">
               <p className="text-4xl mb-3">✅</p>
-              <p className="text-sm">要確認案件はありません</p>
+              <p className="text-sm">要確認案件メールはありません</p>
             </div>
           )}
           {items?.data.map(item => (
