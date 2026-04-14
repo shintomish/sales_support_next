@@ -303,7 +303,7 @@ export default function EngineerMailsPage() {
     } catch { /* ignore */ }
   }
 
-  // 一括スコアリング
+  // 一括スコアリング（添付解析スキップで高速化）
   const handleScoreAll = async () => {
     setScoring(true); setScoreMsg('')
     try {
@@ -312,25 +312,31 @@ export default function EngineerMailsPage() {
         const res = await axios.post('/api/v1/engineer-mails/score-all')
         total += res.data.count ?? 0
         const remaining = res.data.remaining ?? 0
-        // バッチごとにUIを更新するためにmicrotaskを挟む
-        await new Promise(resolve => setTimeout(resolve, 0))
         setScoreMsg(`処理済: ${total}件 / 残り: ${remaining}件`)
         if (remaining === 0 || res.data.count === 0) break
       }
-      await new Promise(resolve => setTimeout(resolve, 0))
       setScoreMsg(`完了: ${total}件をスコアリングしました`)
       fetchList()
     } catch { setScoreMsg('スコアリングに失敗しました') }
     finally { setScoring(false) }
   }
 
-  // 全件再スコアリング
+  // 全件再スコアリング（バッチ処理で進捗表示）
   const handleRescoreAll = async () => {
     if (!confirm('全件を再スコアリングします。よろしいですか？')) return
     setRescoring(true); setScoreMsg('')
     try {
-      const res = await axios.post('/api/v1/engineer-mails/rescore-all')
-      setScoreMsg(res.data.message)
+      let total = 0
+      let offset = 0
+      while (true) {
+        const res = await axios.post('/api/v1/engineer-mails/rescore-all', { offset })
+        total += res.data.count ?? 0
+        const remaining = res.data.remaining ?? 0
+        setScoreMsg(`再スコア: ${total}件完了 / 残り: ${remaining}件`)
+        if (remaining === 0 || res.data.count === 0) break
+        offset = res.data.offset ?? (offset + (res.data.count ?? 0))
+      }
+      setScoreMsg(`完了: ${total}件を再スコアリングしました`)
       fetchList()
       if (selected) {
         const refreshed = await axios.get(`/api/v1/engineer-mails/${selected.id}`)
