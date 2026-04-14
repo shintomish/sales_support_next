@@ -137,7 +137,7 @@ function ReplyModal({ h, campaignSubject, onClose }: { h: SendHistory; campaignS
         {/* 本文 */}
         <div className="px-5 py-4">
           <p className="text-xs text-gray-400 mb-2">本文（抜粋）</p>
-          <p className="text-sm text-gray-700 leading-relaxed">{h.reply_body_snippet}</p>
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{h.reply_body_snippet}</p>
         </div>
 
         <div className="px-5 py-3 border-t border-gray-200 flex justify-end">
