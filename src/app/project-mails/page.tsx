@@ -293,22 +293,13 @@ export default function ProjectMailsPage() {
       <div className="min-h-screen bg-gray-50">
         {/* ヘッダー */}
         <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-10">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <h1 className="text-lg font-semibold text-gray-900">要確認案件メール</h1>
-              {items && (
-                <span className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-300 px-2.5 py-0.5 rounded-full font-medium">
-                  {items.total}件
-                </span>
-              )}
-            </div>
-            <div className="flex gap-1.5">
-              <button onClick={handleRescoreAll} disabled={rescoring}
-                className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
-                {rescoring && <Spinner size={11} />}
-                {rescoring ? '再スコア中...' : '全件再スコア'}
-              </button>
-            </div>
+          <div className="flex items-center gap-3 mb-3">
+            <h1 className="text-lg font-semibold text-gray-900">要確認案件メール</h1>
+            {items && (
+              <span className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-300 px-2.5 py-0.5 rounded-full font-medium">
+                {items.total}件
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             {/* タブ切り替え */}
@@ -326,6 +317,16 @@ export default function ProjectMailsPage() {
             <input type="text" placeholder="検索"
               value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
               className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48" />
+            <button onClick={handleRescoreAll} disabled={rescoring || extracting}
+              className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
+              {rescoring && <Spinner size={11} />}
+              {rescoring ? '再スコア中...' : '全件再スコア'}
+            </button>
+            <button onClick={handleReextractAll} disabled={extracting || rescoring}
+              className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1.5 rounded-md hover:bg-blue-100 disabled:opacity-50 flex items-center gap-1.5">
+              {extracting && <Spinner size={11} />}
+              {extracting ? '抽出中...' : '情報抽出'}
+            </button>
           </div>
           <ProcessingBar
             active={rescoring}
