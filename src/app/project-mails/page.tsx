@@ -116,7 +116,6 @@ export default function ProjectMailsPage() {
   const [scoreFilter, setScoreFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [scoring, setScoring] = useState(false)
   const [rescoring, setRescoring] = useState(false)
   const [extracting, setExtracting] = useState(false)
   const [scoreMsg, setScoreMsg] = useState('')
@@ -176,24 +175,21 @@ export default function ProjectMailsPage() {
     } catch { /* ignore */ }
   }
 
-  // 一括スコアリング（新着未処理のみ）
-  const handleScoreAll = async () => {
-    setScoring(true); setScoreMsg('')
-    try {
-      const res = await axios.post('/api/v1/project-mails/score-all')
-      setScoreMsg(res.data.message)
-      fetchList()
-    } catch { setScoreMsg('スコアリングに失敗しました') }
-    finally { setScoring(false) }
-  }
-
-  // 既存レコードを全件再スコアリング
+  // 全件再スコアリング（バッチ処理で進捗表示）
   const handleRescoreAll = async () => {
     if (!confirm('全件を再スコアリングします。ステータスが自動変更されますがよろしいですか？')) return
     setRescoring(true); setScoreMsg('')
     try {
-      const res = await axios.post('/api/v1/project-mails/rescore-all')
-      setScoreMsg(res.data.message)
+      let total = 0, offset = 0
+      while (true) {
+        const res = await axios.post('/api/v1/project-mails/rescore-all', { offset })
+        total += res.data.count ?? 0
+        const remaining = res.data.remaining ?? 0
+        setScoreMsg(`再スコア: ${total}件完了 / 残り: ${remaining}件`)
+        if (remaining === 0 || res.data.count === 0) break
+        offset = res.data.offset ?? (offset + (res.data.count ?? 0))
+      }
+      setScoreMsg(`完了: ${total}件を再スコアリングしました`)
       fetchList()
       if (selected) {
         const refreshed = await axios.get(`/api/v1/project-mails/${selected.id}`)
@@ -204,12 +200,20 @@ export default function ProjectMailsPage() {
     finally { setRescoring(false) }
   }
 
-  // 既存レコードの抽出情報を一括更新
+  // 抽出情報を全件再計算（バッチ処理で進捗表示）
   const handleReextractAll = async () => {
     setExtracting(true); setScoreMsg('')
     try {
-      const res = await axios.post('/api/v1/project-mails/reextract-all')
-      setScoreMsg(res.data.message)
+      let total = 0, offset = 0
+      while (true) {
+        const res = await axios.post('/api/v1/project-mails/reextract-all', { offset })
+        total += res.data.count ?? 0
+        const remaining = res.data.remaining ?? 0
+        setScoreMsg(`抽出: ${total}件完了 / 残り: ${remaining}件`)
+        if (remaining === 0 || res.data.count === 0) break
+        offset = res.data.offset ?? (offset + (res.data.count ?? 0))
+      }
+      setScoreMsg(`完了: ${total}件の抽出情報を更新しました`)
       fetchList()
       if (selected) {
         const refreshed = await axios.get(`/api/v1/project-mails/${selected.id}`)
@@ -299,9 +303,10 @@ export default function ProjectMailsPage() {
               )}
             </div>
             <div className="flex gap-1.5">
-              <button onClick={handleScoreAll} disabled={scoring}
-                className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50">
-                {scoring ? '処理中...' : '新着取込'}
+              <button onClick={handleRescoreAll} disabled={rescoring}
+                className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
+                {rescoring && <Spinner size={11} />}
+                {rescoring ? '再スコア中...' : '全件再スコア'}
               </button>
             </div>
           </div>
@@ -323,8 +328,8 @@ export default function ProjectMailsPage() {
               className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48" />
           </div>
           <ProcessingBar
-            active={scoring || rescoring}
-            label={scoring ? '新着取込中...' : rescoring ? '全件再スコア中...' : undefined}
+            active={rescoring}
+            label={rescoring ? '全件再スコア中...' : undefined}
           />
           {scoreMsg && <p className="text-xs text-green-600 mt-2">{scoreMsg}</p>}
         </div>
@@ -371,16 +376,12 @@ export default function ProjectMailsPage() {
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-semibold text-gray-900">案件メール</h1>
             <div className="flex gap-1.5">
-              <button onClick={handleScoreAll} disabled={scoring}
-                className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50">
-                {scoring ? '処理中...' : '新着取込'}
-              </button>
-              <button onClick={handleRescoreAll} disabled={rescoring}
+              <button onClick={handleRescoreAll} disabled={rescoring || extracting}
                 className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
                 {rescoring && <Spinner size={11} />}
                 {rescoring ? '再スコア中...' : '全件再スコア'}
               </button>
-              <button onClick={handleReextractAll} disabled={extracting}
+              <button onClick={handleReextractAll} disabled={extracting || rescoring}
                 className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1.5 rounded-md hover:bg-blue-100 disabled:opacity-50 flex items-center gap-1.5">
                 {extracting && <Spinner size={11} />}
                 {extracting ? '抽出中...' : '情報抽出'}
@@ -394,8 +395,8 @@ export default function ProjectMailsPage() {
             className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
 
           <ProcessingBar
-            active={scoring || rescoring || extracting}
-            label={scoring ? '新着取込中...' : rescoring ? '全件再スコア中...' : extracting ? '情報抽出中...' : undefined}
+            active={rescoring || extracting}
+            label={rescoring ? '全件再スコア中...' : extracting ? '情報抽出中...' : undefined}
           />
 
           {/* ステータスタブ */}
