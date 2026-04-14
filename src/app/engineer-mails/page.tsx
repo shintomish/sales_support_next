@@ -459,7 +459,7 @@ export default function EngineerMailsPage() {
             active={rescoring}
             label={rescoring ? '全件再スコア中...' : undefined}
           />
-          {!rescoring && scoreMsg && <p className="text-xs text-green-600 mt-2">{scoreMsg}</p>}
+          {scoreMsg && <p className="text-xs text-teal-700 mt-2 font-medium">{scoreMsg}</p>}
         </div>
 
         {/* リスト */}
@@ -512,7 +512,7 @@ export default function EngineerMailsPage() {
               </button>
             </div>
           </div>
-          {!rescoring && scoreMsg && <p className="text-xs text-green-600">{scoreMsg}</p>}
+          {scoreMsg && <p className="text-xs text-teal-700 font-medium">{scoreMsg}</p>}
 
           <input type="text" placeholder="氏名・スキル・最寄り駅で検索"
             value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
