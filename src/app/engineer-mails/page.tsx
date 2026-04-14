@@ -176,7 +176,6 @@ export default function EngineerMailsPage() {
   const [statusFilter, setStatusFilter] = useState('review')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [scoring, setScoring] = useState(false)
   const [rescoring, setRescoring] = useState(false)
   const [scoreMsg, setScoreMsg] = useState('')
 
@@ -301,24 +300,6 @@ export default function EngineerMailsPage() {
       fetchList()
       if (expandedId === id) { setExpandedId(null); setExpandedItem(null) }
     } catch { /* ignore */ }
-  }
-
-  // 一括スコアリング（添付解析スキップで高速化）
-  const handleScoreAll = async () => {
-    setScoring(true); setScoreMsg('')
-    try {
-      let total = 0
-      while (true) {
-        const res = await axios.post('/api/v1/engineer-mails/score-all')
-        total += res.data.count ?? 0
-        const remaining = res.data.remaining ?? 0
-        setScoreMsg(`処理済: ${total}件 / 残り: ${remaining}件`)
-        if (remaining === 0 || res.data.count === 0) break
-      }
-      setScoreMsg(`完了: ${total}件をスコアリングしました`)
-      fetchList()
-    } catch { setScoreMsg('スコアリングに失敗しました') }
-    finally { setScoring(false) }
   }
 
   // 全件再スコアリング（バッチ処理で進捗表示）
@@ -451,9 +432,10 @@ export default function EngineerMailsPage() {
               )}
             </div>
             <div className="flex gap-1.5">
-              <button onClick={handleScoreAll} disabled={scoring}
-                className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50">
-                {scoring ? '処理中...' : '新着取込'}
+              <button onClick={handleRescoreAll} disabled={rescoring}
+                className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
+                {rescoring && <Spinner size={11} />}
+                {rescoring ? '再スコア中...' : '全件再スコア'}
               </button>
             </div>
           </div>
@@ -474,10 +456,10 @@ export default function EngineerMailsPage() {
               className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500 w-48" />
           </div>
           <ProcessingBar
-            active={scoring || rescoring}
-            label={scoring ? (scoreMsg || '新着取込中...') : rescoring ? '全件再スコア中...' : undefined}
+            active={rescoring}
+            label={rescoring ? '全件再スコア中...' : undefined}
           />
-          {!scoring && scoreMsg && <p className="text-xs text-green-600 mt-2">{scoreMsg}</p>}
+          {!rescoring && scoreMsg && <p className="text-xs text-green-600 mt-2">{scoreMsg}</p>}
         </div>
 
         {/* リスト */}
@@ -523,10 +505,6 @@ export default function EngineerMailsPage() {
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-semibold text-gray-900">技術者メール</h1>
             <div className="flex gap-1.5">
-              <button onClick={handleScoreAll} disabled={scoring}
-                className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50">
-                {scoring ? '処理中...' : '新着取込'}
-              </button>
               <button onClick={handleRescoreAll} disabled={rescoring}
                 className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
                 {rescoring && <Spinner size={11} />}
@@ -534,15 +512,15 @@ export default function EngineerMailsPage() {
               </button>
             </div>
           </div>
-          {!scoring && scoreMsg && <p className="text-xs text-green-600">{scoreMsg}</p>}
+          {!rescoring && scoreMsg && <p className="text-xs text-green-600">{scoreMsg}</p>}
 
           <input type="text" placeholder="氏名・スキル・最寄り駅で検索"
             value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
             className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500" />
 
           <ProcessingBar
-            active={scoring || rescoring}
-            label={scoring ? (scoreMsg || '新着取込中...') : rescoring ? '全件再スコア中...' : undefined}
+            active={rescoring}
+            label={rescoring ? '全件再スコア中...' : undefined}
           />
 
           {/* ステータスタブ */}
