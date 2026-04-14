@@ -2,7 +2,7 @@ import axios from 'axios';
 import { supabase } from '@/lib/supabase';
 
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: typeof window !== 'undefined' ? '' : process.env.NEXT_PUBLIC_API_URL,
   withCredentials: false,
   headers: {
     'Accept': 'application/json',
