@@ -277,6 +277,7 @@ export default function EngineerMailsPage() {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       setProposalModal(m => m ? { ...m, sending: false, sent: true } : m)
+      setTimeout(() => setProposalModal(null), 1500)
     } catch {
       setProposalModal(m => m ? { ...m, sending: false, error: '送信に失敗しました' } : m)
     }
@@ -888,7 +889,6 @@ export default function EngineerMailsPage() {
                 <div className="text-center py-8">
                   <p className="text-2xl mb-2">✅</p>
                   <p className="text-sm font-medium text-gray-700">送信しました</p>
-                  <button onClick={() => setProposalModal(null)} className="mt-4 text-sm text-teal-600 hover:underline">閉じる</button>
                 </div>
               ) : (
                 <>
