@@ -137,6 +137,16 @@ export default function DeliveriesPage() {
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null)
 
+  // 送信進捗
+  const [sendProgress, setSendProgress] = useState<{
+    campaignId: number
+    total: number
+    success: number
+    failed: number
+    isSending: boolean
+  } | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   // ── 配信先一覧取得 ────────────────────────────────────
   const fetchAddresses = useCallback(async () => {
     const res = await axios.get('/api/v1/delivery-addresses', {
@@ -270,24 +280,47 @@ export default function DeliveriesPage() {
   }
 
   // ── 配信実行 ─────────────────────────────────────────
+  const startProgressPolling = (campaignId: number, total: number) => {
+    setSendProgress({ campaignId, total, success: 0, failed: 0, isSending: true })
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await axios.get(`/api/v1/delivery-campaigns/${campaignId}/progress`)
+        const { total_count, success_count, failed_count, is_sending } = res.data
+        setSendProgress({ campaignId, total: total_count, success: success_count, failed: failed_count, isSending: is_sending })
+        if (!is_sending) {
+          clearInterval(pollRef.current!)
+          pollRef.current = null
+          setTimeout(() => {
+            setSendProgress(null)
+            setSendForm({ project_mail_id: '', subject: '', body: '' })
+            setPmSearch('')
+            setTab('campaigns')
+            fetchCampaigns()
+          }, 3000)
+        }
+      } catch {
+        clearInterval(pollRef.current!)
+        pollRef.current = null
+      }
+    }, 2000)
+  }
+
   const handleSend = async () => {
     if (!sendForm.subject || !sendForm.body) return
     if (!confirm(`配信先リスト全員（有効件数）にメールを送信します。よろしいですか？`)) return
     setSending(true)
     setSendResult(null)
     try {
-      await axios.post('/api/v1/delivery-campaigns', {
+      const res = await axios.post('/api/v1/delivery-campaigns', {
         project_mail_id: sendForm.project_mail_id ? Number(sendForm.project_mail_id) : null,
         subject: sendForm.subject,
         body: sendForm.body,
       })
-      setSendResult({ success: true, message: '配信を開始しました。キャンペーン一覧で進捗を確認できます。' })
-      setSendForm({ project_mail_id: '', subject: '', body: '' })
-      setTab('campaigns')
-      setTimeout(fetchCampaigns, 1000)
+      const { id, total_count } = res.data
+      setSending(false)
+      startProgressPolling(id, total_count)
     } catch (err: any) {
       setSendResult({ success: false, message: `エラー: ${err.response?.data?.message ?? err.message}` })
-    } finally {
       setSending(false)
     }
   }
@@ -723,6 +756,33 @@ export default function DeliveriesPage() {
             </div>
           )}
 
+          {/* 送信進捗 */}
+          {sendProgress && (
+            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex justify-between items-center text-sm text-blue-800 mb-2">
+                <span className="font-medium">
+                  {sendProgress.isSending ? '送信中...' : '送信完了'}
+                </span>
+                <span>
+                  {sendProgress.success + sendProgress.failed} 件目 / {sendProgress.total} 件中
+                </span>
+              </div>
+              <div className="w-full bg-blue-100 rounded-full h-2.5 mb-2">
+                <div
+                  className={`h-2.5 rounded-full transition-all duration-500 ${sendProgress.isSending ? 'bg-blue-500' : 'bg-green-500'}`}
+                  style={{ width: `${sendProgress.total ? ((sendProgress.success + sendProgress.failed) / sendProgress.total) * 100 : 0}%` }}
+                />
+              </div>
+              <div className="flex gap-4 text-xs">
+                <span className="text-green-700">成功: {sendProgress.success}</span>
+                <span className="text-red-600">失敗: {sendProgress.failed}</span>
+                {!sendProgress.isSending && (
+                  <span className="text-blue-600 ml-auto">まもなくキャンペーン一覧へ移動します</span>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-5">
             {/* 案件紐づけ（任意） */}
             <div>
@@ -794,10 +854,10 @@ export default function DeliveriesPage() {
             <div className="flex items-center gap-4 pt-2">
               <button
                 onClick={handleSend}
-                disabled={sending || !sendForm.subject || !sendForm.body}
+                disabled={sending || !!sendProgress || !sendForm.subject || !sendForm.body}
                 className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-6 py-2.5 rounded"
               >
-                {sending ? '送信中...' : '配信先リストへ一括送信'}
+                {sending ? '送信準備中...' : '配信先リストへ一括送信'}
               </button>
               <span className="text-xs text-gray-400">
                 ※ 有効な配信先全員に送信されます
