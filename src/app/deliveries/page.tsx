@@ -495,7 +495,9 @@ export default function DeliveriesPage() {
         formData.append('engineer_mail_source_id', sendForm.engineer_mail_source_id)
       attachments.forEach(file => formData.append('attachments[]', file))
 
-      const res = await axios.post('/api/v1/delivery-campaigns', formData)
+      const res = await axios.post('/api/v1/delivery-campaigns', formData, {
+        headers: { 'Content-Type': undefined },
+      })
       const { id, total_count } = res.data
       setSending(false)
       startProgressPolling(id, total_count)
