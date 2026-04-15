@@ -74,37 +74,7 @@ type EmailBodyTemplate = {
 
 type DeliveryType = 'project' | 'engineer'
 
-const SIGNATURE_MARKER = '================以下はメール署名設定のフッター部==============='
-
-function buildSignature(tpl: EmailBodyTemplate | null): string {
-  if (!tpl) return ''
-  if (tpl.body_text) {
-    const idx = tpl.body_text.indexOf('（本文）')
-    if (idx !== -1) return tpl.body_text.slice(idx + '（本文）'.length).trimStart()
-  }
-  return `_/_/_/__/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-株式会社アイゼン・ソリューション
-　${tpl.department ?? ''}
-　${tpl.position ?? ''}
-　${tpl.name}${tpl.name_en ? `（${tpl.name_en}）` : ''}
-
-　〒332-0017
-　埼玉県川口市栄町3-12-11 コスモ川口栄町2F
-　Tel：048-253-3922　Fax：048-271-9355
-　E-Mail：${tpl.email ?? ''}
-　Mobile：${tpl.mobile ?? ''}
-　URL:https://www.aizen-sol.co.jp
-/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
-}
-
-function applySignature(templateBody: string, tpl: EmailBodyTemplate | null): string {
-  const sig = buildSignature(tpl)
-  if (!sig) return templateBody
-  const markerIdx = templateBody.indexOf(SIGNATURE_MARKER)
-  if (markerIdx === -1) return templateBody
-  return templateBody.slice(0, markerIdx) + SIGNATURE_MARKER + '\n' + sig
-}
-
+// ベーステンプレート（<送信者>等はapplyTemplate内で置換、<%Name%>はバックエンドで置換）
 const TEMPLATE_PROJECT = `<%Name%>様
 
 いつもお世話になっております。
@@ -151,21 +121,7 @@ TEL:<送信者TEL>
 　・経験の浅い方への指導、支援などを考慮し対応できる方
 -----------------------------------------------------------------------
 以上となります。
-是非よろしくお願いいたします。
-
-================以下はメール署名設定のフッター部===============
-_/_/_/__/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-株式会社アイゼン・ソリューション
-　営業本部 課長
-　藤崎 翔平（SHOHEI FUJISAKI）
-
-　〒332-0017
-　埼玉県川口市栄町3-12-11 コスモ川口栄町2F
-　Tel：048-253-3922　Fax：048-271-9355
-　E-Mail：s-fujisaki@aizen-sol.co.jp
-　Mobile：080-5970-9715
-　URL:https://www.aizen-sol.co.jp
-/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
+是非よろしくお願いいたします。`
 
 const TEMPLATE_ENGINEER = `<%Name%>様
 
@@ -195,21 +151,40 @@ TEL:<送信者TEL>
 面談のご調整をお願いできますでしょうか。
 -----------------------------------------------------------------------
 以上となります。
-是非よろしくお願いいたします。
+是非よろしくお願いいたします。`
 
-================以下はメール署名設定のフッター部===============
-_/_/_/__/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+/** 署名ブロックを生成する（body_text があれば（本文）以降を抽出、なければフィールドから生成）*/
+function buildSignature(tpl: EmailBodyTemplate | null): string {
+  if (!tpl) return ''
+  if (tpl.body_text) {
+    const idx = tpl.body_text.indexOf('（本文）')
+    if (idx !== -1) return tpl.body_text.slice(idx + '（本文）'.length).trimStart()
+  }
+  return `_/_/_/__/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 株式会社アイゼン・ソリューション
-　営業本部 課長
-　藤崎 翔平（SHOHEI FUJISAKI）
+　${tpl.department ?? ''}
+　${tpl.position ?? ''}
+　${tpl.name}${tpl.name_en ? `（${tpl.name_en}）` : ''}
 
 　〒332-0017
 　埼玉県川口市栄町3-12-11 コスモ川口栄町2F
 　Tel：048-253-3922　Fax：048-271-9355
-　E-Mail：s-fujisaki@aizen-sol.co.jp
-　Mobile：080-5970-9715
+　E-Mail：${tpl.email ?? ''}
+　Mobile：${tpl.mobile ?? ''}
 　URL:https://www.aizen-sol.co.jp
 /_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
+}
+
+/** <送信者>等を署名設定から置換し、末尾に署名ブロックを追記する */
+function applyTemplate(base: string, tpl: EmailBodyTemplate | null): string {
+  let body = base
+    .replace(/<送信者>/g,      tpl?.name   ?? '<送信者>')
+    .replace(/<送信者アドレス>/g, tpl?.email  ?? '<送信者アドレス>')
+    .replace(/<送信者TEL>/g,   tpl?.mobile ?? '<送信者TEL>')
+  const sig = buildSignature(tpl)
+  if (sig) body += '\n\n' + sig
+  return body
+}
 
 type Tab = 'addresses' | 'campaigns' | 'send'
 
@@ -291,7 +266,7 @@ export default function DeliveriesPage() {
   const [engineerMails, setEngineerMails] = useState<EngineerMail[]>([])
   const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
   const [pmSearch, setPmSearch] = useState('')
-  const [sendForm, setSendForm] = useState({ project_mail_id: '', engineer_mail_source_id: '', subject: '', body: TEMPLATE_PROJECT })
+  const [sendForm, setSendForm] = useState({ project_mail_id: '', engineer_mail_source_id: '', subject: '', body: applyTemplate(TEMPLATE_PROJECT, null) })
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null)
 
@@ -356,7 +331,8 @@ export default function DeliveriesPage() {
         const tpl: EmailBodyTemplate | null = res.data ?? null
         setEmailTemplate(tpl)
         // 現在のテンプレートに署名を反映
-        setSendForm(f => ({ ...f, body: applySignature(f.body, tpl) }))
+        const currentBase = deliveryType === 'project' ? TEMPLATE_PROJECT : TEMPLATE_ENGINEER
+        setSendForm(f => ({ ...f, body: applyTemplate(currentBase, tpl) }))
       })
       .catch(() => {})
   }, [tab])
@@ -369,7 +345,7 @@ export default function DeliveriesPage() {
       ...f,
       project_mail_id:         '',
       engineer_mail_source_id: '',
-      body: applySignature(base, emailTemplate),
+      body: applyTemplate(base, emailTemplate),
     }))
     setPmSearch('')
   }
@@ -473,7 +449,7 @@ export default function DeliveriesPage() {
           pollRef.current = null
           setTimeout(() => {
             setSendProgress(null)
-            setSendForm({ project_mail_id: '', engineer_mail_source_id: '', subject: '', body: TEMPLATE_PROJECT })
+            setSendForm({ project_mail_id: '', engineer_mail_source_id: '', subject: '', body: applyTemplate(TEMPLATE_PROJECT, null) })
             setPmSearch('')
             setTab('campaigns')
             fetchCampaigns()
