@@ -272,6 +272,18 @@ export default function DeliveriesPage() {
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null)
 
+  // 添付ファイル
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [isDragOver, setIsDragOver]     = useState(false)
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileAdd = (files: FileList | null) => {
+    if (!files) return
+    setAttachments(prev => [...prev, ...Array.from(files)])
+  }
+  const removeAttachment = (idx: number) =>
+    setAttachments(prev => prev.filter((_, i) => i !== idx))
+
   // 送信進捗
   const [sendProgress, setSendProgress] = useState<{
     campaignId: number
@@ -455,6 +467,7 @@ export default function DeliveriesPage() {
             setSendProgress(null)
             setSendForm({ project_mail_id: '', engineer_mail_source_id: '', subject: '【案件ご紹介】', body: applyTemplate(TEMPLATE_PROJECT, null) })
             setDeliveryType('project')
+            setAttachments([])
             setPmSearch('')
             setTab('campaigns')
             fetchCampaigns()
@@ -473,12 +486,16 @@ export default function DeliveriesPage() {
     setSending(true)
     setSendResult(null)
     try {
-      const res = await axios.post('/api/v1/delivery-campaigns', {
-        project_mail_id:         deliveryType === 'project' && sendForm.project_mail_id ? Number(sendForm.project_mail_id) : null,
-        engineer_mail_source_id: deliveryType === 'engineer' && sendForm.engineer_mail_source_id ? Number(sendForm.engineer_mail_source_id) : null,
-        subject: sendForm.subject,
-        body:    sendForm.body,
-      })
+      const formData = new FormData()
+      formData.append('subject', sendForm.subject)
+      formData.append('body',    sendForm.body)
+      if (deliveryType === 'project' && sendForm.project_mail_id)
+        formData.append('project_mail_id', sendForm.project_mail_id)
+      if (deliveryType === 'engineer' && sendForm.engineer_mail_source_id)
+        formData.append('engineer_mail_source_id', sendForm.engineer_mail_source_id)
+      attachments.forEach(file => formData.append('attachments[]', file))
+
+      const res = await axios.post('/api/v1/delivery-campaigns', formData)
       const { id, total_count } = res.data
       setSending(false)
       startProgressPolling(id, total_count)
@@ -1078,6 +1095,50 @@ export default function DeliveriesPage() {
                 placeholder="メール本文を入力してください"
                 className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-y"
               />
+            </div>
+
+            {/* 添付ファイル */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">添付ファイル</label>
+              <div
+                onDragOver={e => { e.preventDefault(); setIsDragOver(true) }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={e => { e.preventDefault(); setIsDragOver(false); handleFileAdd(e.dataTransfer.files) }}
+                onClick={() => attachmentInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-lg px-4 py-5 text-center cursor-pointer transition-colors ${
+                  isDragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+                }`}
+              >
+                <p className="text-sm text-gray-500">クリックまたはドラッグ＆ドロップでファイルを追加</p>
+                <p className="text-xs text-gray-400 mt-0.5">1ファイル最大 10MB</p>
+                <input
+                  ref={attachmentInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={e => { handleFileAdd(e.target.files); e.target.value = '' }}
+                />
+              </div>
+              {attachments.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {attachments.map((file, idx) => (
+                    <li key={idx} className="flex items-center justify-between text-sm bg-gray-50 border border-gray-200 rounded px-3 py-1.5">
+                      <span className="truncate text-gray-700">{file.name}
+                        <span className="ml-2 text-xs text-gray-400">
+                          {file.size < 1024 * 1024
+                            ? `${(file.size / 1024).toFixed(1)} KB`
+                            : `${(file.size / 1024 / 1024).toFixed(1)} MB`}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(idx)}
+                        className="ml-3 text-gray-400 hover:text-red-500 shrink-0"
+                      >✕</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {/* 配信ボタン */}
