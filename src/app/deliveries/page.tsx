@@ -132,6 +132,7 @@ export default function DeliveriesPage() {
 
   // 新規配信
   const [projectMails, setProjectMails] = useState<ProjectMail[]>([])
+  const [pmSearch, setPmSearch] = useState('')
   const [sendForm, setSendForm] = useState({ project_mail_id: '', subject: '', body: '' })
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null)
@@ -728,22 +729,36 @@ export default function DeliveriesPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 紐づき案件メール <span className="text-gray-400 font-normal">（任意）</span>
               </label>
+              <input
+                type="text"
+                value={pmSearch}
+                onChange={e => setPmSearch(e.target.value)}
+                placeholder="案件名・会社名で絞り込み..."
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              />
               <select
                 value={sendForm.project_mail_id}
                 onChange={e => setSendForm(f => ({ ...f, project_mail_id: e.target.value }))}
                 className="w-full max-w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
               >
                 <option value="">選択しない</option>
-                {projectMails.map(pm => {
-                  const title = pm.title ?? `案件 #${pm.id}`
-                  const customer = pm.customer_name ? ` ／ ${pm.customer_name}` : ''
-                  const label = `${title}${customer}`
-                  return (
-                    <option key={pm.id} value={pm.id}>
-                      {label.length > 40 ? label.slice(0, 40) + '…' : label}
-                    </option>
-                  )
-                })}
+                {projectMails
+                  .filter(pm => {
+                    if (!pmSearch) return true
+                    const q = pmSearch.toLowerCase()
+                    return (pm.title ?? '').toLowerCase().includes(q) ||
+                           (pm.customer_name ?? '').toLowerCase().includes(q)
+                  })
+                  .map(pm => {
+                    const title = pm.title ?? `案件 #${pm.id}`
+                    const customer = pm.customer_name ? ` ／ ${pm.customer_name}` : ''
+                    const label = `${title}${customer}`
+                    return (
+                      <option key={pm.id} value={pm.id}>
+                        {label.length > 40 ? label.slice(0, 40) + '…' : label}
+                      </option>
+                    )
+                  })}
               </select>
             </div>
 
