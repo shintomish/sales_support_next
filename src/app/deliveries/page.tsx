@@ -880,10 +880,12 @@ export default function DeliveriesPage() {
                         {camp.sent_at ? new Date(camp.sent_at).toLocaleString('ja-JP') : '-'}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-800">{camp.sent_by ?? '-'}</td>
-                    <td className="px-4 py-3 text-gray-800 max-w-xs truncate">{camp.subject}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs max-w-xs truncate">
-                      {camp.project_title ?? '-'}
+                    <td className="px-4 py-3 text-gray-800 whitespace-nowrap">{camp.sent_by ?? '-'}</td>
+                    <td className="px-4 py-3 w-44">
+                      <div className="truncate max-w-[176px] text-gray-800" title={camp.subject}>{camp.subject}</div>
+                    </td>
+                    <td className="px-4 py-3 w-32">
+                      <div className="truncate max-w-[128px] text-gray-500 text-xs" title={camp.project_title ?? ''}>{camp.project_title ?? '-'}</div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {camp.engineer_mail_source_id != null
