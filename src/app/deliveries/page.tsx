@@ -62,7 +62,48 @@ type EngineerMail = {
   email: { subject: string } | null
 }
 
+type EmailBodyTemplate = {
+  name: string
+  name_en: string | null
+  department: string | null
+  position: string | null
+  email: string | null
+  mobile: string | null
+  body_text?: string | null
+}
+
 type DeliveryType = 'project' | 'engineer'
+
+const SIGNATURE_MARKER = '================以下はメール署名設定のフッター部==============='
+
+function buildSignature(tpl: EmailBodyTemplate | null): string {
+  if (!tpl) return ''
+  if (tpl.body_text) {
+    const idx = tpl.body_text.indexOf('（本文）')
+    if (idx !== -1) return tpl.body_text.slice(idx + '（本文）'.length).trimStart()
+  }
+  return `_/_/_/__/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+株式会社アイゼン・ソリューション
+　${tpl.department ?? ''}
+　${tpl.position ?? ''}
+　${tpl.name}${tpl.name_en ? `（${tpl.name_en}）` : ''}
+
+　〒332-0017
+　埼玉県川口市栄町3-12-11 コスモ川口栄町2F
+　Tel：048-253-3922　Fax：048-271-9355
+　E-Mail：${tpl.email ?? ''}
+　Mobile：${tpl.mobile ?? ''}
+　URL:https://www.aizen-sol.co.jp
+/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
+}
+
+function applySignature(templateBody: string, tpl: EmailBodyTemplate | null): string {
+  const sig = buildSignature(tpl)
+  if (!sig) return templateBody
+  const markerIdx = templateBody.indexOf(SIGNATURE_MARKER)
+  if (markerIdx === -1) return templateBody
+  return templateBody.slice(0, markerIdx) + SIGNATURE_MARKER + '\n' + sig
+}
 
 const TEMPLATE_PROJECT = `<%Name%>様
 
@@ -248,6 +289,7 @@ export default function DeliveriesPage() {
   const [deliveryType, setDeliveryType] = useState<DeliveryType>('project')
   const [projectMails, setProjectMails] = useState<ProjectMail[]>([])
   const [engineerMails, setEngineerMails] = useState<EngineerMail[]>([])
+  const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
   const [pmSearch, setPmSearch] = useState('')
   const [sendForm, setSendForm] = useState({ project_mail_id: '', engineer_mail_source_id: '', subject: '', body: TEMPLATE_PROJECT })
   const [sending, setSending] = useState(false)
@@ -300,7 +342,7 @@ export default function DeliveriesPage() {
     axios.get('/api/v1/users').then(res => setSalesUsers(res.data)).catch(() => {})
   }, [])
 
-  // ── 案件・技術者メール一覧取得（送信タブ用） ──────────
+  // ── 案件・技術者メール一覧 + 署名設定 取得（送信タブ用） ─
   useEffect(() => {
     if (tab !== 'send') return
     axios.get('/api/v1/project-mails', { params: { per_page: 100 } })
@@ -309,16 +351,25 @@ export default function DeliveriesPage() {
     axios.get('/api/v1/engineer-mails', { params: { per_page: 200 } })
       .then(res => setEngineerMails(res.data.data ?? []))
       .catch(() => {})
+    axios.get('/api/v1/email-body-templates/me')
+      .then(res => {
+        const tpl: EmailBodyTemplate | null = res.data ?? null
+        setEmailTemplate(tpl)
+        // 現在のテンプレートに署名を反映
+        setSendForm(f => ({ ...f, body: applySignature(f.body, tpl) }))
+      })
+      .catch(() => {})
   }, [tab])
 
-  // deliveryType 切替時にテンプレートを挿入・セレクトをリセット
+  // deliveryType 切替時にテンプレートを挿入（署名も反映）・セレクトをリセット
   const handleDeliveryTypeChange = (type: DeliveryType) => {
     setDeliveryType(type)
+    const base = type === 'project' ? TEMPLATE_PROJECT : TEMPLATE_ENGINEER
     setSendForm(f => ({
       ...f,
-      project_mail_id:        '',
+      project_mail_id:         '',
       engineer_mail_source_id: '',
-      body: type === 'project' ? TEMPLATE_PROJECT : TEMPLATE_ENGINEER,
+      body: applySignature(base, emailTemplate),
     }))
     setPmSearch('')
   }
