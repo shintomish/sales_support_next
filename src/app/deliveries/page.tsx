@@ -56,6 +56,120 @@ type SalesUser = {
   name: string
 }
 
+type EngineerMail = {
+  id: number
+  name: string | null
+  email: { subject: string } | null
+}
+
+type DeliveryType = 'project' | 'engineer'
+
+const TEMPLATE_PROJECT = `<%Name%>様
+
+いつもお世話になっております。
+株式会社アイゼン・ソリューションの<送信者>です。
+
+下記案件のご紹介をさせていただきます。
+内容をご確認いただき適任要員様いらっしゃいましたらご紹介をお願いいたします。
+また、これまでの経験で似たような業務がございましたら経歴書の項番を
+ご提示いただけますと幸いです。
+
+また要員様をご紹介いただく場合は下記にお願いいたします。
+※下記通りでないとメールがこちらに届かない場合がございます。
+　お手数おかけしますがよろしくお願いいたします。
+
+こちらからのご返信に関しまして基本的に動きがあった場合のみ
+ご連絡させていただく形になると思います。
+
+<送信者>
+To:<送信者アドレス>
+CC:outsource@aizen-sol.co.jp
+TEL:<送信者TEL>
+
+【案件情報】
+-----------------------------------------------------------------------
+■案件概要
+
+■募集要項
+
+勤務時間
+
+勤務地：
+
+単価：
+
+時期：
+
+
+■求める人物像
+　・周囲とのコミュニケーションが円滑にとれること
+　・必要に応じて周囲へ支援を仰ぎ能動的に動ける人
+　・出来ないではなく、実現するためにどうすれば出来るかの思考の方
+　・運用なのでお客様業務を優先するといった意識をお持ちの方
+　・故障しているようなものを放っておかず復旧と優先に考える方
+　・経験の浅い方への指導、支援などを考慮し対応できる方
+-----------------------------------------------------------------------
+以上となります。
+是非よろしくお願いいたします。
+
+================以下はメール署名設定のフッター部===============
+_/_/_/__/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+株式会社アイゼン・ソリューション
+　営業本部 課長
+　藤崎 翔平（SHOHEI FUJISAKI）
+
+　〒332-0017
+　埼玉県川口市栄町3-12-11 コスモ川口栄町2F
+　Tel：048-253-3922　Fax：048-271-9355
+　E-Mail：s-fujisaki@aizen-sol.co.jp
+　Mobile：080-5970-9715
+　URL:https://www.aizen-sol.co.jp
+/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
+
+const TEMPLATE_ENGINEER = `<%Name%>様
+
+いつもお世話になっております。
+株式会社アイゼン・ソリューションの<送信者>です。
+
+下記技術者のご紹介をさせていただきます。
+
+また案件情報をご紹介いただく場合は下記にお願いいたします。
+※下記通りでないとメールがこちらに届かない場合がございます。
+　お手数おかけしますがよろしくお願いいたします。
+
+こちらからのご返信に関しまして基本的に動きがあった場合のみ
+ご連絡させていただく形になると思います。
+
+<送信者>
+To:<送信者アドレス>
+CC:outsource@aizen-sol.co.jp
+TEL:<送信者TEL>
+
+【技術者情報】
+-----------------------------------------------------------------------
+
+
+
+ぜひ一度お会いいただき、詳しくお話しさせていただきたく存じます。
+面談のご調整をお願いできますでしょうか。
+-----------------------------------------------------------------------
+以上となります。
+是非よろしくお願いいたします。
+
+================以下はメール署名設定のフッター部===============
+_/_/_/__/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+株式会社アイゼン・ソリューション
+　営業本部 課長
+　藤崎 翔平（SHOHEI FUJISAKI）
+
+　〒332-0017
+　埼玉県川口市栄町3-12-11 コスモ川口栄町2F
+　Tel：048-253-3922　Fax：048-271-9355
+　E-Mail：s-fujisaki@aizen-sol.co.jp
+　Mobile：080-5970-9715
+　URL:https://www.aizen-sol.co.jp
+/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
+
 type Tab = 'addresses' | 'campaigns' | 'send'
 
 // ── デモ用モックデータ ─────────────────────────────────────
@@ -131,9 +245,11 @@ export default function DeliveriesPage() {
   const [salesUsers, setSalesUsers] = useState<SalesUser[]>([])
 
   // 新規配信
+  const [deliveryType, setDeliveryType] = useState<DeliveryType>('project')
   const [projectMails, setProjectMails] = useState<ProjectMail[]>([])
+  const [engineerMails, setEngineerMails] = useState<EngineerMail[]>([])
   const [pmSearch, setPmSearch] = useState('')
-  const [sendForm, setSendForm] = useState({ project_mail_id: '', subject: '', body: '' })
+  const [sendForm, setSendForm] = useState({ project_mail_id: '', engineer_mail_source_id: '', subject: '', body: TEMPLATE_PROJECT })
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null)
 
@@ -184,14 +300,28 @@ export default function DeliveriesPage() {
     axios.get('/api/v1/users').then(res => setSalesUsers(res.data)).catch(() => {})
   }, [])
 
-  // ── 案件メール一覧取得（送信タブ用） ─────────────────
+  // ── 案件・技術者メール一覧取得（送信タブ用） ──────────
   useEffect(() => {
-    if (tab === 'send') {
-      axios.get('/api/v1/project-mails', { params: { per_page: 100 } })
-        .then(res => setProjectMails(res.data.data ?? []))
-        .catch(() => {})
-    }
+    if (tab !== 'send') return
+    axios.get('/api/v1/project-mails', { params: { per_page: 100 } })
+      .then(res => setProjectMails(res.data.data ?? []))
+      .catch(() => {})
+    axios.get('/api/v1/engineer-mails', { params: { per_page: 200 } })
+      .then(res => setEngineerMails(res.data.data ?? []))
+      .catch(() => {})
   }, [tab])
+
+  // deliveryType 切替時にテンプレートを挿入・セレクトをリセット
+  const handleDeliveryTypeChange = (type: DeliveryType) => {
+    setDeliveryType(type)
+    setSendForm(f => ({
+      ...f,
+      project_mail_id:        '',
+      engineer_mail_source_id: '',
+      body: type === 'project' ? TEMPLATE_PROJECT : TEMPLATE_ENGINEER,
+    }))
+    setPmSearch('')
+  }
 
   // ── CSVインポート ─────────────────────────────────────
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -292,7 +422,7 @@ export default function DeliveriesPage() {
           pollRef.current = null
           setTimeout(() => {
             setSendProgress(null)
-            setSendForm({ project_mail_id: '', subject: '', body: '' })
+            setSendForm({ project_mail_id: '', engineer_mail_source_id: '', subject: '', body: TEMPLATE_PROJECT })
             setPmSearch('')
             setTab('campaigns')
             fetchCampaigns()
@@ -312,9 +442,10 @@ export default function DeliveriesPage() {
     setSendResult(null)
     try {
       const res = await axios.post('/api/v1/delivery-campaigns', {
-        project_mail_id: sendForm.project_mail_id ? Number(sendForm.project_mail_id) : null,
+        project_mail_id:         deliveryType === 'project' && sendForm.project_mail_id ? Number(sendForm.project_mail_id) : null,
+        engineer_mail_source_id: deliveryType === 'engineer' && sendForm.engineer_mail_source_id ? Number(sendForm.engineer_mail_source_id) : null,
         subject: sendForm.subject,
-        body: sendForm.body,
+        body:    sendForm.body,
       })
       const { id, total_count } = res.data
       setSending(false)
@@ -784,42 +915,90 @@ export default function DeliveriesPage() {
           )}
 
           <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-5">
-            {/* 案件紐づけ（任意） */}
+            {/* 案件 / 技術者 切替 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">配信種別</label>
+              <div className="flex gap-6">
+                {(['project', 'engineer'] as const).map(type => (
+                  <label key={type} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="deliveryType"
+                      value={type}
+                      checked={deliveryType === type}
+                      onChange={() => handleDeliveryTypeChange(type)}
+                      className="accent-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">{type === 'project' ? '案件' : '技術者'}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* 紐づきメール（任意） */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                紐づき案件メール <span className="text-gray-400 font-normal">（任意）</span>
+                {deliveryType === 'project' ? '紐づき案件メール' : '紐づき技術者メール'}
+                <span className="text-gray-400 font-normal ml-1">（任意）</span>
               </label>
               <input
                 type="text"
                 value={pmSearch}
                 onChange={e => setPmSearch(e.target.value)}
-                placeholder="案件名・会社名で絞り込み..."
+                placeholder={deliveryType === 'project' ? '案件名・会社名で絞り込み...' : '件名・技術者名で絞り込み...'}
                 className="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
               />
-              <select
-                value={sendForm.project_mail_id}
-                onChange={e => setSendForm(f => ({ ...f, project_mail_id: e.target.value }))}
-                className="w-full max-w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-              >
-                <option value="">選択しない</option>
-                {projectMails
-                  .filter(pm => {
-                    if (!pmSearch) return true
-                    const q = pmSearch.toLowerCase()
-                    return (pm.title ?? '').toLowerCase().includes(q) ||
-                           (pm.customer_name ?? '').toLowerCase().includes(q)
-                  })
-                  .map(pm => {
-                    const title = pm.title ?? `案件 #${pm.id}`
-                    const customer = pm.customer_name ? ` ／ ${pm.customer_name}` : ''
-                    const label = `${title}${customer}`
-                    return (
-                      <option key={pm.id} value={pm.id}>
-                        {label.length > 40 ? label.slice(0, 40) + '…' : label}
-                      </option>
-                    )
-                  })}
-              </select>
+              {deliveryType === 'project' ? (
+                <select
+                  value={sendForm.project_mail_id}
+                  onChange={e => setSendForm(f => ({ ...f, project_mail_id: e.target.value }))}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                >
+                  <option value="">選択しない</option>
+                  {projectMails
+                    .filter(pm => {
+                      if (!pmSearch) return true
+                      const q = pmSearch.toLowerCase()
+                      return (pm.title ?? '').toLowerCase().includes(q) ||
+                             (pm.customer_name ?? '').toLowerCase().includes(q)
+                    })
+                    .map(pm => {
+                      const title = pm.title ?? `案件 #${pm.id}`
+                      const customer = pm.customer_name ? ` ／ ${pm.customer_name}` : ''
+                      const label = `${title}${customer}`
+                      return (
+                        <option key={pm.id} value={pm.id}>
+                          {label.length > 50 ? label.slice(0, 50) + '…' : label}
+                        </option>
+                      )
+                    })}
+                </select>
+              ) : (
+                <select
+                  value={sendForm.engineer_mail_source_id}
+                  onChange={e => setSendForm(f => ({ ...f, engineer_mail_source_id: e.target.value }))}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                >
+                  <option value="">選択しない</option>
+                  {engineerMails
+                    .filter(em => {
+                      if (!pmSearch) return true
+                      const q = pmSearch.toLowerCase()
+                      return (em.email?.subject ?? '').toLowerCase().includes(q) ||
+                             (em.name ?? '').toLowerCase().includes(q)
+                    })
+                    .map(em => {
+                      const subject = em.email?.subject ?? `技術者メール #${em.id}`
+                      const name = em.name ? ` ／ ${em.name}` : ''
+                      const label = `${subject}${name}`
+                      return (
+                        <option key={em.id} value={em.id}>
+                          {label.length > 50 ? label.slice(0, 50) + '…' : label}
+                        </option>
+                      )
+                    })}
+                </select>
+              )}
             </div>
 
             {/* 件名 */}
