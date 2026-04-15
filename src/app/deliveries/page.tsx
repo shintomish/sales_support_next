@@ -48,6 +48,14 @@ type ProjectMail = {
   customer_name: string | null
 }
 
+type SortDir = 'asc' | 'desc'
+type CampSortBy = 'sent_at' | 'subject' | 'sent_by' | 'project_title'
+
+type SalesUser = {
+  id: number
+  name: string
+}
+
 type Tab = 'addresses' | 'campaigns' | 'send'
 
 // ── デモ用モックデータ ─────────────────────────────────────
@@ -115,6 +123,12 @@ export default function DeliveriesPage() {
   const [campSearch, setCampSearch]     = useState('')
   const [campDateFrom, setCampDateFrom] = useState('')
   const [campDateTo, setCampDateTo]     = useState('')
+  const [campUserId, setCampUserId]     = useState('')
+  const [campSortBy, setCampSortBy]     = useState<CampSortBy>('sent_at')
+  const [campSortDir, setCampSortDir]   = useState<SortDir>('desc')
+
+  // 送信者一覧
+  const [salesUsers, setSalesUsers] = useState<SalesUser[]>([])
 
   // 新規配信
   const [projectMails, setProjectMails] = useState<ProjectMail[]>([])
@@ -142,14 +156,22 @@ export default function DeliveriesPage() {
         search:    campSearch   || undefined,
         date_from: campDateFrom || undefined,
         date_to:   campDateTo   || undefined,
+        user_id:   campUserId   || undefined,
+        sort_by:   campSortBy,
+        sort_dir:  campSortDir,
       },
     })
     setCampaigns(res.data)
-  }, [campPage, campSearch, campDateFrom, campDateTo])
+  }, [campPage, campSearch, campDateFrom, campDateTo, campUserId, campSortBy, campSortDir])
 
   useEffect(() => {
     if (tab === 'campaigns') fetchCampaigns()
   }, [tab, fetchCampaigns])
+
+  // 送信者一覧取得
+  useEffect(() => {
+    axios.get('/api/v1/users').then(res => setSalesUsers(res.data)).catch(() => {})
+  }, [])
 
   // ── 案件メール一覧取得（送信タブ用） ─────────────────
   useEffect(() => {
@@ -205,6 +227,32 @@ export default function DeliveriesPage() {
     fetchAddresses()
   }
 
+  // ── 新規登録モーダル ──────────────────────────────────
+  const [showNewModal, setShowNewModal] = useState(false)
+  const [newForm, setNewForm] = useState({ email: '', name: '', occupation: '' })
+  const [newFormError, setNewFormError] = useState<string | null>(null)
+  const [newFormSaving, setNewFormSaving] = useState(false)
+
+  const handleNewAddress = async () => {
+    if (!newForm.email) return
+    setNewFormSaving(true)
+    setNewFormError(null)
+    try {
+      await axios.post('/api/v1/delivery-addresses', {
+        email:      newForm.email,
+        name:       newForm.name || null,
+        occupation: newForm.occupation || null,
+      })
+      setShowNewModal(false)
+      setNewForm({ email: '', name: '', occupation: '' })
+      fetchAddresses()
+    } catch (err: any) {
+      setNewFormError(err.response?.data?.message ?? 'エラーが発生しました。')
+    } finally {
+      setNewFormSaving(false)
+    }
+  }
+
   // ── 名前インライン編集 ────────────────────────────────
   const [editingNameId, setEditingNameId] = useState<number | null>(null)
   const [editingNameValue, setEditingNameValue] = useState('')
@@ -241,6 +289,22 @@ export default function DeliveriesPage() {
     } finally {
       setSending(false)
     }
+  }
+
+  // ── ソート切替 ────────────────────────────────────────
+  const handleCampSort = (col: CampSortBy) => {
+    if (campSortBy === col) {
+      setCampSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setCampSortBy(col)
+      setCampSortDir('desc')
+    }
+    setCampPage(1)
+  }
+
+  const SortIcon = ({ col }: { col: CampSortBy }) => {
+    if (campSortBy !== col) return <span className="ml-1 text-gray-300">↕</span>
+    return <span className="ml-1 text-blue-500">{campSortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
   // ── タブラベル ────────────────────────────────────────
@@ -287,6 +351,12 @@ export default function DeliveriesPage() {
               {addresses ? `全 ${addresses.total} 件` : ''}
             </span>
             <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => { setShowNewModal(true); setNewFormError(null) }}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded"
+              >
+                新規登録
+              </button>
               <input
                 type="file"
                 accept=".csv,.txt"
@@ -489,9 +559,22 @@ export default function DeliveriesPage() {
                 className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
               />
             </div>
-            {(campSearch || campDateFrom || campDateTo) && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">送信者</label>
+              <select
+                value={campUserId}
+                onChange={e => { setCampUserId(e.target.value); setCampPage(1) }}
+                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              >
+                <option value="">全員</option>
+                {salesUsers.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+            {(campSearch || campDateFrom || campDateTo || campUserId) && (
               <button
-                onClick={() => { setCampSearch(''); setCampDateFrom(''); setCampDateTo(''); setCampPage(1) }}
+                onClick={() => { setCampSearch(''); setCampDateFrom(''); setCampDateTo(''); setCampUserId(''); setCampPage(1) }}
                 className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 border border-gray-200 rounded"
               >
                 リセット
@@ -534,10 +617,22 @@ export default function DeliveriesPage() {
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3 text-left">送信日時</th>
-                  <th className="px-4 py-3 text-left">送信者</th>
-                  <th className="px-4 py-3 text-left">件名</th>
-                  <th className="px-4 py-3 text-left">紐づき案件</th>
+                  {(
+                    [
+                      { col: 'sent_at' as CampSortBy, label: '送信日時', align: 'left' },
+                      { col: 'sent_by' as CampSortBy, label: '送信者', align: 'left' },
+                      { col: 'subject' as CampSortBy, label: '件名', align: 'left' },
+                      { col: 'project_title' as CampSortBy, label: '紐づき案件', align: 'left' },
+                    ] as const
+                  ).map(({ col, label, align }) => (
+                    <th
+                      key={col}
+                      className={`px-4 py-3 text-${align} cursor-pointer select-none hover:bg-gray-100`}
+                      onClick={() => handleCampSort(col)}
+                    >
+                      {label}<SortIcon col={col} />
+                    </th>
+                  ))}
                   <th className="px-4 py-3 text-center">送信数</th>
                   <th className="px-4 py-3 text-center">成功</th>
                   <th className="px-4 py-3 text-center">失敗</th>
@@ -692,6 +787,72 @@ export default function DeliveriesPage() {
               <span className="text-xs text-gray-400">
                 ※ 有効な配信先全員に送信されます
               </span>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── 新規登録モーダル ──────────────────────────── */}
+      {showNewModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">配信先を新規登録</h2>
+
+            {newFormError && (
+              <div className="mb-3 px-3 py-2 bg-red-50 text-red-700 text-sm rounded">
+                {newFormError}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  メールアドレス <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={newForm.email}
+                  onChange={e => setNewForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="example@company.co.jp"
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
+                <input
+                  type="text"
+                  value={newForm.name}
+                  onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="山田 太郎"
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">職種</label>
+                <input
+                  type="text"
+                  value={newForm.occupation}
+                  onChange={e => setNewForm(f => ({ ...f, occupation: e.target.value }))}
+                  placeholder="営業担当"
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => { setShowNewModal(false); setNewForm({ email: '', name: '', occupation: '' }) }}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleNewAddress}
+                disabled={newFormSaving || !newForm.email}
+                className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
+              >
+                {newFormSaving ? '登録中...' : '登録'}
+              </button>
             </div>
           </div>
         </div>
