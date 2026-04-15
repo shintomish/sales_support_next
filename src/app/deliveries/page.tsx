@@ -24,6 +24,7 @@ type PaginatedAddresses = {
 type Campaign = {
   id: number
   project_mail_id: number | null
+  engineer_mail_source_id: number | null
   project_title: string | null
   subject: string
   sent_at: string | null
@@ -193,7 +194,7 @@ type Tab = 'addresses' | 'campaigns' | 'send'
 const DEMO_CAMPAIGNS: Campaign[] = [
   {
     id: 9001, _isDemo: true,
-    project_mail_id: 1372,
+    project_mail_id: 1372, engineer_mail_source_id: null,
     project_title: 'Java/Spring バックエンド開発（六本木）',
     subject: '【エンジニアご紹介】即日稼働可能なJavaエンジニア3名のご案内',
     sent_at: '2026-04-11T10:00:00+09:00',
@@ -205,7 +206,7 @@ const DEMO_CAMPAIGNS: Campaign[] = [
   },
   {
     id: 9002, _isDemo: true,
-    project_mail_id: 1366,
+    project_mail_id: 1366, engineer_mail_source_id: null,
     project_title: 'Python/Django データ基盤開発',
     subject: '【ご紹介】Python・データエンジニア2名のご案内',
     sent_at: '2026-04-10T14:30:00+09:00',
@@ -217,7 +218,7 @@ const DEMO_CAMPAIGNS: Campaign[] = [
   },
   {
     id: 9003, _isDemo: true,
-    project_mail_id: null,
+    project_mail_id: null, engineer_mail_source_id: null,
     project_title: null,
     subject: '【定期配信】4月の稼働可能エンジニアご案内',
     sent_at: '2026-04-01T09:00:00+09:00',
@@ -249,13 +250,14 @@ export default function DeliveriesPage() {
 
   // キャンペーン一覧
   const [campaigns, setCampaigns] = useState<PaginatedCampaigns | null>(null)
-  const [campPage, setCampPage]   = useState(1)
-  const [campSearch, setCampSearch]     = useState('')
-  const [campDateFrom, setCampDateFrom] = useState('')
-  const [campDateTo, setCampDateTo]     = useState('')
-  const [campUserId, setCampUserId]     = useState('')
-  const [campSortBy, setCampSortBy]     = useState<CampSortBy>('sent_at')
-  const [campSortDir, setCampSortDir]   = useState<SortDir>('desc')
+  const [campPage, setCampPage]             = useState(1)
+  const [campSearch, setCampSearch]         = useState('')
+  const [campDateFrom, setCampDateFrom]     = useState('')
+  const [campDateTo, setCampDateTo]         = useState('')
+  const [campUserId, setCampUserId]         = useState('')
+  const [campDeliveryType, setCampDeliveryType] = useState<'' | 'project' | 'engineer'>('')
+  const [campSortBy, setCampSortBy]         = useState<CampSortBy>('sent_at')
+  const [campSortDir, setCampSortDir]       = useState<SortDir>('desc')
 
   // 送信者一覧
   const [salesUsers, setSalesUsers] = useState<SalesUser[]>([])
@@ -266,7 +268,7 @@ export default function DeliveriesPage() {
   const [engineerMails, setEngineerMails] = useState<EngineerMail[]>([])
   const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
   const [pmSearch, setPmSearch] = useState('')
-  const [sendForm, setSendForm] = useState({ project_mail_id: '', engineer_mail_source_id: '', subject: '', body: applyTemplate(TEMPLATE_PROJECT, null) })
+  const [sendForm, setSendForm] = useState({ project_mail_id: '', engineer_mail_source_id: '', subject: '【案件ご紹介】', body: applyTemplate(TEMPLATE_PROJECT, null) })
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null)
 
@@ -296,17 +298,18 @@ export default function DeliveriesPage() {
   const fetchCampaigns = useCallback(async () => {
     const res = await axios.get('/api/v1/delivery-campaigns', {
       params: {
-        page:      campPage,
-        search:    campSearch   || undefined,
-        date_from: campDateFrom || undefined,
-        date_to:   campDateTo   || undefined,
-        user_id:   campUserId   || undefined,
-        sort_by:   campSortBy,
-        sort_dir:  campSortDir,
+        page:          campPage,
+        search:        campSearch        || undefined,
+        date_from:     campDateFrom      || undefined,
+        date_to:       campDateTo        || undefined,
+        user_id:       campUserId        || undefined,
+        delivery_type: campDeliveryType  || undefined,
+        sort_by:       campSortBy,
+        sort_dir:      campSortDir,
       },
     })
     setCampaigns(res.data)
-  }, [campPage, campSearch, campDateFrom, campDateTo, campUserId, campSortBy, campSortDir])
+  }, [campPage, campSearch, campDateFrom, campDateTo, campUserId, campDeliveryType, campSortBy, campSortDir])
 
   useEffect(() => {
     if (tab === 'campaigns') fetchCampaigns()
@@ -337,7 +340,7 @@ export default function DeliveriesPage() {
       .catch(() => {})
   }, [tab])
 
-  // deliveryType 切替時にテンプレートを挿入（署名も反映）・セレクトをリセット
+  // deliveryType 切替時にテンプレート・件名デフォルトを反映・セレクトをリセット
   const handleDeliveryTypeChange = (type: DeliveryType) => {
     setDeliveryType(type)
     const base = type === 'project' ? TEMPLATE_PROJECT : TEMPLATE_ENGINEER
@@ -345,6 +348,7 @@ export default function DeliveriesPage() {
       ...f,
       project_mail_id:         '',
       engineer_mail_source_id: '',
+      subject: type === 'project' ? '【案件ご紹介】' : '【技術者ご紹介】',
       body: applyTemplate(base, emailTemplate),
     }))
     setPmSearch('')
@@ -449,7 +453,8 @@ export default function DeliveriesPage() {
           pollRef.current = null
           setTimeout(() => {
             setSendProgress(null)
-            setSendForm({ project_mail_id: '', engineer_mail_source_id: '', subject: '', body: applyTemplate(TEMPLATE_PROJECT, null) })
+            setSendForm({ project_mail_id: '', engineer_mail_source_id: '', subject: '【案件ご紹介】', body: applyTemplate(TEMPLATE_PROJECT, null) })
+            setDeliveryType('project')
             setPmSearch('')
             setTab('campaigns')
             fetchCampaigns()
@@ -752,6 +757,18 @@ export default function DeliveriesPage() {
               />
             </div>
             <div>
+              <label className="block text-xs text-gray-500 mb-1">分類</label>
+              <select
+                value={campDeliveryType}
+                onChange={e => { setCampDeliveryType(e.target.value as '' | 'project' | 'engineer'); setCampPage(1) }}
+                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              >
+                <option value="">全部</option>
+                <option value="project">案件</option>
+                <option value="engineer">技術者</option>
+              </select>
+            </div>
+            <div>
               <label className="block text-xs text-gray-500 mb-1">送信者</label>
               <select
                 value={campUserId}
@@ -764,9 +781,9 @@ export default function DeliveriesPage() {
                 ))}
               </select>
             </div>
-            {(campSearch || campDateFrom || campDateTo || campUserId) && (
+            {(campSearch || campDateFrom || campDateTo || campUserId || campDeliveryType) && (
               <button
-                onClick={() => { setCampSearch(''); setCampDateFrom(''); setCampDateTo(''); setCampUserId(''); setCampPage(1) }}
+                onClick={() => { setCampSearch(''); setCampDateFrom(''); setCampDateTo(''); setCampUserId(''); setCampDeliveryType(''); setCampPage(1) }}
                 className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 border border-gray-200 rounded"
               >
                 リセット
@@ -825,6 +842,7 @@ export default function DeliveriesPage() {
                       {label}<SortIcon col={col} />
                     </th>
                   ))}
+                  <th className="px-4 py-3 text-center">分類</th>
                   <th className="px-4 py-3 text-center">送信数</th>
                   <th className="px-4 py-3 text-center">成功</th>
                   <th className="px-4 py-3 text-center">失敗</th>
@@ -847,6 +865,12 @@ export default function DeliveriesPage() {
                     <td className="px-4 py-3 text-gray-800 max-w-xs truncate">{camp.subject}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs max-w-xs truncate">
                       {camp.project_title ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {camp.engineer_mail_source_id != null
+                        ? <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">技術者</span>
+                        : <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">案件</span>
+                      }
                     </td>
                     <td className="px-4 py-3 text-center text-gray-700">{camp.total_count}</td>
                     <td className="px-4 py-3 text-center text-green-600 font-medium">{camp.success_count}</td>
@@ -875,7 +899,7 @@ export default function DeliveriesPage() {
                 ))}
                 {campaigns?.data.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
                       キャンペーン履歴がありません。
                     </td>
                   </tr>
