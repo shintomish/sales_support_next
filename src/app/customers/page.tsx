@@ -12,6 +12,7 @@ import SortableHeader from '@/components/SortableHeader';
 interface Customer {
   id: number; company_name: string; industry: string | null;
   employee_count: number | null; phone: string | null; created_at: string;
+  is_supplier: boolean; is_customer: boolean;
 }
 interface Meta { current_page: number; last_page: number; total: number; }
 
@@ -20,11 +21,11 @@ const selectCls = 'border border-gray-200 rounded-md px-3 py-2 text-sm bg-white 
 // ヘッダー・ボディで幅を揃えるcolgroup定義
 const ColGroup = () => (
   <colgroup>
-    <col style={{ width: '34%' }} />
+    <col style={{ width: '30%' }} />
+    <col style={{ width: '13%' }} />
     <col style={{ width: '14%' }} />
-    <col style={{ width: '12%' }} />
     <col style={{ width: '17%' }} />
-    <col style={{ width: '12%' }} />
+    <col style={{ width: '15%' }} />
     <col style={{ width: '11%' }} />
   </colgroup>
 );
@@ -41,6 +42,7 @@ function CustomersPage() {
   const [search, setSearch]                 = useState(searchParams.get('search') ?? '');
   const [industryFilter, setIndustryFilter] = useState(searchParams.get('industry') ?? '');
   const [page, setPage]     = useState(Number(searchParams.get('page') ?? '1'));
+  const [typeFilter, setTypeFilter]     = useState(searchParams.get('type') ?? '');
   const [sortField, setSortField] = useState<string>('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [loading, setLoading] = useState(true);
@@ -64,7 +66,7 @@ function CustomersPage() {
     try {
       setError(null);
       const [res, indRes] = await Promise.all([
-        apiClient.get('/api/v1/customers', { params: { search, industry: industryFilter, page, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined } }),
+        apiClient.get('/api/v1/customers', { params: { search, industry: industryFilter, type: typeFilter || undefined, page, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined } }),
         apiClient.get('/api/v1/customers/industries'),
       ]);
       setCustomers(res.data.data);
@@ -74,13 +76,13 @@ function CustomersPage() {
       if (err.response?.status === 401) router.push('/login');
       else setError('顧客データの取得に失敗しました');
     } finally { setLoading(false); }
-  }, [search, industryFilter, page, sortField, sortOrder, router]);
+  }, [search, industryFilter, typeFilter, page, sortField, sortOrder, router]);
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
-  useEffect(() => { updateUrl({ search, industry: industryFilter, page: String(page) }); }, [search, industryFilter, page, updateUrl]);
+  useEffect(() => { updateUrl({ search, industry: industryFilter, type: typeFilter, page: String(page) }); }, [search, industryFilter, typeFilter, page, updateUrl]);
 
   const handleSearch = () => { setSearch(searchInput); setPage(1); };
-  const handleClear  = () => { setSearchInput(''); setSearch(''); setIndustryFilter(''); setPage(1); };
+  const handleClear  = () => { setSearchInput(''); setSearch(''); setIndustryFilter(''); setTypeFilter(''); setPage(1); };
 
   const handleDelete = async (id: number) => {
     if (!confirm('削除してもよろしいですか？')) return;
@@ -104,7 +106,7 @@ function CustomersPage() {
     </div>
   );
 
-  const hasFilter = !!(search || industryFilter);
+  const hasFilter = !!(search || industryFilter || typeFilter);
 
   return (
     <div className="flex flex-col h-screen py-8 px-6 max-w-7xl mx-auto">
@@ -131,6 +133,13 @@ function CustomersPage() {
                 onChange={e => setSearchInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()} />
             </div>
+            <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(1); }}
+              className={selectCls}>
+              <option value="">全区分</option>
+              <option value="customer">売上先</option>
+              <option value="supplier">仕入先</option>
+              <option value="both">両方</option>
+            </select>
             <select value={industryFilter} onChange={e => { setIndustryFilter(e.target.value); setPage(1); }}
               className={selectCls}>
               <option value="">全業種</option>
@@ -157,8 +166,8 @@ function CustomersPage() {
               <thead>
                 <tr>
                   <SortableHeader label="会社名" field="company_name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                  <th className="font-semibold text-gray-600 py-3 px-4">区分</th>
                   <SortableHeader label="業種" field="industry" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
-                  <SortableHeader label="従業員数" field="employee_count" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <SortableHeader label="電話番号" field="phone" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <SortableHeader label="登録日" field="created_at" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <th className="font-semibold text-gray-600 py-3 px-4 text-center">操作</th>
@@ -200,13 +209,15 @@ function CustomersPage() {
                   >
                     <td className="font-semibold text-blue-600 py-3 px-4 truncate">{c.company_name}</td>
                     <td className="px-4">
+                      <div className="flex gap-1 flex-wrap">
+                        {c.is_customer && <Badge className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-100">売上先</Badge>}
+                        {c.is_supplier && <Badge className="text-xs bg-orange-100 text-orange-700 hover:bg-orange-100">仕入先</Badge>}
+                        {!c.is_customer && !c.is_supplier && <span className="text-gray-300">—</span>}
+                      </div>
+                    </td>
+                    <td className="px-4">
                       {c.industry
                         ? <Badge variant="secondary" className="text-xs">{c.industry}</Badge>
-                        : <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="text-gray-600 px-4">
-                      {c.employee_count
-                        ? `${c.employee_count.toLocaleString()}名`
                         : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="text-gray-600 px-4">{c.phone ?? <span className="text-gray-300">—</span>}</td>

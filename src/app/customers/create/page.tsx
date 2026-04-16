@@ -14,8 +14,12 @@ const FIELDS = [
   { name: 'industry',       label: '業種',         type: 'text',   required: false, placeholder: '例：製造業、IT・通信',          span: 1 },
   { name: 'employee_count', label: '従業員数',     type: 'number', required: false, placeholder: '例：100',                      span: 1 },
   { name: 'phone',          label: '電話番号',     type: 'tel',    required: false, placeholder: '例：03-1234-5678',             span: 1 },
+  { name: 'fax',            label: 'FAX',          type: 'tel',    required: false, placeholder: '例：03-1234-5679',             span: 1 },
   { name: 'address',        label: '住所',         type: 'text',   required: false, placeholder: '例：東京都千代田区丸の内1-1-1', span: 2 },
   { name: 'website',        label: 'ウェブサイト', type: 'url',    required: false, placeholder: '例：https://example.com',      span: 2 },
+  { name: 'invoice_number', label: '適格請求書番号', type: 'text', required: false, placeholder: '例：T1234567890123',           span: 1 },
+  { name: 'payment_site',   label: '入金サイト（売上先・日）', type: 'number', required: false, placeholder: '例：30', span: 1 },
+  { name: 'vendor_payment_site', label: '支払サイト（仕入先・日）', type: 'number', required: false, placeholder: '例：30', span: 1 },
 ];
 
 const textareaCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none';
@@ -23,6 +27,8 @@ const textareaCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm 
 export default function CustomerCreatePage() {
   const [form, setForm]             = useState<Record<string, string>>({});
   const [notes, setNotes]           = useState('');
+  const [isSupplier, setIsSupplier] = useState(false);
+  const [isCustomer, setIsCustomer] = useState(true);
   const [saving, setSaving]         = useState(false);
   const [errors, setErrors]         = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -49,7 +55,7 @@ export default function CustomerCreatePage() {
 
     setSaving(true); setSubmitError(null);
     try {
-      await apiClient.post('/api/v1/customers', { ...form, notes });
+      await apiClient.post('/api/v1/customers', { ...form, notes, is_supplier: isSupplier, is_customer: isCustomer });
       router.push('/customers');
     } catch (err: any) {
       if (err.response?.status === 422) {
@@ -81,6 +87,20 @@ export default function CustomerCreatePage() {
               <span>⚠️</span><span>{submitError}</span>
             </div>
           )}
+
+          {/* 区分 */}
+          <div className="flex gap-6 p-3 bg-gray-50 rounded-md border border-gray-100">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" checked={isCustomer} onChange={e => setIsCustomer(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600" />
+              <span className="text-sm font-medium text-gray-700">売上先</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" checked={isSupplier} onChange={e => setIsSupplier(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-orange-500" />
+              <span className="text-sm font-medium text-gray-700">仕入先</span>
+            </label>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             {FIELDS.map(({ name, label, type, required, placeholder, span }) => (

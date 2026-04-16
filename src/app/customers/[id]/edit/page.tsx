@@ -14,15 +14,25 @@ const FIELDS = [
   { name: 'industry',       label: '業種',         type: 'text',   required: false, placeholder: '例：製造業、IT・通信',          span: 1 },
   { name: 'employee_count', label: '従業員数',     type: 'number', required: false, placeholder: '例：100',                      span: 1 },
   { name: 'phone',          label: '電話番号',     type: 'tel',    required: false, placeholder: '例：03-1234-5678',             span: 1 },
+  { name: 'fax',            label: 'FAX',          type: 'tel',    required: false, placeholder: '例：03-1234-5679',             span: 1 },
   { name: 'address',        label: '住所',         type: 'text',   required: false, placeholder: '例：東京都千代田区丸の内1-1-1', span: 2 },
   { name: 'website',        label: 'ウェブサイト', type: 'url',    required: false, placeholder: '例：https://example.com',      span: 2 },
+  { name: 'invoice_number', label: '適格請求書番号', type: 'text', required: false, placeholder: '例：T1234567890123',           span: 1 },
+  { name: 'payment_site',   label: '入金サイト（売上先・日）', type: 'number', required: false, placeholder: '例：30', span: 1 },
+  { name: 'vendor_payment_site', label: '支払サイト（仕入先・日）', type: 'number', required: false, placeholder: '例：30', span: 1 },
 ];
 
 const textareaCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none';
 
+interface ContactItem { id: number; name: string; email: string | null; }
+
 export default function CustomerEditPage() {
   const [form, setForm]             = useState<Record<string, string>>({});
   const [notes, setNotes]           = useState('');
+  const [isSupplier, setIsSupplier] = useState(false);
+  const [isCustomer, setIsCustomer] = useState(true);
+  const [primaryContactId, setPrimaryContactId] = useState<string>('');
+  const [contacts, setContacts]     = useState<ContactItem[]>([]);
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
   const [isDirty, setIsDirty]       = useState(false);
@@ -36,14 +46,22 @@ export default function CustomerEditPage() {
       const res = await apiClient.get(`/api/v1/customers/${id}`);
       const c = res.data.data ?? res.data;
       setForm({
-        company_name:   c.company_name        ?? '',
-        industry:       c.industry            ?? '',
-        employee_count: c.employee_count?.toString() ?? '',
-        phone:          c.phone               ?? '',
-        address:        c.address             ?? '',
-        website:        c.website             ?? '',
+        company_name:        c.company_name             ?? '',
+        industry:            c.industry                 ?? '',
+        employee_count:      c.employee_count?.toString() ?? '',
+        phone:               c.phone                    ?? '',
+        fax:                 c.fax                      ?? '',
+        address:             c.address                  ?? '',
+        website:             c.website                  ?? '',
+        invoice_number:      c.invoice_number           ?? '',
+        payment_site:        c.payment_site?.toString() ?? '',
+        vendor_payment_site: c.vendor_payment_site?.toString() ?? '',
       });
       setNotes(c.notes ?? '');
+      setIsSupplier(!!c.is_supplier);
+      setIsCustomer(!!c.is_customer);
+      setPrimaryContactId(c.primary_contact_id?.toString() ?? '');
+      setContacts(c.contacts ?? []);
     } catch (err: any) {
       if (err.response?.status === 401) router.push('/login');
       else router.push('/customers');
@@ -81,7 +99,13 @@ export default function CustomerEditPage() {
     if (!isValid(allErrors)) return;
     setSaving(true); setSubmitError(null);
     try {
-      await apiClient.put(`/api/v1/customers/${id}`, { ...form, notes });
+      await apiClient.put(`/api/v1/customers/${id}`, {
+        ...form,
+        notes,
+        is_supplier: isSupplier,
+        is_customer: isCustomer,
+        primary_contact_id: primaryContactId || null,
+      });
       setIsDirty(false);
       router.push(`/customers/${id}`);
     } catch (err: any) {
@@ -132,6 +156,22 @@ export default function CustomerEditPage() {
             </div>
           )}
 
+          {/* 区分 */}
+          <div className="flex gap-6 p-3 bg-gray-50 rounded-md border border-gray-100">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" checked={isCustomer}
+                onChange={e => { setIsCustomer(e.target.checked); setIsDirty(true); }}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600" />
+              <span className="text-sm font-medium text-gray-700">売上先</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" checked={isSupplier}
+                onChange={e => { setIsSupplier(e.target.checked); setIsDirty(true); }}
+                className="w-4 h-4 rounded border-gray-300 text-orange-500" />
+              <span className="text-sm font-medium text-gray-700">仕入先</span>
+            </label>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             {FIELDS.map(({ name, label, type, required, placeholder, span }) => (
               <div key={name} className={`space-y-1.5 ${span === 2 ? 'col-span-2' : ''}`}>
@@ -156,6 +196,24 @@ export default function CustomerEditPage() {
                 className={`${textareaCls} ${errors.notes ? 'border-red-400' : ''}`} />
               {errors.notes && <p className="text-xs text-red-500 mt-0.5">{errors.notes}</p>}
             </div>
+
+            {contacts.length > 0 && (
+              <div className="space-y-1.5 col-span-2 md:col-span-1">
+                <Label className="text-sm font-medium text-gray-700">主担当者</Label>
+                <select
+                  value={primaryContactId}
+                  onChange={e => { setPrimaryContactId(e.target.value); setIsDirty(true); }}
+                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">選択しない</option>
+                  {contacts.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.email ? ` (${c.email})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">

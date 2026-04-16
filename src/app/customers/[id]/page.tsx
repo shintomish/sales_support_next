@@ -35,9 +35,16 @@ interface Customer {
   industry: string | null;
   employee_count: number | null;
   phone: string | null;
+  fax: string | null;
   address: string | null;
   website: string | null;
   notes: string | null;
+  is_supplier: boolean;
+  is_customer: boolean;
+  invoice_number: string | null;
+  payment_site: number | null;
+  vendor_payment_site: number | null;
+  primary_contact: { id: number; name: string; email: string | null } | null;
   created_at: string;
   contacts: Contact[];
   deals: Deal[];
@@ -102,7 +109,11 @@ export default function CustomerDetailPage() {
       {/* ヘッダー */}
       <div className="flex justify-between items-start mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">{customer.company_name}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-bold text-gray-800">{customer.company_name}</h1>
+            {customer.is_customer && <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">売上先</Badge>}
+            {customer.is_supplier && <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">仕入先</Badge>}
+          </div>
           <p className="text-sm text-gray-400 mt-1">
             登録日: {new Date(customer.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
@@ -143,6 +154,10 @@ export default function CustomerDetailPage() {
                 : <Em />}
             </div>
             <div>
+              <p className="text-xs text-gray-400 mb-1">FAX</p>
+              <p className="text-sm font-medium text-gray-800">{customer.fax ?? <Em />}</p>
+            </div>
+            <div>
               <p className="text-xs text-gray-400 mb-1">住所</p>
               <p className="text-sm font-medium text-gray-800">{customer.address ?? <Em />}</p>
             </div>
@@ -153,6 +168,36 @@ export default function CustomerDetailPage() {
                      className="text-sm text-blue-500 hover:underline truncate block">{customer.website}</a>
                 : <Em />}
             </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">適格請求書番号</p>
+              <p className="text-sm font-medium text-gray-800">{customer.invoice_number ?? <Em />}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">入金サイト（売上先）</p>
+              <p className="text-sm font-medium text-gray-800">
+                {customer.payment_site != null ? `${customer.payment_site}日` : <Em />}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">支払サイト（仕入先）</p>
+              <p className="text-sm font-medium text-gray-800">
+                {customer.vendor_payment_site != null ? `${customer.vendor_payment_site}日` : <Em />}
+              </p>
+            </div>
+            {customer.primary_contact && (
+              <div>
+                <p className="text-xs text-gray-400 mb-1">主担当者</p>
+                <p
+                  className="text-sm font-medium text-blue-600 cursor-pointer hover:underline"
+                  onClick={() => router.push(`/contacts/${customer.primary_contact!.id}`)}
+                >
+                  {customer.primary_contact.name}
+                  {customer.primary_contact.email && (
+                    <span className="text-gray-400 font-normal ml-1">({customer.primary_contact.email})</span>
+                  )}
+                </p>
+              </div>
+            )}
             {customer.notes && (
               <div className="col-span-2 md:col-span-3">
                 <p className="text-xs text-gray-400 mb-2">備考</p>
