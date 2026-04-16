@@ -875,7 +875,7 @@ export default function DeliveriesPage() {
                         {camp._isDemo && (
                           <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium shrink-0">デモ</span>
                         )}
-                        {camp.sent_at ? new Date(camp.sent_at).toLocaleString('ja-JP') : '-'}
+                        {camp.sent_at ? new Date(camp.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-gray-800 whitespace-nowrap">{camp.sent_by ?? '-'}</td>

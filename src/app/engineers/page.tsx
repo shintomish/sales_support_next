@@ -104,9 +104,13 @@ export default function EngineersPage() {
   const selectCls = 'border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
 
   return (
-    <div className={viewMode === 'kanban' ? 'py-6 px-6' : 'max-w-6xl mx-auto py-8 px-6'}>
+    <div className={
+      viewMode === 'kanban' ? 'py-6 px-6' :
+      viewMode === 'list'   ? 'flex flex-col h-screen py-8 px-6 max-w-6xl mx-auto' :
+                              'max-w-6xl mx-auto py-8 px-6'
+    }>
       {/* ヘッダー */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">技術者管理</h1>
           <p className="text-sm text-gray-500 mt-1">全 {meta.total} 名</p>
@@ -134,7 +138,7 @@ export default function EngineersPage() {
       </div>
 
       {/* 検索フィルタ */}
-      <form onSubmit={handleSearch} className="flex gap-3 mb-6">
+      <form onSubmit={handleSearch} className="flex gap-3 mb-6 flex-shrink-0">
         <Input placeholder="氏名・所属で検索..." value={search}
           onChange={e => setSearch(e.target.value)} className="max-w-xs" />
         <select value={workStyle} onChange={e => { setWorkStyle(e.target.value); setPage(1); }} className={selectCls}>
@@ -147,12 +151,12 @@ export default function EngineersPage() {
       </form>
 
       {loading && (
-        <div className="flex justify-center py-16">
+        <div className="flex justify-center py-16 flex-shrink-0">
           <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
-      {!loading && engineers.length === 0 && (
+      {!loading && engineers.length === 0 && viewMode !== 'list' && (
         <div className="text-center py-16 text-gray-400">
           <p className="text-4xl mb-3">🧑‍💻</p>
           <p>技術者が見つかりません</p>
@@ -160,7 +164,7 @@ export default function EngineersPage() {
       )}
 
       {/* ── カードビュー ── */}
-      {!loading && engineers.length > 0 && viewMode === 'card' && (
+      {!loading && viewMode === 'card' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {engineers.map(e => <EngineerCard key={e.id} e={e} onClick={() => router.push(`/engineers/${e.id}`)} />)}
@@ -170,73 +174,115 @@ export default function EngineersPage() {
       )}
 
       {/* ── リストビュー ── */}
-      {!loading && engineers.length > 0 && viewMode === 'list' && (
+      {!loading && viewMode === 'list' && (
         <>
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <SortableHeader label="氏名" field="name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
-                  <SortableHeader label="所属" field="affiliation" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
-                  {['所属区分', '年齢', '稼働状況', '希望単価'].map(h => (
-                    <th key={h} className="text-left text-xs font-medium text-gray-500 px-4 py-3">{h}</th>
-                  ))}
-                  <SortableHeader label="稼働可能日" field="available_from" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
-                  <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">スキル</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {engineers.map(e => (
-                  <tr key={e.id} onClick={() => router.push(`/engineers/${e.id}`)}
-                    className="cursor-pointer hover:bg-blue-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-gray-800">{e.name}</p>
-                      {e.name_kana && <p className="text-xs text-gray-400">{e.name_kana}</p>}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">{e.affiliation ?? '—'}</td>
-                    <td className="px-4 py-3">
-                      {e.affiliation_type
-                        ? <span className={`text-xs px-2 py-0.5 rounded-full ${e.affiliation_type === 'self' ? 'bg-indigo-100 text-indigo-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                            {AFFILIATION_TYPE_LABEL[e.affiliation_type]}
-                          </span>
-                        : <span className="text-gray-300 text-xs">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">{e.age ? `${e.age}歳` : '—'}</td>
-                    <td className="px-4 py-3">
-                      {e.profile?.availability_status && AVAILABILITY_BADGE[e.profile.availability_status]
-                        ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${AVAILABILITY_BADGE[e.profile.availability_status].cls}`}>
-                            {AVAILABILITY_BADGE[e.profile.availability_status].label}
-                          </span>
-                        : <span className="text-gray-300 text-xs">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-600">
-                      {(e.profile?.desired_unit_price_min || e.profile?.desired_unit_price_max)
-                        ? `${e.profile?.desired_unit_price_min ?? '?'}〜${e.profile?.desired_unit_price_max ?? '?'}万`
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-600">{fmtDate(e.profile?.available_from ?? null)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {e.skills.slice(0, 3).map((s, i) => (
-                          <span key={s.skill_id ?? i}
-                            className={`text-xs px-1.5 py-0.5 rounded-full ${SKILL_CATEGORY_COLOR[s.category ?? 'other'] ?? SKILL_CATEGORY_COLOR.other}`}>
-                            {s.skill_name}
-                          </span>
-                        ))}
-                        {e.skills.length > 3 && <span className="text-xs text-gray-400">+{e.skills.length - 3}</span>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <Card className="shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+            <CardContent className="p-0 flex flex-col h-full overflow-hidden">
+
+              {/* テーブルヘッダー（固定） */}
+              <div className="flex-shrink-0 border-b bg-gray-50">
+                <table className="w-full text-sm table-fixed">
+                  <colgroup>
+                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '11%' }} />
+                    <col style={{ width: '7%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '11%' }} />
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '22%' }} />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <SortableHeader label="氏名" field="name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-semibold text-gray-600 px-4 py-3" />
+                      <SortableHeader label="所属" field="affiliation" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-semibold text-gray-600 px-4 py-3" />
+                      {['所属区分', '年齢', '稼働状況', '希望単価'].map(h => (
+                        <th key={h} className="text-left text-xs font-semibold text-gray-600 px-4 py-3">{h}</th>
+                      ))}
+                      <SortableHeader label="稼働可能日" field="available_from" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-semibold text-gray-600 px-4 py-3" />
+                      <th className="text-left text-xs font-semibold text-gray-600 px-4 py-3">スキル</th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+
+              {/* テーブルボディ（スクロール） */}
+              <div className="overflow-y-auto flex-1">
+                {engineers.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 text-gray-400 py-16">
+                    <span className="text-5xl">🧑‍💻</span>
+                    <p className="text-sm">技術者が見つかりません</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-sm table-fixed">
+                    <colgroup>
+                      <col style={{ width: '14%' }} />
+                      <col style={{ width: '14%' }} />
+                      <col style={{ width: '11%' }} />
+                      <col style={{ width: '7%' }} />
+                      <col style={{ width: '9%' }} />
+                      <col style={{ width: '11%' }} />
+                      <col style={{ width: '12%' }} />
+                      <col style={{ width: '22%' }} />
+                    </colgroup>
+                    <tbody className="divide-y divide-gray-100">
+                      {engineers.map((e, index) => (
+                        <tr key={e.id} onClick={() => router.push(`/engineers/${e.id}`)}
+                          className={`cursor-pointer hover:bg-blue-50/60 transition-colors border-b last:border-0 ${index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}`}>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-blue-600 truncate">{e.name}</p>
+                            {e.name_kana && <p className="text-xs text-gray-400 truncate">{e.name_kana}</p>}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 text-xs truncate">{e.affiliation ?? '—'}</td>
+                          <td className="px-4 py-3">
+                            {e.affiliation_type
+                              ? <span className={`text-xs px-2 py-0.5 rounded-full ${e.affiliation_type === 'self' ? 'bg-indigo-100 text-indigo-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                  {AFFILIATION_TYPE_LABEL[e.affiliation_type]}
+                                </span>
+                              : <span className="text-gray-300 text-xs">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 text-xs">{e.age ? `${e.age}歳` : '—'}</td>
+                          <td className="px-4 py-3">
+                            {e.profile?.availability_status && AVAILABILITY_BADGE[e.profile.availability_status]
+                              ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${AVAILABILITY_BADGE[e.profile.availability_status].cls}`}>
+                                  {AVAILABILITY_BADGE[e.profile.availability_status].label}
+                                </span>
+                              : <span className="text-gray-300 text-xs">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-600">
+                            {(e.profile?.desired_unit_price_min || e.profile?.desired_unit_price_max)
+                              ? `${e.profile?.desired_unit_price_min ?? '?'}〜${e.profile?.desired_unit_price_max ?? '?'}万`
+                              : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-600">{fmtDate(e.profile?.available_from ?? null)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap gap-1">
+                              {e.skills.slice(0, 3).map((s, i) => (
+                                <span key={s.skill_id ?? i}
+                                  className={`text-xs px-1.5 py-0.5 rounded-full ${SKILL_CATEGORY_COLOR[s.category ?? 'other'] ?? SKILL_CATEGORY_COLOR.other}`}>
+                                  {s.skill_name}
+                                </span>
+                              ))}
+                              {e.skills.length > 3 && <span className="text-xs text-gray-400">+{e.skills.length - 3}</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+            </CardContent>
+          </Card>
+          <div className="flex-shrink-0">
+            <Pagination meta={meta} page={page} setPage={setPage} />
           </div>
-          <Pagination meta={meta} page={page} setPage={setPage} />
         </>
       )}
 
       {/* ── カンバンビュー ── */}
-      {!loading && engineers.length > 0 && viewMode === 'kanban' && (
+      {!loading && viewMode === 'kanban' && (
         <div className="grid grid-cols-4 gap-4 items-start">
           {KANBAN_COLS.map(col => {
             const colEngineers = engineers.filter(e =>
