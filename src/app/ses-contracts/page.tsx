@@ -455,11 +455,11 @@ function SesContractsPage() {
                       </colgroup>
                       <thead><tr>
                         <SortableHeader label="項番" field="project_number" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 first:pl-4 text-xs" />
-                        {['氏名','変更種別','所属'].map(h => (
-                          <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">{h}</th>
-                        ))}
+                        <SortableHeader label="氏名" field="engineer_name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
+                        <SortableHeader label="変更種別" field="change_type" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
+                        <SortableHeader label="所属" field="affiliation" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
                         <SortableHeader label="顧客" field="customer_name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
-                        <th className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">エンド</th>
+                        <SortableHeader label="エンド" field="end_client" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
                         <SortableHeader label="案件名" field="project_name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
                         <SortableHeader label="ステータス" field="status" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
                         <SortableHeader label="契約終了" field="contract_period_end" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
