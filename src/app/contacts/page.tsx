@@ -6,6 +6,7 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import SortableHeader from '@/components/SortableHeader';
 
 interface Contact {
   id: number; name: string; department: string | null; position: string | null;
@@ -42,9 +43,17 @@ function ContactsPage() {
   const [search, setSearch]                 = useState(searchParams.get('search') ?? '');
   const [customerFilter, setCustomerFilter] = useState(searchParams.get('customer_id') ?? '');
   const [page, setPage]       = useState(Number(searchParams.get('page') ?? '1'));
+  const [sortField, setSortField] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) { setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); }
+    else { setSortField(field); setSortOrder('asc'); }
+    setPage(1);
+  };
 
   const updateUrl = useCallback((params: Record<string, string>) => {
     const p = new URLSearchParams();
@@ -57,7 +66,7 @@ function ContactsPage() {
     try {
       setError(null);
       const [cRes, cusRes] = await Promise.all([
-        apiClient.get('/api/v1/contacts', { params: { search, customer_id: customerFilter, page } }),
+        apiClient.get('/api/v1/contacts', { params: { search, customer_id: customerFilter, page, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined } }),
         apiClient.get('/api/v1/customers', { params: { page: 1 } }),
       ]);
       setContacts(cRes.data.data);
@@ -67,7 +76,7 @@ function ContactsPage() {
       if (err.response?.status === 401) router.push('/login');
       else setError('担当者データの取得に失敗しました');
     } finally { setLoading(false); }
-  }, [search, customerFilter, page, router]);
+  }, [search, customerFilter, page, sortField, sortOrder, router]);
 
   useEffect(() => { fetchContacts(); }, [fetchContacts]);
   useEffect(() => {
@@ -148,11 +157,11 @@ function ContactsPage() {
               <ColGroup />
               <thead>
                 <tr>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">氏名</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">会社名</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">部署</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">役職</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">メール</th>
+                  <SortableHeader label="氏名" field="name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                  <SortableHeader label="会社名" field="company_name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                  <SortableHeader label="部署" field="department" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                  <SortableHeader label="役職" field="position" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                  <SortableHeader label="メール" field="email" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">電話番号</th>
                   <th className="font-semibold text-gray-600 py-3 px-4 text-center">操作</th>
                 </tr>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from '@/lib/axios'
 import { useRouter } from 'next/navigation'
+import SortableHeader from '@/components/SortableHeader'
 
 // ── 型定義 ────────────────────────────────────────────────
 
@@ -518,11 +519,6 @@ export default function DeliveriesPage() {
     setCampPage(1)
   }
 
-  const SortIcon = ({ col }: { col: CampSortBy }) => {
-    if (campSortBy !== col) return <span className="ml-1 text-gray-300">↕</span>
-    return <span className="ml-1 text-blue-500">{campSortDir === 'asc' ? '↑' : '↓'}</span>
-  }
-
   // ── タブラベル ────────────────────────────────────────
   const tabs: { key: Tab; label: string }[] = [
     { key: 'addresses', label: '配信先一覧' },
@@ -847,19 +843,21 @@ export default function DeliveriesPage() {
                 <tr>
                   {(
                     [
-                      { col: 'sent_at' as CampSortBy, label: '送信日時', align: 'left' },
-                      { col: 'sent_by' as CampSortBy, label: '送信者', align: 'left' },
-                      { col: 'subject' as CampSortBy, label: '件名', align: 'left' },
-                      { col: 'project_title' as CampSortBy, label: '紐づき案件', align: 'left' },
+                      { col: 'sent_at' as CampSortBy, label: '送信日時' },
+                      { col: 'sent_by' as CampSortBy, label: '送信者' },
+                      { col: 'subject' as CampSortBy, label: '件名' },
+                      { col: 'project_title' as CampSortBy, label: '紐づき案件' },
                     ] as const
-                  ).map(({ col, label, align }) => (
-                    <th
+                  ).map(({ col, label }) => (
+                    <SortableHeader
                       key={col}
-                      className={`px-4 py-3 text-${align} cursor-pointer select-none hover:bg-gray-100`}
-                      onClick={() => handleCampSort(col)}
-                    >
-                      {label}<SortIcon col={col} />
-                    </th>
+                      label={label}
+                      field={col}
+                      sortField={campSortBy}
+                      sortOrder={campSortDir}
+                      onSort={(f) => handleCampSort(f as CampSortBy)}
+                      className="px-4 py-3"
+                    />
                   ))}
                   <th className="px-4 py-3 text-center">分類</th>
                   <th className="px-4 py-3 text-center">送信数</th>
