@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import SortableHeader from '@/components/SortableHeader';
 
 interface Customer {
   id: number; company_name: string; industry: string | null;
@@ -40,9 +41,17 @@ function CustomersPage() {
   const [search, setSearch]                 = useState(searchParams.get('search') ?? '');
   const [industryFilter, setIndustryFilter] = useState(searchParams.get('industry') ?? '');
   const [page, setPage]     = useState(Number(searchParams.get('page') ?? '1'));
+  const [sortField, setSortField] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) { setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); }
+    else { setSortField(field); setSortOrder('asc'); }
+    setPage(1);
+  };
 
   const updateUrl = useCallback((params: Record<string, string>) => {
     const p = new URLSearchParams();
@@ -55,7 +64,7 @@ function CustomersPage() {
     try {
       setError(null);
       const [res, indRes] = await Promise.all([
-        apiClient.get('/api/v1/customers', { params: { search, industry: industryFilter, page } }),
+        apiClient.get('/api/v1/customers', { params: { search, industry: industryFilter, page, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined } }),
         apiClient.get('/api/v1/customers/industries'),
       ]);
       setCustomers(res.data.data);
@@ -65,7 +74,7 @@ function CustomersPage() {
       if (err.response?.status === 401) router.push('/login');
       else setError('顧客データの取得に失敗しました');
     } finally { setLoading(false); }
-  }, [search, industryFilter, page, router]);
+  }, [search, industryFilter, page, sortField, sortOrder, router]);
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
   useEffect(() => { updateUrl({ search, industry: industryFilter, page: String(page) }); }, [search, industryFilter, page, updateUrl]);
@@ -147,11 +156,11 @@ function CustomersPage() {
               <ColGroup />
               <thead>
                 <tr>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">会社名</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">業種</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">従業員数</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">電話番号</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">登録日</th>
+                  <SortableHeader label="会社名" field="company_name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                  <SortableHeader label="業種" field="industry" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                  <SortableHeader label="従業員数" field="employee_count" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                  <SortableHeader label="電話番号" field="phone" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                  <SortableHeader label="登録日" field="created_at" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <th className="font-semibold text-gray-600 py-3 px-4 text-center">操作</th>
                 </tr>
               </thead>

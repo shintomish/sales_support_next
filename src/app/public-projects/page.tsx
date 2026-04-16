@@ -69,7 +69,7 @@ export default function PublicProjectsPage() {
   const fetchProjects = useCallback(async () => {
     setLoading(true);
     try {
-      const perPage = viewMode === 'kanban' ? 200 : 20;
+      const perPage = viewMode === 'kanban' ? 200 : 50;
       const res = await apiClient.get('/api/v1/public-projects', {
         params: {
           search: search || undefined,
@@ -180,17 +180,18 @@ export default function PublicProjectsPage() {
       {/* ── リストビュー ── */}
       {!loading && projects.length > 0 && viewMode === 'list' && (
         <>
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
                 <tr>
                   <th className="text-left text-xs font-medium text-gray-500 px-4 py-3"></th>
                   <SortableHeader label="案件名" field="title" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
-                  <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">顧客</th>
+                  <SortableHeader label="顧客" field="posted_by_customer_name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
                   <SortableHeader label="ステータス" field="status" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
                   <SortableHeader label="単価" field="unit_price_min" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
                   <SortableHeader label="勤務形態" field="work_style" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
-                  {['開始', 'スキル', '応募'].map(h => (
+                  <SortableHeader label="開始" field="start_date" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-medium text-gray-500 px-4 py-3" />
+                  {['スキル', '応募'].map(h => (
                     <th key={h} className="text-left text-xs font-medium text-gray-500 px-4 py-3">{h}</th>
                   ))}
                 </tr>

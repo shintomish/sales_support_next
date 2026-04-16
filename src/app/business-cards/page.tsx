@@ -123,9 +123,9 @@ export default function BusinessCardsPage() {
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">画像</th>
                   <SortableHeader label="会社名" field="company_name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <SortableHeader label="氏名" field="person_name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">役職</th>
+                  <SortableHeader label="役職" field="position" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">連絡先</th>
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">ステータス</th>
+                  <SortableHeader label="ステータス" field="status" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <SortableHeader label="登録日" field="created_at" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <th className="font-semibold text-gray-600 py-3 px-4 text-center">操作</th>
                 </tr>

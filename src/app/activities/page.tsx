@@ -194,7 +194,7 @@ function ActivitiesPage() {
                   <SortableHeader label="活動日" field="activity_date" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <SortableHeader label="種別" field="type" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <SortableHeader label="件名" field="subject" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
-                  <th className="font-semibold text-gray-600 py-3 px-4 text-left">顧客</th>
+                  <SortableHeader label="顧客" field="customer_name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">担当者</th>
                   <th className="font-semibold text-gray-600 py-3 px-4 text-left">関連商談</th>
                   <th className="font-semibold text-gray-600 py-3 px-4 text-center">操作</th>
