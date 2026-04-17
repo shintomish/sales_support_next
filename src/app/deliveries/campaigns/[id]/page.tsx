@@ -105,7 +105,7 @@ function ReplyModal({ h, campaignSubject, onClose }: { h: SendHistory; campaignS
     <div onClick={onClose} className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-xl w-full max-w-xl shadow-2xl overflow-hidden"
+        className="bg-white rounded-xl w-full max-w-xl max-h-[80vh] shadow-2xl overflow-hidden flex flex-col"
       >
         {/* ヘッダー */}
         <div className="bg-blue-50 px-5 py-3 border-b border-blue-200 flex items-center justify-between">
@@ -135,12 +135,12 @@ function ReplyModal({ h, campaignSubject, onClose }: { h: SendHistory; campaignS
         </div>
 
         {/* 本文 */}
-        <div className="px-5 py-4">
+        <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0">
           <p className="text-xs text-gray-400 mb-2">本文（抜粋）</p>
           <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{h.reply_body_snippet}</p>
         </div>
 
-        <div className="px-5 py-3 border-t border-gray-200 flex justify-end">
+        <div className="px-5 py-3 border-t border-gray-200 flex justify-end shrink-0">
           <button onClick={onClose} className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700">
             閉じる
           </button>
