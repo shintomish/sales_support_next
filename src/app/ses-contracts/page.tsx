@@ -332,6 +332,12 @@ function SesContractsPage() {
     } finally { setLoading(false); }
   }, [search, statusFilter, page, userFilter, sortField, sortOrder, router]);
 
+  // テキスト入力のデバウンス（300ms）
+  useEffect(() => {
+    const timer = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading) return (
@@ -412,15 +418,13 @@ function SesContractsPage() {
                 <div className="relative flex-1 min-w-48">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
                   <Input className="pl-8 bg-white" placeholder="氏名・顧客・案件名で検索"
-                    value={searchInput} onChange={e => setSearchInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { setSearch(searchInput); setPage(1); } }} />
+                    value={searchInput} onChange={e => setSearchInput(e.target.value)} />
                 </div>
                 <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} className={selectCls}>
                   <option value="">全ステータス</option>
                   {SES_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 <UserFilter value={userFilter} onChange={v => { setUserFilter(v); setPage(1); }} className={selectCls} />
-                <Button onClick={() => { setSearch(searchInput); setPage(1); }}>検索</Button>
                 {(search || statusFilter) && (
                   <Button variant="ghost" size="sm"
                     onClick={() => { setSearch(''); setSearchInput(''); setStatusFilter(''); setPage(1); }}
