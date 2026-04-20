@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 
@@ -28,6 +28,9 @@ function BulkSendModal({
   const [body, setBody] = useState(initialBody)
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleSend = async () => {
     if (!to.trim()) { alert('送信先メールアドレスを入力してください'); return }
@@ -36,11 +39,14 @@ function BulkSendModal({
     if (!confirm(`${toName || to} に送信しますか？`)) return
     setSending(true)
     try {
-      await axios.post(`/api/v1/project-mails/${projectMailId}/send-proposal`, {
-        to,
-        to_name: toName,
-        subject,
-        body,
+      const formData = new FormData()
+      formData.append('to', to)
+      formData.append('to_name', toName)
+      formData.append('subject', subject)
+      formData.append('body', body)
+      attachments.forEach(f => formData.append('attachments[]', f))
+      await axios.post(`/api/v1/project-mails/${projectMailId}/send-proposal`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
       setSent(true)
       setTimeout(() => onClose(), 2000)
@@ -124,6 +130,46 @@ function BulkSendModal({
               rows={12}
               style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
             />
+          </div>
+
+          {/* 添付ファイル D&D */}
+          <div
+            onDragOver={e => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }}
+            onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setIsDragging(false) }}
+            onDrop={e => {
+              e.preventDefault(); e.stopPropagation(); setIsDragging(false)
+              const files = Array.from(e.dataTransfer.files)
+              if (files.length) setAttachments(prev => [...prev, ...files])
+            }}
+            style={{
+              border: `2px dashed ${isDragging ? '#3b82f6' : '#d1d5db'}`,
+              borderRadius: 8,
+              padding: '12px 16px',
+              textAlign: 'center',
+              background: isDragging ? '#eff6ff' : '#f9fafb',
+              transition: 'all 0.2s',
+            }}
+          >
+            <p style={{ fontSize: 12, color: '#2563eb', margin: '0 0 6px' }}>スキルシート等をドラッグ＆ドロップ、またはファイルを選択</p>
+            <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }} onChange={e => {
+              const files = Array.from(e.target.files ?? [])
+              if (files.length) setAttachments(prev => [...prev, ...files])
+              if (fileInputRef.current) fileInputRef.current.value = ''
+            }} />
+            <button onClick={() => fileInputRef.current?.click()}
+              style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #93c5fd', background: '#fff', cursor: 'pointer', fontSize: 12, color: '#1d4ed8' }}>
+              ファイルを選択
+            </button>
+            {attachments.length > 0 && (
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {attachments.map((f, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, background: '#fff', borderRadius: 4, padding: '4px 8px', border: '1px solid #e5e7eb' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {f.name} ({(f.size / 1024).toFixed(1)}KB)</span>
+                    <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', marginLeft: 8 }}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

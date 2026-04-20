@@ -513,6 +513,28 @@ export default function ProjectMailsPage() {
                   マッチング →
                 </button>
                 <button
+                  onClick={() => {
+                    const params = new URLSearchParams()
+                    if (selected.title) params.set('title', selected.title)
+                    if (selected.work_location) params.set('work_location', selected.work_location)
+                    if (selected.unit_price_min) params.set('unit_price_min', String(selected.unit_price_min))
+                    if (selected.unit_price_max) params.set('unit_price_max', String(selected.unit_price_max))
+                    if (selected.start_date) params.set('start_date', selected.start_date)
+                    if (selected.remote_ok != null) params.set('remote_ok', String(selected.remote_ok))
+                    if (selected.required_skills?.length) params.set('required_skills', selected.required_skills.join(','))
+                    if (selected.preferred_skills?.length) params.set('preferred_skills', selected.preferred_skills.join(','))
+                    if (selected.email?.from_name) params.set('customer_name', selected.email.from_name)
+                    params.set('from', '/project-mails')
+                    params.set('project_mail_id', String(selected.id))
+                    if (selected.email?.body_text) {
+                      sessionStorage.setItem('project_mail_body', selected.email.body_text)
+                    }
+                    router.push(`/public-projects/create?${params.toString()}`)
+                  }}
+                  className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 font-medium">
+                  案件マーケットに登録 →
+                </button>
+                <button
                   onClick={() => router.push(`/emails?email_id=${selected.email_id}`)}
                   className="text-xs border border-blue-300 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-50">
                   メール詳細 →

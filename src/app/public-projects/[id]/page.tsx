@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
@@ -31,9 +31,15 @@ interface PublicProject {
   expires_at: string | null;
   required_skills: RequiredSkill[];
   is_favorite: boolean;
+  project_mail_source_id: number | null;
+  mail_from_address: string | null;
+  mail_from_name: string | null;
+  mail_sales_contact: string | null;
+  mail_body_text: string | null;
 }
 interface RecommendedEngineer {
   engineer_id: number; engineer_name: string; affiliation: string | null;
+  affiliation_type: string | null; engineer_mail_source_id: number | null;
   available_from: string | null; work_style: string | null;
   desired_unit_price_min: number | null; desired_unit_price_max: number | null;
   score: number; skill_match_score: number; price_match_score: number;
@@ -55,20 +61,45 @@ function ScoreBar({ label, score }: { label: string; score: number }) {
   );
 }
 
+interface EmailBodyTemplate {
+  name: string; name_en: string; department: string; position: string;
+  email: string; mobile: string; body_text?: string | null;
+}
+
+function buildEmailBody(greeting: string, mainContent: string, tpl: EmailBodyTemplate | null): string {
+  if (tpl?.body_text) {
+    return tpl.body_text
+      .replace(/^.*?様\s*/u, `${greeting}\n\n`)
+      .replace('（本文）', mainContent)
+  }
+  const intro = tpl
+    ? `いつも大変お世話になっております。\n株式会社アイゼン・ソリューションの${tpl.name}です。`
+    : `いつも大変お世話になっております。`
+  const sig = tpl
+    ? `_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/\n　　株式会社アイゼン・ソリューション\n　${tpl.department ?? ''}\n　${tpl.position ?? ''}\n　${tpl.name}${tpl.name_en ? `（${tpl.name_en}）` : ''}\n\n　〒332-0017\n　埼玉県川口市栄町3-12-11 コスモ川口栄町2F\n　Tel：048-253-3922　Fax：048-271-9355\n\n　E-Mail：${tpl.email ?? ''}\n　Mobile：${tpl.mobile ?? ''}\n\n　URL:https://www.aizen-sol.co.jp\n_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
+    : ''
+  return `${greeting}\n\n${intro}\n\n${mainContent}\n\nお忙しいところ大変恐れ入りますが、ご検討いただけますと幸いでございます。\n何卒よろしくお願いいたします。\n${sig}`
+}
+
 export default function PublicProjectDetailPage() {
   const { id } = useParams();
   const router  = useRouter();
   const [project, setProject]       = useState<PublicProject | null>(null);
   const [recommended, setRecommended] = useState<RecommendedEngineer[]>([]);
+  const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<'' | 'self' | 'bp' | 'mail'>('');
   const [loading, setLoading]       = useState(true);
   const [showApplyModal, setShowApplyModal] = useState(false);
-  const [engineerOptions, setEngineerOptions] = useState<EngineerOption[]>([]);
-  const [selectedEngineerId, setSelectedEngineerId] = useState('');
-  const [proposedPrice, setProposedPrice] = useState('');
-  const [applyMessage, setApplyMessage]   = useState('');
-  const [applying, setApplying]     = useState(false);
-  const [applyError, setApplyError] = useState('');
-  const [applySuccess, setApplySuccess] = useState(false);
+  const [toName, setToName] = useState('');
+  const [to, setTo] = useState('');
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [mailBodyOpen, setMailBodyOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const inputCls = 'border border-gray-200 rounded-md px-3 py-2 text-sm bg-white w-full focus:outline-none focus:ring-2 focus:ring-blue-500';
   const labelCls = 'text-xs text-gray-500 mb-1 block';
@@ -89,31 +120,70 @@ export default function PublicProjectDetailPage() {
   }, [id, router]);
 
   useEffect(() => { fetchProject(); }, [fetchProject]);
+  useEffect(() => {
+    apiClient.get('/api/v1/email-body-templates/me').then(res => {
+      if (res.data) setEmailTemplate(res.data);
+    }).catch(() => {});
+  }, []);
 
-  const openApplyModal = async () => {
-    const res = await apiClient.get('/api/v1/engineers', { params: { per_page: 100 } });
-    setEngineerOptions(res.data.data.map((e: any) => ({ id: e.id, name: e.name, affiliation: e.affiliation })));
+  const openApplyModal = () => {
+    if (!project) return;
+    const contact = project.mail_sales_contact || project.mail_from_name || '';
+    setToName(contact ? `${contact} 様` : (project.mail_from_address ? 'ご担当者 様' : ''));
+    setTo(project.mail_from_address ?? '');
+    setSubject(`【技術者ご紹介】${project.title}`);
+
+    // おすすめ技術者の情報を本文に含める
+    const greeting = contact ? `${contact} 様` : 'ご担当者様';
+    const engineerLines = recommended.map(e => {
+      const skills = e.skills.slice(0, 5).map(s => s.name).join('／');
+      const avail = e.available_from ? `${fmtDate(e.available_from)}〜` : '';
+      return `・${e.engineer_name}（${e.affiliation ?? ''}）\n　スキル：${skills || '—'}　稼働：${avail || '—'}`;
+    }).join('\n');
+    const mainContent = recommended.length > 0
+      ? `この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。\n\n【ご紹介エンジニア（${recommended.length}名）】\n${engineerLines}\n\n各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。\nまた、面談のご調整も随時承っております。`
+      : `この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。`;
+    setBody(buildEmailBody(greeting, mainContent, emailTemplate));
+
+    setAttachments([]);
+    setSent(false);
     setShowApplyModal(true);
-    setApplyError('');
-    setApplySuccess(false);
   };
 
-  const handleApply = async () => {
-    if (!selectedEngineerId) { setApplyError('技術者を選択してください'); return; }
-    setApplying(true); setApplyError('');
+  const handleSend = async () => {
+    if (!to.trim()) { alert('送信先メールアドレスを入力してください'); return; }
+    if (!subject.trim()) { alert('件名を入力してください'); return; }
+    if (!body.trim()) { alert('本文を入力してください'); return; }
+    if (!confirm(`${toName || to} に送信しますか？`)) return;
+    setSending(true);
     try {
-      await apiClient.post('/api/v1/applications', {
-        project_id:           Number(id),
-        engineer_id:          Number(selectedEngineerId),
-        proposed_unit_price:  proposedPrice ? Number(proposedPrice) : null,
-        message:              applyMessage || null,
+      const formData = new FormData();
+      formData.append('to', to);
+      formData.append('to_name', toName);
+      formData.append('subject', subject);
+      formData.append('body', body);
+      attachments.forEach(f => formData.append('attachments[]', f));
+      await apiClient.post(`/api/v1/public-projects/${id}/send-proposal`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setApplySuccess(true);
-      setProject(prev => prev ? { ...prev, applications_count: prev.applications_count + 1 } : prev);
-      setTimeout(() => { setShowApplyModal(false); setApplySuccess(false); }, 1500);
-    } catch (err: any) {
-      setApplyError(err.response?.data?.message ?? '応募に失敗しました');
-    } finally { setApplying(false); }
+      setSent(true);
+      setTimeout(() => setShowApplyModal(false), 2000);
+    } catch {
+      alert('送信に失敗しました');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation(); setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length) setAttachments(prev => [...prev, ...files]);
+  };
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length) setAttachments(prev => [...prev, ...files]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleDelete = async () => {
@@ -258,15 +328,57 @@ export default function PublicProjectDetailPage() {
             {project.expires_at && <span>⏰ 締切 {fmtDate(project.expires_at)}</span>}
             {project.end_client && <span>🏢 エンド: {project.end_client}</span>}
           </div>
+
+          {/* 元メール本文 */}
+          {project.mail_body_text && (
+            <Card className="overflow-hidden">
+              <button
+                onClick={() => setMailBodyOpen(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700"
+              >
+                <span>📧 元メール本文</span>
+                <span className="text-gray-400">{mailBodyOpen ? '▲ 閉じる' : '▼ 開く'}</span>
+              </button>
+              {mailBodyOpen && (
+                <CardContent className="max-h-64 overflow-y-auto border-t border-gray-200 p-4">
+                  <pre className="text-xs text-gray-600 whitespace-pre-wrap font-sans leading-relaxed">{project.mail_body_text}</pre>
+                </CardContent>
+              )}
+            </Card>
+          )}
         </div>
 
         {/* ── 右：おすすめ技術者 ── */}
         <div className="space-y-3">
-          <h2 className="text-base font-semibold text-gray-700">🧑‍💻 おすすめ技術者</h2>
-          {recommended.length === 0 ? (
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-gray-700">🧑‍💻 おすすめ技術者</h2>
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-gray-50 p-0.5 gap-0.5">
+              {([
+                { value: '' as const, label: '全て' },
+                { value: 'self' as const, label: '自社' },
+                { value: 'bp' as const, label: 'BP' },
+                { value: 'mail' as const, label: 'メール' },
+              ]).map(opt => (
+                <button key={opt.value} onClick={() => setSourceFilter(opt.value)}
+                  className={`px-2 py-1 text-xs rounded-md transition-colors font-medium ${
+                    sourceFilter === opt.value ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {(() => {
+            const filtered = recommended.filter(eng => {
+              if (sourceFilter === 'self') return eng.affiliation_type === 'self';
+              if (sourceFilter === 'bp') return eng.affiliation_type && eng.affiliation_type !== 'self' && !eng.engineer_mail_source_id;
+              if (sourceFilter === 'mail') return !!eng.engineer_mail_source_id;
+              return true;
+            });
+            return filtered.length === 0 ? (
             <Card><CardContent className="py-8 text-center text-sm text-gray-400">技術者が見つかりません<br /><span className="text-xs">（公開設定済みの技術者のみ表示）</span></CardContent></Card>
           ) : (
-            recommended.map(eng => (
+            filtered.map(eng => (
               <Card key={eng.engineer_id} className="cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => router.push(`/engineers/${eng.engineer_id}`)}>
                 <CardContent className="p-4">
@@ -299,68 +411,104 @@ export default function PublicProjectDetailPage() {
                 </CardContent>
               </Card>
             ))
-          )}
+          );
+          })()}
         </div>
       </div>
 
-      {/* ── 応募モーダル ── */}
+      {/* ── 提案メール送信モーダル ── */}
       {showApplyModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold text-gray-800">案件に応募する</h2>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowApplyModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold">📤 案件に応募する</p>
+                <p className="text-xs text-gray-400 truncate max-w-sm">{project.title}</p>
+              </div>
               <button onClick={() => setShowApplyModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
             </div>
-            <p className="text-sm text-gray-500 mb-4 truncate">{project.title}</p>
 
-            {applySuccess ? (
-              <div className="text-center py-8">
-                <p className="text-4xl mb-2">✅</p>
-                <p className="text-green-600 font-medium">応募が完了しました</p>
+            {sent ? (
+              <div className="p-10 text-center">
+                <p className="text-5xl mb-4">✅</p>
+                <p className="text-base font-bold text-gray-800 mb-1">送信しました</p>
+                <p className="text-sm text-gray-500">{toName || to}</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                <div>
-                  <label className={labelCls}>技術者を選択 <span className="text-red-500">*</span></label>
-                  <select
-                    className={inputCls}
-                    value={selectedEngineerId}
-                    onChange={e => setSelectedEngineerId(e.target.value)}
+              <>
+                <div className="px-5 py-4 flex-1 overflow-y-auto space-y-3">
+                  {/* 元メール本文 */}
+                  {project.mail_body_text && (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setMailBodyOpen(v => !v)}
+                        className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors text-xs font-medium text-gray-700"
+                      >
+                        <span>📧 元メール本文</span>
+                        <span className="text-gray-400">{mailBodyOpen ? '▲ 閉じる' : '▼ 開く'}</span>
+                      </button>
+                      {mailBodyOpen && (
+                        <div className="px-3 py-2 bg-white max-h-48 overflow-y-auto border-t border-gray-200">
+                          <pre className="text-xs text-gray-600 whitespace-pre-wrap font-sans leading-relaxed">{project.mail_body_text}</pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 宛先 */}
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-xs">
+                    <div className="flex gap-2 items-center">
+                      <span className="text-gray-500 w-12 shrink-0">宛先名</span>
+                      <input className={inputCls} value={toName} onChange={e => setToName(e.target.value)} placeholder="担当者名" />
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <span className="text-gray-500 w-12 shrink-0">送信先</span>
+                      <input className={inputCls} type="email" value={to} onChange={e => setTo(e.target.value)} placeholder="example@example.com" />
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <span className="text-gray-500 w-12 shrink-0">件名</span>
+                      <input className={inputCls} value={subject} onChange={e => setSubject(e.target.value)} />
+                    </div>
+                  </div>
+
+                  {/* 本文 */}
+                  <div>
+                    <label className={labelCls}>本文</label>
+                    <textarea className={inputCls + ' h-48 resize-y'} value={body} onChange={e => setBody(e.target.value)} />
+                  </div>
+
+                  {/* 添付ファイル D&D */}
+                  <div
+                    onDragOver={e => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+                    onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+                    onDrop={handleFileDrop}
+                    className={`border-2 border-dashed rounded-lg p-3 text-center transition-colors ${isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}
                   >
-                    <option value="">選択してください</option>
-                    {engineerOptions.map(e => (
-                      <option key={e.id} value={e.id}>
-                        {e.name}{e.affiliation ? ` (${e.affiliation})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                    <p className="text-xs text-blue-600 mb-1">スキルシート等をドラッグ＆ドロップ、またはファイルを選択</p>
+                    <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} />
+                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}
+                      className="border-blue-300 text-blue-700 hover:bg-blue-100">ファイルを選択</Button>
+                    {attachments.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {attachments.map((f, i) => (
+                          <div key={i} className="flex items-center justify-between text-xs bg-white rounded px-2 py-1 border">
+                            <span className="truncate">📎 {f.name} ({(f.size / 1024).toFixed(1)}KB)</span>
+                            <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 ml-2">✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <label className={labelCls}>提案単価（万円/月）</label>
-                  <input
-                    className={inputCls} type="number" min="0"
-                    value={proposedPrice}
-                    onChange={e => setProposedPrice(e.target.value)}
-                    placeholder={`${project.unit_price_min ?? ''}〜${project.unit_price_max ?? ''}万円`}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>アピールメッセージ</label>
-                  <textarea
-                    className={inputCls + ' h-24 resize-none'}
-                    value={applyMessage}
-                    onChange={e => setApplyMessage(e.target.value)}
-                    placeholder="スキルのアピールポイントなど"
-                  />
-                </div>
-                {applyError && <p className="text-xs text-red-500">{applyError}</p>}
-                <div className="flex gap-3 pt-2">
-                  <Button variant="outline" onClick={() => setShowApplyModal(false)} className="flex-1">キャンセル</Button>
-                  <Button onClick={handleApply} disabled={applying} className="flex-1">
-                    {applying ? '送信中...' : '応募する'}
+
+                <div className="px-5 py-3 border-t flex gap-2 justify-end">
+                  <Button variant="outline" onClick={() => setShowApplyModal(false)}>閉じる</Button>
+                  <Button onClick={handleSend} disabled={sending}>
+                    {sending ? '送信中...' : '📤 送信する'}
                   </Button>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useCallback, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,20 +16,34 @@ type Tab = 'basic' | 'contract' | 'skills';
 
 export default function PublicProjectCreatePage() {
   const router  = useRouter();
+  const searchParams = useSearchParams();
   const [tab, setTab]     = useState<Tab>('basic');
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // 案件メールからの引き継ぎ
+  const fromPath = searchParams.get('from') ?? '/public-projects';
+  const [mailBody, setMailBody] = useState('');
+  const [mailBodyOpen, setMailBodyOpen] = useState(false);
+
+  useEffect(() => {
+    const body = sessionStorage.getItem('project_mail_body');
+    if (body) {
+      setMailBody(body);
+      sessionStorage.removeItem('project_mail_body');
+    }
+  }, []);
+
   // 基本情報
-  const [title, setTitle]         = useState('');
+  const [title, setTitle]         = useState(searchParams.get('title') ?? '');
   const [description, setDescription] = useState('');
-  const [endClient, setEndClient] = useState('');
-  const [startDate, setStartDate] = useState('');
+  const [endClient, setEndClient] = useState(searchParams.get('customer_name') ?? '');
+  const [startDate, setStartDate] = useState(searchParams.get('start_date') ?? '');
   const [contractType, setContractType] = useState('');
   const [contractMonths, setContractMonths] = useState('');
   const [workStyle, setWorkStyle] = useState('');
   const [remoteFrequency, setRemoteFrequency] = useState('');
-  const [workLocation, setWorkLocation] = useState('');
+  const [workLocation, setWorkLocation] = useState(searchParams.get('work_location') ?? '');
   const [nearestStation, setNearestStation] = useState('');
   const [expYears, setExpYears]   = useState('');
   const [teamSize, setTeamSize]   = useState('');
@@ -37,8 +51,8 @@ export default function PublicProjectCreatePage() {
   const [headcount, setHeadcount] = useState('1');
 
   // 契約条件
-  const [priceMin, setPriceMin]   = useState('');
-  const [priceMax, setPriceMax]   = useState('');
+  const [priceMin, setPriceMin]   = useState(searchParams.get('unit_price_min') ?? '');
+  const [priceMax, setPriceMax]   = useState(searchParams.get('unit_price_max') ?? '');
   const [deductionHours, setDeductionHours] = useState('');
   const [overtimeHours, setOvertimeHours]   = useState('');
   const [settlementUnit, setSettlementUnit] = useState('');
@@ -49,6 +63,27 @@ export default function PublicProjectCreatePage() {
   const [skillQuery, setSkillQuery]       = useState('');
   const [skillOptions, setSkillOptions]   = useState<SkillOption[]>([]);
   const [addedSkills, setAddedSkills]     = useState<SkillItem[]>([]);
+
+  // 案件メールからのスキル引き継ぎ
+  useEffect(() => {
+    const skillsParam = searchParams.get('required_skills');
+    if (!skillsParam) return;
+    const skillNames = skillsParam.split(',').map(s => s.trim()).filter(Boolean);
+    if (skillNames.length === 0) return;
+    (async () => {
+      const results: SkillItem[] = [];
+      for (const name of skillNames) {
+        try {
+          const res = await apiClient.get('/api/v1/matching/skills', { params: { search: name } });
+          const exact = (res.data.data as SkillOption[]).find(o => o.name.toLowerCase() === name.toLowerCase());
+          if (exact) {
+            results.push({ skill_id: exact.id, skill_name: exact.name, category: exact.category, is_required: true, min_experience_years: '' });
+          }
+        } catch { /* skip */ }
+      }
+      if (results.length > 0) setAddedSkills(results);
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const searchSkills = useCallback(async (q: string) => {
     if (!q.trim()) { setSkillOptions([]); return; }
@@ -72,10 +107,12 @@ export default function PublicProjectCreatePage() {
     if (!title.trim()) { setErrors({ title: '案件タイトルは必須です' }); setTab('basic'); return; }
     setSaving(true); setErrors({});
     try {
+      const projectMailId = searchParams.get('project_mail_id');
       await apiClient.post('/api/v1/public-projects', {
         title,
         description:               description || null,
         end_client:                endClient || null,
+        project_mail_source_id:    projectMailId ? Number(projectMailId) : null,
         start_date:                startDate || null,
         contract_type:             contractType || null,
         contract_period_months:    contractMonths ? Number(contractMonths) : null,
@@ -100,7 +137,7 @@ export default function PublicProjectCreatePage() {
           min_experience_years: s.min_experience_years ? Number(s.min_experience_years) : null,
         })),
       });
-      router.push('/public-projects');
+      router.push(fromPath);
     } catch (err: any) {
       if (err.response?.data?.errors) setErrors(err.response.data.errors);
       else alert('保存に失敗しました');
@@ -139,6 +176,23 @@ export default function PublicProjectCreatePage() {
           {/* ── 基本情報 ── */}
           {tab === 'basic' && (
             <>
+              {mailBody && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setMailBodyOpen(v => !v)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700"
+                  >
+                    <span>📧 元メール本文</span>
+                    <span className="text-gray-400">{mailBodyOpen ? '▲ 閉じる' : '▼ 開く'}</span>
+                  </button>
+                  {mailBodyOpen && (
+                    <div className="px-4 py-3 bg-white max-h-64 overflow-y-auto border-t border-gray-200">
+                      <pre className="text-xs text-gray-600 whitespace-pre-wrap font-sans leading-relaxed">{mailBody}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
               <div>
                 <label className={labelCls}>案件タイトル <span className="text-red-500">*</span></label>
                 <input className={inputCls} value={title} onChange={e => setTitle(e.target.value)} placeholder="大規模ECサイト開発 バックエンドエンジニア" />
