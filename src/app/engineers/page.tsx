@@ -23,6 +23,7 @@ interface Engineer {
   affiliation: string | null;
   age: number | null;
   affiliation_type: string | null;
+  engineer_mail_source_id: number | null;
   profile: {
     desired_unit_price_min: number | null;
     desired_unit_price_max: number | null;
@@ -70,8 +71,10 @@ export default function EngineersPage() {
   const [engineers, setEngineers] = useState<Engineer[]>([]);
   const [meta, setMeta]           = useState<Meta>({ current_page: 1, last_page: 1, total: 0 });
   const [loading, setLoading]     = useState(true);
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch]       = useState('');
   const [workStyle, setWorkStyle] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
   const [page, setPage]           = useState(1);
   const [viewMode, setViewMode]   = useState<ViewMode>('card');
   const [sortField, setSortField] = useState<string>('');
@@ -87,18 +90,23 @@ export default function EngineersPage() {
     try {
       const perPage = viewMode === 'kanban' ? 200 : 20;
       const res = await apiClient.get('/api/v1/engineers', {
-        params: { search: search || undefined, work_style: workStyle || undefined, page, per_page: perPage, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined },
+        params: { search: search || undefined, work_style: workStyle || undefined, source: sourceFilter || undefined, page, per_page: perPage, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined },
       });
       setEngineers(res.data.data);
       setMeta(res.data.meta);
     } catch (err: any) {
       if (err.response?.status === 401) router.push('/login');
     } finally { setLoading(false); }
-  }, [search, workStyle, page, viewMode, sortField, sortOrder, router]);
+  }, [search, workStyle, sourceFilter, page, viewMode, sortField, sortOrder, router]);
+
+  // テキスト入力のデバウンス（300ms）
+  useEffect(() => {
+    const timer = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   useEffect(() => { fetchEngineers(); }, [fetchEngineers]);
 
-  const handleSearch = (e: React.FormEvent) => { e.preventDefault(); setPage(1); fetchEngineers(); };
   const switchView = (v: ViewMode) => { setViewMode(v); setPage(1); };
 
   const selectCls = 'border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -138,17 +146,22 @@ export default function EngineersPage() {
       </div>
 
       {/* 検索フィルタ */}
-      <form onSubmit={handleSearch} className="flex gap-3 mb-6 flex-shrink-0">
-        <Input placeholder="氏名・所属で検索..." value={search}
-          onChange={e => setSearch(e.target.value)} className="max-w-xs" />
+      <div className="flex gap-3 mb-6 flex-shrink-0">
+        <Input placeholder="氏名・所属で検索..." value={searchInput}
+          onChange={e => setSearchInput(e.target.value)} className="max-w-xs" />
+        <select value={sourceFilter} onChange={e => { setSourceFilter(e.target.value); setPage(1); }} className={selectCls}>
+          <option value="">区分：すべて</option>
+          <option value="self">自社社員</option>
+          <option value="bp">BP社員</option>
+          <option value="mail">メール登録</option>
+        </select>
         <select value={workStyle} onChange={e => { setWorkStyle(e.target.value); setPage(1); }} className={selectCls}>
           <option value="">勤務形態：すべて</option>
           <option value="remote">フルリモート</option>
           <option value="hybrid">出社、リモートどちらも対応</option>
           <option value="office">出社</option>
         </select>
-        <Button type="submit" variant="outline">検索</Button>
-      </form>
+      </div>
 
       {loading && (
         <div className="flex justify-center py-16 flex-shrink-0">

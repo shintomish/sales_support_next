@@ -368,6 +368,7 @@ interface MatchedEngineer {
   affiliation_contact: string | null
   affiliation_email: string | null
   affiliation_type: string | null
+  engineer_mail_source_id: number | null
   age: number | null
   score: number
   breakdown: {
@@ -959,8 +960,15 @@ export default function MatchingPage() {
   const [checked, setChecked] = useState<Set<number>>(new Set())
   const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card')
+  const [sourceFilter, setSourceFilter] = useState<'' | 'self' | 'bp' | 'mail'>('')
 
-  const visibleEngineers = engineers.filter(e => !excluded.has(e.engineer_id))
+  const visibleEngineers = engineers.filter(e => {
+    if (excluded.has(e.engineer_id)) return false
+    if (sourceFilter === 'self') return e.affiliation_type === 'self'
+    if (sourceFilter === 'bp') return e.affiliation_type && e.affiliation_type !== 'self' && !e.engineer_mail_source_id
+    if (sourceFilter === 'mail') return !!e.engineer_mail_source_id
+    return true
+  })
   const allChecked = visibleEngineers.length > 0 && visibleEngineers.every(e => checked.has(e.engineer_id))
 
   const toggleCheck = (engId: number) => {
@@ -1046,9 +1054,9 @@ export default function MatchingPage() {
 
   const s = '◎', o = '○', t = '△'
   const grouped = {
-    [s]: engineers.filter(e => e.score >= 80),
-    [o]: engineers.filter(e => e.score >= 60 && e.score < 80),
-    [t]: engineers.filter(e => e.score < 60),
+    [s]: visibleEngineers.filter(e => e.score >= 80),
+    [o]: visibleEngineers.filter(e => e.score >= 60 && e.score < 80),
+    [t]: visibleEngineers.filter(e => e.score < 60),
   }
 
   const proposedCount = proposed.size
@@ -1116,6 +1124,23 @@ export default function MatchingPage() {
             >
               ≡
             </button>
+          </div>
+          {/* ソース別フィルタ */}
+          <div style={{ display: 'flex', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+            {([
+              { value: '', label: '全て' },
+              { value: 'self', label: '自社' },
+              { value: 'bp', label: 'BP' },
+              { value: 'mail', label: 'メール' },
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setSourceFilter(opt.value)}
+                style={{ padding: '5px 10px', border: 'none', borderLeft: opt.value ? '1px solid rgba(255,255,255,0.3)' : 'none', cursor: 'pointer', fontSize: 11, background: sourceFilter === opt.value ? 'rgba(255,255,255,0.35)' : 'transparent', color: '#fff', fontWeight: sourceFilter === opt.value ? 700 : 400 }}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
           <button
             onClick={toggleCheckAll}

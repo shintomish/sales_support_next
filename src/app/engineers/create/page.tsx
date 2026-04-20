@@ -219,6 +219,7 @@ export default function EngineerCreatePage() {
         affiliation_contact: affiliationContact || null,
         affiliation_email: affiliationEmail || null,
         affiliation_type: affiliationType || null,
+        engineer_mail_source_id: engineerMailId ? Number(engineerMailId) : null,
         age: age ? Number(age) : null,
         gender: gender || null,
         nationality: nationality || null,
