@@ -29,6 +29,8 @@ interface Engineer {
     desired_unit_price_max: number | null;
     available_from: string | null;
     availability_status: string | null;
+    current_project: string | null;
+    current_customer: string | null;
     work_style: string | null;
     is_public: boolean;
   } | null;
@@ -196,20 +198,22 @@ export default function EngineersPage() {
               <div className="flex-shrink-0 border-b bg-gray-50">
                 <table className="w-full text-sm table-fixed">
                   <colgroup>
-                    <col style={{ width: '14%' }} />
-                    <col style={{ width: '14%' }} />
                     <col style={{ width: '11%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '5%' }} />
                     <col style={{ width: '7%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '10%' }} />
                     <col style={{ width: '9%' }} />
-                    <col style={{ width: '11%' }} />
-                    <col style={{ width: '12%' }} />
-                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '20%' }} />
                   </colgroup>
                   <thead>
                     <tr>
                       <SortableHeader label="氏名" field="name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-semibold text-gray-600 px-4 py-3" />
                       <SortableHeader label="所属" field="affiliation" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-semibold text-gray-600 px-4 py-3" />
-                      {['所属区分', '年齢', '稼働状況', '希望単価'].map(h => (
+                      {['所属区分', '年齢', '稼働状況', '案件名', '顧客', '希望単価'].map(h => (
                         <th key={h} className="text-left text-xs font-semibold text-gray-600 px-4 py-3">{h}</th>
                       ))}
                       <SortableHeader label="稼働可能日" field="available_from" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="text-xs font-semibold text-gray-600 px-4 py-3" />
@@ -229,14 +233,16 @@ export default function EngineersPage() {
                 ) : (
                   <table className="w-full text-sm table-fixed">
                     <colgroup>
-                      <col style={{ width: '14%' }} />
-                      <col style={{ width: '14%' }} />
                       <col style={{ width: '11%' }} />
+                      <col style={{ width: '10%' }} />
+                      <col style={{ width: '8%' }} />
+                      <col style={{ width: '5%' }} />
                       <col style={{ width: '7%' }} />
+                      <col style={{ width: '10%' }} />
+                      <col style={{ width: '10%' }} />
                       <col style={{ width: '9%' }} />
-                      <col style={{ width: '11%' }} />
-                      <col style={{ width: '12%' }} />
-                      <col style={{ width: '22%' }} />
+                      <col style={{ width: '10%' }} />
+                      <col style={{ width: '20%' }} />
                     </colgroup>
                     <tbody className="divide-y divide-gray-100">
                       {engineers.map((e, index) => (
@@ -262,6 +268,8 @@ export default function EngineersPage() {
                                 </span>
                               : <span className="text-gray-300 text-xs">—</span>}
                           </td>
+                          <td className="px-4 py-3 text-gray-600 text-xs truncate">{e.profile?.current_project ?? '—'}</td>
+                          <td className="px-4 py-3 text-gray-600 text-xs truncate">{e.profile?.current_customer ?? '—'}</td>
                           <td className="px-4 py-3 text-xs text-gray-600">
                             {(e.profile?.desired_unit_price_min || e.profile?.desired_unit_price_max)
                               ? `${e.profile?.desired_unit_price_min ?? '?'}〜${e.profile?.desired_unit_price_max ?? '?'}万`

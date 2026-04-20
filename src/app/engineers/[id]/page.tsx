@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
@@ -40,7 +40,7 @@ interface Engineer {
   profile: {
     desired_unit_price_min: number | null; desired_unit_price_max: number | null;
     available_from: string | null; availability_status: string | null;
-    past_client_count: number | null;
+    current_project: string | null; current_customer: string | null; past_client_count: number | null;
     work_style: string | null; preferred_location: string | null;
     self_introduction: string | null; github_url: string | null; portfolio_url: string | null;
     resume_file_path: string | null; is_public: boolean;
@@ -106,10 +106,79 @@ export default function EngineerDetailPage() {
   const [nearestStation, setNearestStation]     = useState('');
   const [affiliationType, setAffiliationType]   = useState('');
   const [availabilityStatus, setAvailabilityStatus] = useState('available');
+  const [currentProject, setCurrentProject] = useState('');
+  const [currentCustomer, setCurrentCustomer] = useState('');
   const [pastClientCount, setPastClientCount] = useState('');
   const [addedSkills, setAddedSkills] = useState<SkillItem[]>([]);
   const [skillQuery, setSkillQuery] = useState('');
   const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
+
+  // スキルシートアップロード
+  const [parsing, setParsing] = useState(false);
+  const [parseError, setParseError] = useState('');
+  const [resumeFileUrl, setResumeFileUrl] = useState('');
+  const [resumeFileName, setResumeFileName] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const processSkillSheetFile = async (file: File) => {
+    setParsing(true);
+    setParseError('');
+    setResumeFileName(file.name);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await apiClient.post('/api/v1/engineers/parse-skill-sheet', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const { extracted, skills: parsedSkills, file_url } = res.data;
+
+      if (extracted.name)                setName(extracted.name);
+      if (extracted.name_kana)           setNameKana(extracted.name_kana);
+      if (extracted.email)               setEmail(extracted.email);
+      if (extracted.phone)               setPhone(extracted.phone);
+      if (extracted.affiliation)         setAffiliation(extracted.affiliation);
+      if (extracted.affiliation_contact) setAffiliationContact(extracted.affiliation_contact);
+      if (extracted.affiliation_type)    setAffiliationType(extracted.affiliation_type);
+      if (extracted.age)                 setAge(String(extracted.age));
+      if (extracted.gender)              setGender(extracted.gender);
+      if (extracted.nationality)         setNationality(extracted.nationality);
+      if (extracted.nearest_station)     setNearestStation(extracted.nearest_station);
+      if (extracted.desired_unit_price_min) setPriceMin(String(extracted.desired_unit_price_min));
+      if (extracted.desired_unit_price_max) setPriceMax(String(extracted.desired_unit_price_max));
+      if (extracted.available_from)      setAvailableFrom(extracted.available_from);
+      if (extracted.work_style)          setWorkStyle(extracted.work_style);
+      if (extracted.preferred_location)  setLocation(extracted.preferred_location);
+      if (extracted.self_introduction)   setIntro(extracted.self_introduction);
+      if (parsedSkills?.length > 0) {
+        setAddedSkills(parsedSkills.map((s: { skill_id: number; skill_name: string; category: string | null; experience_years: number }) => ({
+          skill_id: s.skill_id, skill_name: s.skill_name, category: s.category,
+          experience_years: String(s.experience_years ?? 0), proficiency_level: '3',
+        })));
+      }
+      if (file_url) setResumeFileUrl(file_url);
+    } catch {
+      setParseError('解析に失敗しました。ファイル形式を確認してください。');
+    } finally {
+      setParsing(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processSkillSheetFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
+  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processSkillSheetFile(file);
+  };
 
   const fetchEngineer = useCallback(async () => {
     setLoading(true);
@@ -136,6 +205,8 @@ export default function EngineerDetailPage() {
       setNearestStation(e.nearest_station ?? '');
       setAffiliationType(e.affiliation_type ?? '');
       setAvailabilityStatus(e.profile?.availability_status ?? 'available');
+      setCurrentProject(e.profile?.current_project ?? '');
+      setCurrentCustomer(e.profile?.current_customer ?? '');
       setPastClientCount(e.profile?.past_client_count?.toString() ?? '');
       setPriceMin(e.profile?.desired_unit_price_min?.toString() ?? '');
       setPriceMax(e.profile?.desired_unit_price_max?.toString() ?? '');
@@ -196,12 +267,15 @@ export default function EngineerDetailPage() {
         nearest_station: nearestStation || null,
         affiliation_type: affiliationType || null,
         availability_status: availabilityStatus || 'available',
+        current_project: currentProject || null,
+        current_customer: currentCustomer || null,
         past_client_count: pastClientCount ? Number(pastClientCount) : null,
         desired_unit_price_min: priceMin ? Number(priceMin) : null,
         desired_unit_price_max: priceMax ? Number(priceMax) : null,
         available_from: availableFrom || null, work_style: workStyle || null,
         preferred_location: location || null, self_introduction: intro || null,
         github_url: github || null, portfolio_url: portfolio || null,
+        resume_file_path: resumeFileUrl || engineer?.profile?.resume_file_path || null,
         is_public: isPublic,
         skills: addedSkills.map(s => ({
           skill_id: s.skill_id, experience_years: Number(s.experience_years),
@@ -320,6 +394,8 @@ export default function EngineerDetailPage() {
                         </span>
                       : <Em />}
                   </div>
+                  <div><p className="text-xs text-gray-400">案件名</p><p>{engineer.profile?.current_project ?? <Em />}</p></div>
+                  <div><p className="text-xs text-gray-400">顧客</p><p>{engineer.profile?.current_customer ?? <Em />}</p></div>
                   <div><p className="text-xs text-gray-400">稼働実績社数</p><p>{engineer.profile?.past_client_count != null ? `${engineer.profile.past_client_count}社` : <Em />}</p></div>
                 </CardContent>
               </Card>
@@ -379,6 +455,37 @@ export default function EngineerDetailPage() {
             <Card>
               <CardHeader><CardTitle className="text-base">編集</CardTitle></CardHeader>
               <CardContent className="space-y-4">
+                {/* スキルシートから自動入力 */}
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
+                    isDragging ? 'border-blue-400 bg-blue-100' : 'border-blue-200 bg-blue-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-800 mb-1">スキルシートから自動入力</p>
+                      <p className="text-xs text-blue-600">PDF・Excel・Word をドラッグ＆ドロップ、またはファイルを選択するとフォームに自動セットされます</p>
+                      {parseError && <p className="text-xs text-red-500 mt-1">{parseError}</p>}
+                    </div>
+                    <div className="flex-shrink-0">
+                      <input ref={fileInputRef} type="file" accept=".pdf,.xlsx,.xls,.xlsm,.docx,.doc" onChange={handleFileInputChange} className="hidden" />
+                      <Button type="button" variant="outline" disabled={parsing} onClick={() => fileInputRef.current?.click()}
+                        className="border-blue-300 text-blue-700 hover:bg-blue-100">
+                        {parsing ? (
+                          <span className="flex items-center gap-2">
+                            <span className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                            解析中...
+                          </span>
+                        ) : 'ファイルを選択'}
+                      </Button>
+                    </div>
+                  </div>
+                  {resumeFileName && <p className="text-xs text-green-600 mt-2">📄 {resumeFileName}</p>}
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className={labelCls}>氏名（イニシャル） <span className="text-red-500">*</span></label>
@@ -447,6 +554,16 @@ export default function EngineerDetailPage() {
                       <option value="scheduled">◯月予定</option>
                     </select>
                   </div>
+                  <div>
+                    <label className={labelCls}>案件名</label>
+                    <input className={inputCls} value={currentProject} onChange={e => setCurrentProject(e.target.value)} placeholder="基幹システム開発" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>顧客</label>
+                    <input className={inputCls} value={currentCustomer} onChange={e => setCurrentCustomer(e.target.value)} placeholder="株式会社ABC" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className={labelCls}>稼働実績社数</label>
                     <input className={inputCls} type="number" min="0" value={pastClientCount} onChange={e => setPastClientCount(e.target.value)} placeholder="5" />

@@ -308,7 +308,7 @@ export default function EngineerCreatePage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.xlsx,.xls,.docx,.doc"
+              accept=".pdf,.xlsx,.xls,.xlsm,.docx,.doc"
               className="hidden"
               onChange={handleFileInputChange}
             />
