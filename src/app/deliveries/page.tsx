@@ -272,6 +272,8 @@ export default function DeliveriesPage() {
   const [sendForm, setSendForm] = useState({ project_mail_id: '', engineer_mail_source_id: '', subject: '【案件ご紹介】', body: applyTemplate(TEMPLATE_PROJECT, null) })
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [mailBodyText, setMailBodyText] = useState('')
+  const [mailBodyOpen, setMailBodyOpen] = useState(false)
 
   // 添付ファイル
   const [attachments, setAttachments] = useState<File[]>([])
@@ -365,6 +367,8 @@ export default function DeliveriesPage() {
       body: applyTemplate(base, emailTemplate),
     }))
     setPmSearch('')
+    setMailBodyText('')
+    setMailBodyOpen(false)
   }
 
   // ── CSVインポート ─────────────────────────────────────
@@ -1021,7 +1025,32 @@ export default function DeliveriesPage() {
               {deliveryType === 'project' ? (
                 <select
                   value={sendForm.project_mail_id}
-                  onChange={e => setSendForm(f => ({ ...f, project_mail_id: e.target.value }))}
+                  onChange={async e => {
+                    const val = e.target.value
+                    setSendForm(f => ({ ...f, project_mail_id: val }))
+                    if (!val) {
+                      setMailBodyText('')
+                      setSendForm(f => ({ ...f, subject: '【案件ご紹介】', body: applyTemplate(TEMPLATE_PROJECT, emailTemplate) }))
+                      return
+                    }
+                    try {
+                      const res = await axios.get(`/api/v1/project-mails/${val}`)
+                      const pm = res.data
+                      const emailSubject = pm.email?.subject ?? pm.title ?? ''
+                      setMailBodyText(pm.email?.body_text ?? '')
+                      // 件名更新
+                      setSendForm(f => ({ ...f, subject: `【案件ご紹介】${emailSubject}` }))
+                      // 本文の案件情報セクションを更新
+                      const projectInfo = `■案件概要\n${pm.title ?? ''}\n\n■募集要項\n${(pm.required_skills ?? []).join('、')}\n\n勤務時間\n\n勤務地：${pm.work_location ?? ''}\n\n単価：${pm.unit_price_min ?? ''}〜${pm.unit_price_max ?? ''}万円\n\n時期：${pm.start_date ?? ''}`
+                      setSendForm(f => {
+                        const body = f.body.replace(
+                          /■案件概要[\s\S]*?(?=\n\n■求める人物像|\n-{3,})/,
+                          projectInfo
+                        )
+                        return { ...f, body }
+                      })
+                    } catch {}
+                  }}
                   className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                 >
                   <option value="">選択しない</option>
@@ -1046,7 +1075,41 @@ export default function DeliveriesPage() {
               ) : (
                 <select
                   value={sendForm.engineer_mail_source_id}
-                  onChange={e => setSendForm(f => ({ ...f, engineer_mail_source_id: e.target.value }))}
+                  onChange={async e => {
+                    const val = e.target.value
+                    setSendForm(f => ({ ...f, engineer_mail_source_id: val }))
+                    if (!val) {
+                      setMailBodyText('')
+                      setSendForm(f => ({ ...f, subject: '【技術者ご紹介】', body: applyTemplate(TEMPLATE_ENGINEER, emailTemplate) }))
+                      return
+                    }
+                    try {
+                      const res = await axios.get(`/api/v1/engineer-mails/${val}`)
+                      const em = res.data
+                      const emailSubject = em.email?.subject ?? em.name ?? ''
+                      setMailBodyText(em.email?.body_text ?? '')
+                      // 件名更新
+                      setSendForm(f => ({ ...f, subject: `【技術者ご紹介】${emailSubject}` }))
+                      // 本文の技術者情報セクションを更新
+                      const skills = (em.skills ?? []).join('、')
+                      const engineerInfo = `氏名：${em.name ?? ''}\n年齢：${em.age ?? ''}歳\nスキル：${skills}\n最寄駅：${em.nearest_station ?? ''}\n稼働可能日：${em.available_from ?? ''}`
+                      // 前向きコメント生成
+                      let comment = ''
+                      try {
+                        const commentRes = await axios.post(`/api/v1/engineer-mails/${val}/generate-comment`)
+                        comment = commentRes.data.comment ?? ''
+                      } catch {}
+                      setSendForm(f => {
+                        const infoBlock = `【技術者情報】\n-----------------------------------------------------------------------\n${engineerInfo}\n`
+                        const commentBlock = comment ? `\n${comment}\n` : '\n'
+                        const body = f.body.replace(
+                          /【技術者情報】\n-{3,}\n[\s\S]*?(?=\nぜひ一度)/,
+                          `${infoBlock}${commentBlock}`
+                        )
+                        return { ...f, body }
+                      })
+                    } catch {}
+                  }}
                   className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                 >
                   <option value="">選択しない</option>
@@ -1070,6 +1133,25 @@ export default function DeliveriesPage() {
                 </select>
               )}
             </div>
+
+            {/* 元メール本文 */}
+            {mailBodyText && (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setMailBodyOpen(v => !v)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700"
+                >
+                  <span>📧 元メール本文</span>
+                  <span className="text-gray-400">{mailBodyOpen ? '▲ 閉じる' : '▼ 開く'}</span>
+                </button>
+                {mailBodyOpen && (
+                  <div className="px-4 py-3 bg-white max-h-64 overflow-y-auto border-t border-gray-200">
+                    <pre className="text-xs text-gray-600 whitespace-pre-wrap font-sans leading-relaxed">{mailBodyText}</pre>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 件名 */}
             <div>
