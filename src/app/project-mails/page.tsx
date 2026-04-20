@@ -485,81 +485,99 @@ export default function ProjectMailsPage() {
         {selected ? (
           <div className="p-6 max-w-3xl mx-auto space-y-5">
 
-            {/* スコアヘッダー */}
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-3 mb-1">
+            {/* ── ヘッダー ── */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              {/* 案件タイトル + スコア */}
+              <div className="px-5 py-4 border-b border-gray-100">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-base font-bold text-gray-800 leading-snug mb-1">
+                      {selected.title || selected.email?.subject || `案件メール #${selected.id}`}
+                    </h2>
+                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                      <span>📧 {selected.email?.from_name || selected.customer_name || '—'}</span>
+                      <span className="text-gray-300">|</span>
+                      <span>{selected.email?.from_address}</span>
+                      <span className="text-gray-300">|</span>
+                      <span>{formatReceivedAt(selected.received_at)}</span>
+                    </div>
+                  </div>
                   {(() => { const r = scoreRank(selected.score); return (
-                    <span className={`text-lg font-bold px-3 py-1 rounded-lg ${r.cls}`}>
-                      {r.label} {selected.score}点
-                    </span>
+                    <div className={`text-center px-4 py-2 rounded-xl ${r.cls} flex-shrink-0`}>
+                      <div className="text-xl font-bold leading-none">{r.label}</div>
+                      <div className="text-sm font-semibold mt-0.5">{selected.score}点</div>
+                    </div>
                   )})()}
-                  <span className="text-sm text-gray-500">
-                    {selected.email?.from_name || selected.email?.from_address}
-                  </span>
-                  <span className="text-xs text-gray-400">{formatReceivedAt(selected.received_at)}</span>
                 </div>
                 {/* 判定理由 */}
-                <div className="flex flex-wrap gap-1 mt-1">
+                <div className="flex flex-wrap gap-1 mt-2">
                   {(selected.score_reasons ?? []).map((r, i) => (
                     <ScoreReasonChip key={i} reason={r} />
                   ))}
                 </div>
               </div>
-              <div className="flex gap-2 flex-shrink-0">
-                <button
-                  onClick={() => router.push(`/matching/${selected.id}`)}
-                  className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 font-medium">
-                  マッチング →
-                </button>
-                <button
-                  onClick={() => {
-                    const params = new URLSearchParams()
-                    if (selected.title) params.set('title', selected.title)
-                    if (selected.work_location) params.set('work_location', selected.work_location)
-                    if (selected.unit_price_min) params.set('unit_price_min', String(selected.unit_price_min))
-                    if (selected.unit_price_max) params.set('unit_price_max', String(selected.unit_price_max))
-                    if (selected.start_date) params.set('start_date', selected.start_date)
-                    if (selected.remote_ok != null) params.set('remote_ok', String(selected.remote_ok))
-                    if (selected.required_skills?.length) params.set('required_skills', selected.required_skills.join(','))
-                    if (selected.preferred_skills?.length) params.set('preferred_skills', selected.preferred_skills.join(','))
-                    if (selected.email?.from_name) params.set('customer_name', selected.email.from_name)
-                    params.set('from', '/project-mails')
-                    params.set('project_mail_id', String(selected.id))
-                    if (selected.email?.body_text) {
-                      sessionStorage.setItem('project_mail_body', selected.email.body_text)
-                    }
-                    router.push(`/public-projects/create?${params.toString()}`)
-                  }}
-                  className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 font-medium">
-                  案件マーケットに登録 →
-                </button>
-                <button
-                  onClick={() => router.push(`/emails?email_id=${selected.email_id}`)}
-                  className="text-xs border border-blue-300 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-50">
-                  メール詳細 →
-                </button>
-                <button onClick={handleRescore}
-                  className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50">
-                  再スコア
-                </button>
-              </div>
-            </div>
 
-            {/* ステータス操作 */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-gray-500">ステータス:</span>
-              {STATUS_TABS.find(t => t.value === selected.status) && (
-                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${STATUS_TABS.find(t => t.value === selected.status)!.color}`}>
-                  {STATUS_TABS.find(t => t.value === selected.status)!.label}
-                </span>
-              )}
-              {(STATUS_NEXT[selected.status] ?? []).map(btn => (
-                <button key={btn.value} onClick={() => handleStatus(btn.value)}
-                  className={`text-xs px-3 py-1.5 rounded-lg font-medium ${btn.cls}`}>
-                  {btn.label}
-                </button>
-              ))}
+              {/* ステータス + アクションボタン */}
+              <div className="px-5 py-3 bg-gray-50 flex items-center justify-between gap-3 flex-wrap">
+                {/* ステータス */}
+                <div className="flex items-center gap-2">
+                  {STATUS_TABS.find(t => t.value === selected.status) && (
+                    <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${STATUS_TABS.find(t => t.value === selected.status)!.color}`}>
+                      {STATUS_TABS.find(t => t.value === selected.status)!.label}
+                    </span>
+                  )}
+                  {(STATUS_NEXT[selected.status] ?? []).map(btn => (
+                    <button key={btn.value} onClick={() => handleStatus(btn.value)}
+                      className={`text-xs px-3 py-1.5 rounded-lg font-medium ${btn.cls}`}>
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+                {/* アクション */}
+                <div className="flex gap-1.5 flex-wrap">
+                  <button
+                    onClick={() => router.push(`/matching/${selected.id}`)}
+                    className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 font-medium">
+                    マッチング
+                  </button>
+                  <button
+                    onClick={() => {
+                      const params = new URLSearchParams()
+                      if (selected.title) params.set('title', selected.title)
+                      if (selected.work_location) params.set('work_location', selected.work_location)
+                      if (selected.unit_price_min) params.set('unit_price_min', String(selected.unit_price_min))
+                      if (selected.unit_price_max) params.set('unit_price_max', String(selected.unit_price_max))
+                      if (selected.start_date) params.set('start_date', selected.start_date)
+                      if (selected.remote_ok != null) params.set('remote_ok', String(selected.remote_ok))
+                      if (selected.required_skills?.length) params.set('required_skills', selected.required_skills.join(','))
+                      if (selected.preferred_skills?.length) params.set('preferred_skills', selected.preferred_skills.join(','))
+                      if (selected.email?.from_name) params.set('customer_name', selected.email.from_name)
+                      params.set('from', '/project-mails')
+                      params.set('project_mail_id', String(selected.id))
+                      if (selected.email?.body_text) {
+                        sessionStorage.setItem('project_mail_body', selected.email.body_text)
+                      }
+                      router.push(`/public-projects/create?${params.toString()}`)
+                    }}
+                    className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 font-medium">
+                    案件登録
+                  </button>
+                  <button
+                    onClick={() => router.push(`/deliveries?tab=send&project_mail_id=${selected.id}`)}
+                    className="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg hover:bg-orange-700 font-medium">
+                    📤 一斉配信
+                  </button>
+                  <button
+                    onClick={() => router.push(`/emails?email_id=${selected.email_id}`)}
+                    className="text-xs border border-blue-300 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-50">
+                    メール詳細
+                  </button>
+                  <button onClick={handleRescore}
+                    className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50">
+                    再スコア
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* 編集フォーム */}

@@ -19,4 +19,23 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
+// 401レスポンス時にトークンリフレッシュを試みてリトライ
+apiClient.interceptors.response.use(
+  response => response,
+  async error => {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      try {
+        const { data, error: refreshError } = await supabase.auth.refreshSession();
+        if (!refreshError && data.session?.access_token) {
+          originalRequest.headers['Authorization'] = `Bearer ${data.session.access_token}`;
+          return apiClient(originalRequest);
+        }
+      } catch {}
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default apiClient;

@@ -604,54 +604,82 @@ export default function EngineerMailsPage() {
         {selected ? (
           <div className="p-6 max-w-3xl mx-auto space-y-5">
 
-            {/* ヘッダー */}
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-3 mb-1">
+            {/* ── ヘッダー ── */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              {/* 技術者名 + スコア */}
+              <div className="px-5 py-4 border-b border-gray-100">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-base font-bold text-gray-800 leading-snug mb-1">
+                      {selected.name || selected.email?.subject || `技術者メール #${selected.id}`}
+                    </h2>
+                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                      <span>📧 {selected.email?.from_name || '—'}</span>
+                      <span className="text-gray-300">|</span>
+                      <span>{selected.email?.from_address}</span>
+                      <span className="text-gray-300">|</span>
+                      <span>{formatReceivedAt(selected.received_at)}</span>
+                    </div>
+                    {/* 基本情報 */}
+                    <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-600">
+                      {selected.affiliation_type && <span className="bg-gray-100 px-2 py-0.5 rounded">{selected.affiliation_type}</span>}
+                      {selected.nearest_station && <span>📍 {selected.nearest_station}</span>}
+                      {selected.available_from && <span>📅 {selected.available_from}〜</span>}
+                      {(selected.unit_price_min || selected.unit_price_max) && (
+                        <span>💰 {selected.unit_price_min ? Math.round(selected.unit_price_min) : '?'}〜{selected.unit_price_max ? Math.round(selected.unit_price_max) : '?'}万円</span>
+                      )}
+                    </div>
+                  </div>
                   {(() => { const r = scoreRank(selected.score); return (
-                    <span className={`text-lg font-bold px-3 py-1 rounded-lg ${r.cls}`}>
-                      {r.label} {selected.score}点
-                    </span>
+                    <div className={`text-center px-4 py-2 rounded-xl ${r.cls} flex-shrink-0`}>
+                      <div className="text-xl font-bold leading-none">{r.label}</div>
+                      <div className="text-sm font-semibold mt-0.5">{selected.score}点</div>
+                    </div>
                   )})()}
-                  <span className="text-sm text-gray-500">
-                    {selected.email?.from_name || selected.email?.from_address}
-                  </span>
-                  <span className="text-xs text-gray-400">{formatReceivedAt(selected.received_at)}</span>
                 </div>
-                <div className="flex flex-wrap gap-1 mt-1">
+                {/* 判定理由 */}
+                <div className="flex flex-wrap gap-1 mt-2">
                   {(selected.score_reasons ?? []).map((r, i) => (
                     <ScoreReasonChip key={i} reason={r} />
                   ))}
                 </div>
               </div>
-              <div className="flex gap-2 flex-shrink-0">
-                <button
-                  onClick={handleRegister}
-                  className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 font-medium">
-                  技術者として登録 →
-                </button>
-                <button
-                  onClick={() => router.push(`/emails?email_id=${selected.email_id}`)}
-                  className="text-xs border border-teal-300 text-teal-600 px-3 py-1.5 rounded-lg hover:bg-teal-50">
-                  メール詳細 →
-                </button>
-              </div>
-            </div>
 
-            {/* ステータス操作 */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-gray-500">ステータス:</span>
-              {STATUS_TABS.find(t => t.value === selected.status) && (
-                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${STATUS_TABS.find(t => t.value === selected.status)!.color}`}>
-                  {STATUS_TABS.find(t => t.value === selected.status)!.label}
-                </span>
-              )}
-              {(STATUS_NEXT[selected.status] ?? []).map(btn => (
-                <button key={btn.value} onClick={() => handleStatus(btn.value)}
-                  className={`text-xs px-3 py-1.5 rounded-lg font-medium ${btn.cls}`}>
-                  {btn.label}
-                </button>
-              ))}
+              {/* ステータス + アクションボタン */}
+              <div className="px-5 py-3 bg-gray-50 flex items-center justify-between gap-3 flex-wrap">
+                {/* ステータス */}
+                <div className="flex items-center gap-2">
+                  {STATUS_TABS.find(t => t.value === selected.status) && (
+                    <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${STATUS_TABS.find(t => t.value === selected.status)!.color}`}>
+                      {STATUS_TABS.find(t => t.value === selected.status)!.label}
+                    </span>
+                  )}
+                  {(STATUS_NEXT[selected.status] ?? []).map(btn => (
+                    <button key={btn.value} onClick={() => handleStatus(btn.value)}
+                      className={`text-xs px-3 py-1.5 rounded-lg font-medium ${btn.cls}`}>
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+                {/* アクション */}
+                <div className="flex gap-1.5 flex-wrap">
+                  <button
+                    onClick={handleRegister}
+                    className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 font-medium">
+                    技術者登録
+                  </button>
+                  <button
+                    onClick={() => router.push(`/deliveries?tab=send&delivery_type=engineer&engineer_mail_id=${selected.id}`)}
+                    className="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg hover:bg-orange-700 font-medium">
+                    📤 一斉配信
+                  </button>
+                  <button
+                    onClick={() => router.push(`/emails?email_id=${selected.email_id}`)}
+                    className="text-xs border border-teal-300 text-teal-600 px-3 py-1.5 rounded-lg hover:bg-teal-50">
+                    メール詳細
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* 編集フォーム */}

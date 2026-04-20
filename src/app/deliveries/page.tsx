@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from '@/lib/axios'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import SortableHeader from '@/components/SortableHeader'
 
 // ── 型定義 ────────────────────────────────────────────────
@@ -235,7 +235,12 @@ const DEMO_CAMPAIGNS: Campaign[] = [
 
 export default function DeliveriesPage() {
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>('addresses')
+  const searchParams = useSearchParams()
+  const initTab = searchParams.get('tab') as Tab | null
+  const initProjectMailId = searchParams.get('project_mail_id')
+  const initEngineerMailId = searchParams.get('engineer_mail_id')
+  const initDeliveryType = searchParams.get('delivery_type') as DeliveryType | null
+  const [tab, setTab] = useState<Tab>(initTab || 'addresses')
   const [showCampDemo, setShowCampDemo] = useState(false)
 
   // 配信先一覧
@@ -354,6 +359,77 @@ export default function DeliveriesPage() {
       })
       .catch(() => {})
   }, [tab])
+
+  // クエリパラメータから案件メール自動選択
+  const autoSelectDone = useRef(false)
+  useEffect(() => {
+    if (!initProjectMailId || autoSelectDone.current || tab !== 'send') return
+    autoSelectDone.current = true
+    ;(async () => {
+      try {
+        // 署名テンプレート取得を待つ
+        const tplRes = await axios.get('/api/v1/email-body-templates/me').catch(() => ({ data: null }))
+        const tpl: EmailBodyTemplate | null = tplRes.data ?? null
+        setEmailTemplate(tpl)
+
+        const res = await axios.get(`/api/v1/project-mails/${initProjectMailId}`)
+        const pm = res.data
+        const emailSubject = pm.email?.subject ?? pm.title ?? ''
+        setMailBodyText(pm.email?.body_text ?? '')
+        const projectInfo = `■案件概要\n${pm.title ?? ''}\n\n■募集要項\n${(pm.required_skills ?? []).join('、')}\n\n勤務時間\n\n勤務地：${pm.work_location ?? ''}\n\n単価：${pm.unit_price_min ?? ''}〜${pm.unit_price_max ?? ''}万円\n\n時期：${pm.start_date ?? ''}`
+        const baseBody = applyTemplate(TEMPLATE_PROJECT, tpl)
+        const updatedBody = baseBody.replace(
+          /■案件概要[\s\S]*?(?=\n\n■求める人物像|\n-{3,})/,
+          projectInfo
+        )
+        setSendForm({
+          project_mail_id: initProjectMailId,
+          engineer_mail_source_id: '',
+          subject: `【案件ご紹介】${emailSubject}`,
+          body: updatedBody,
+        })
+      } catch {}
+    })()
+  }, [tab, initProjectMailId])
+
+  // クエリパラメータから技術者メール自動選択
+  const autoSelectEngDone = useRef(false)
+  useEffect(() => {
+    if (!initEngineerMailId || autoSelectEngDone.current || tab !== 'send') return
+    autoSelectEngDone.current = true
+    if (initDeliveryType === 'engineer') setDeliveryType('engineer')
+    ;(async () => {
+      try {
+        const tplRes = await axios.get('/api/v1/email-body-templates/me').catch(() => ({ data: null }))
+        const tpl: EmailBodyTemplate | null = tplRes.data ?? null
+        setEmailTemplate(tpl)
+
+        const res = await axios.get(`/api/v1/engineer-mails/${initEngineerMailId}`)
+        const em = res.data
+        const emailSubject = em.email?.subject ?? em.name ?? ''
+        setMailBodyText(em.email?.body_text ?? '')
+        const skills = (em.skills ?? []).join('、')
+        const engineerInfo = `氏名：${em.name ?? ''}\n年齢：${em.age ?? ''}歳\nスキル：${skills}\n最寄駅：${em.nearest_station ?? ''}\n稼働可能日：${em.available_from ?? ''}`
+        let comment = ''
+        try {
+          const commentRes = await axios.post(`/api/v1/engineer-mails/${initEngineerMailId}/generate-comment`)
+          comment = commentRes.data.comment ?? ''
+        } catch {}
+        const baseBody = applyTemplate(TEMPLATE_ENGINEER, tpl)
+        const commentBlock = comment ? `\n${comment}\n` : '\n'
+        const updatedBody = baseBody.replace(
+          /【技術者情報】\n-{3,}\n[\s\S]*?(?=\nぜひ一度)/,
+          `【技術者情報】\n-----------------------------------------------------------------------\n${engineerInfo}\n${commentBlock}`
+        )
+        setSendForm({
+          project_mail_id: '',
+          engineer_mail_source_id: initEngineerMailId,
+          subject: `【技術者ご紹介】${emailSubject}`,
+          body: updatedBody,
+        })
+      } catch {}
+    })()
+  }, [tab, initEngineerMailId, initDeliveryType])
 
   // deliveryType 切替時にテンプレート・件名デフォルトを反映・セレクトをリセット
   const handleDeliveryTypeChange = (type: DeliveryType) => {
