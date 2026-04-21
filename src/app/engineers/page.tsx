@@ -198,11 +198,11 @@ export default function EngineersPage() {
               <div className="flex-shrink-0 border-b bg-gray-50">
                 <table className="w-full text-sm table-fixed">
                   <colgroup>
-                    <col style={{ width: '11%' }} />
                     <col style={{ width: '10%' }} />
-                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '9%' }} />
                     <col style={{ width: '5%' }} />
-                    <col style={{ width: '7%' }} />
+                    <col style={{ width: '8%' }} />
                     <col style={{ width: '10%' }} />
                     <col style={{ width: '10%' }} />
                     <col style={{ width: '9%' }} />
@@ -255,7 +255,7 @@ export default function EngineersPage() {
                           <td className="px-4 py-3 text-gray-600 text-xs truncate">{e.affiliation ?? '—'}</td>
                           <td className="px-4 py-3">
                             {e.affiliation_type
-                              ? <span className={`text-xs px-2 py-0.5 rounded-full ${e.affiliation_type === 'self' ? 'bg-indigo-100 text-indigo-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                              ? <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${e.affiliation_type === 'self' ? 'bg-indigo-100 text-indigo-700' : 'bg-yellow-100 text-yellow-700'}`}>
                                   {AFFILIATION_TYPE_LABEL[e.affiliation_type]}
                                 </span>
                               : <span className="text-gray-300 text-xs">—</span>}
@@ -263,7 +263,7 @@ export default function EngineersPage() {
                           <td className="px-4 py-3 text-gray-600 text-xs">{e.age ? `${e.age}歳` : '—'}</td>
                           <td className="px-4 py-3">
                             {e.profile?.availability_status && AVAILABILITY_BADGE[e.profile.availability_status]
-                              ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${AVAILABILITY_BADGE[e.profile.availability_status].cls}`}>
+                              ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${AVAILABILITY_BADGE[e.profile.availability_status].cls}`}>
                                   {AVAILABILITY_BADGE[e.profile.availability_status].label}
                                 </span>
                               : <span className="text-gray-300 text-xs">—</span>}
