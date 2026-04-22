@@ -247,6 +247,14 @@ export default function DeliveriesPage() {
   const [addresses, setAddresses] = useState<PaginatedAddresses | null>(null)
   const [addrSearch, setAddrSearch] = useState('')
   const [addrPage, setAddrPage] = useState(1)
+  const [addrSortBy, setAddrSortBy] = useState('id')
+  const [addrSortOrder, setAddrSortOrder] = useState<'asc' | 'desc'>('asc')
+
+  const handleAddrSort = (field: string) => {
+    if (addrSortBy === field) { setAddrSortOrder(o => o === 'asc' ? 'desc' : 'asc') }
+    else { setAddrSortBy(field); setAddrSortOrder('asc') }
+    setAddrPage(1)
+  }
   const [importing, setImporting] = useState(false)
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null)
   const [importResult, setImportResult] = useState<string | null>(null)
@@ -305,10 +313,10 @@ export default function DeliveriesPage() {
   // ── 配信先一覧取得 ────────────────────────────────────
   const fetchAddresses = useCallback(async () => {
     const res = await axios.get('/api/v1/delivery-addresses', {
-      params: { search: addrSearch || undefined, page: addrPage, per_page: 100 },
+      params: { search: addrSearch || undefined, page: addrPage, per_page: 100, sort_by: addrSortBy, sort_order: addrSortOrder },
     })
     setAddresses(res.data)
-  }, [addrSearch, addrPage])
+  }, [addrSearch, addrPage, addrSortBy, addrSortOrder])
 
   useEffect(() => {
     if (tab === 'addresses') fetchAddresses()
@@ -738,16 +746,18 @@ export default function DeliveriesPage() {
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3 text-left">名前</th>
-                  <th className="px-4 py-3 text-left">メールアドレス</th>
-                  <th className="px-4 py-3 text-left">職種</th>
-                  <th className="px-4 py-3 text-center">状態</th>
+                  <th className="px-4 py-3 w-16 text-left text-xs font-semibold text-gray-600">No.</th>
+                  <SortableHeader label="名前" field="name" sortField={addrSortBy} sortOrder={addrSortOrder} onSort={handleAddrSort} className="px-4 py-3" />
+                  <SortableHeader label="メールアドレス" field="email" sortField={addrSortBy} sortOrder={addrSortOrder} onSort={handleAddrSort} className="px-4 py-3" />
+                  <SortableHeader label="職種" field="occupation" sortField={addrSortBy} sortOrder={addrSortOrder} onSort={handleAddrSort} className="px-4 py-3" />
+                  <SortableHeader label="状態" field="is_active" sortField={addrSortBy} sortOrder={addrSortOrder} onSort={handleAddrSort} className="px-4 py-3 text-center" />
                   <th className="px-4 py-3 text-center">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {addresses?.data.map((addr, idx) => (
                   <tr key={addr.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{(addrPage - 1) * 100 + idx + 1}</td>
                     <td className="px-4 py-3 text-gray-800">
                       {editingNameId === addr.id ? (
                         <input
@@ -789,7 +799,7 @@ export default function DeliveriesPage() {
                 ))}
                 {addresses?.data.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                       配信先がありません。CSVをインポートしてください。
                     </td>
                   </tr>
