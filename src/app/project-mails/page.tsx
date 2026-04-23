@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import axios from '@/lib/axios'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
@@ -127,6 +127,7 @@ function scoreRank(score: number) {
 
 export default function ProjectMailsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [items, setItems] = useState<Paginated | null>(null)
   const [selected, setSelected] = useState<ProjectMail | null>(null)
   const [statusFilter, setStatusFilter] = useState('review')
@@ -171,7 +172,30 @@ export default function ProjectMailsPage() {
 
   useEffect(() => { fetchList() }, [fetchList])
 
-  // 選択時に詳細取得
+  // URLパラメータ select={id} でメール自動選��
+  useEffect(() => {
+    const selectId = searchParams.get('select')
+    if (!selectId) return
+    const id = parseInt(selectId)
+    if (isNaN(id)) return
+    // ステータスフィルタを解除して全件から探す
+    setStatusFilter('')
+    axios.get(`/api/v1/project-mails/${id}`).then(res => {
+      setSelected(res.data)
+      setForm(res.data)
+      setSaveMsg(null)
+      setShowBody(false)
+      // スレッド取得
+      setThreadLoading(true)
+      axios.get(`/api/v1/project-mails/${id}/thread`).then(tres => {
+        setThreadItems(tres.data.thread ?? [])
+      }).catch(() => setThreadItems([])).finally(() => setThreadLoading(false))
+    }).catch(() => {})
+    // URLパラメータをクリア
+    router.replace('/project-mails')
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 選択��に詳細取得
   const handleSelect = async (item: ProjectMail) => {
     setDetailLoading(true)
     setSelected(null)

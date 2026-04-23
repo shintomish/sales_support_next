@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import axios from '@/lib/axios'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
@@ -188,6 +188,7 @@ function scoreRank(score: number) {
 
 export default function EngineerMailsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [items, setItems] = useState<Paginated | null>(null)
   const [selected, setSelected] = useState<EngineerMail | null>(null)
   const [statusFilter, setStatusFilter] = useState('review')
@@ -241,6 +242,33 @@ export default function EngineerMailsPage() {
   }, [statusFilter, search, page])
 
   useEffect(() => { fetchList() }, [fetchList])
+
+  // URLパラメータ select={id} でメール自動選択
+  useEffect(() => {
+    const selectId = searchParams.get('select')
+    if (!selectId) return
+    const id = parseInt(selectId)
+    if (isNaN(id)) return
+    setStatusFilter('')
+    axios.get(`/api/v1/engineer-mails/${id}`).then(res => {
+      setSelected(res.data)
+      setForm(res.data)
+      setSkillInput('')
+      setSaveMsg(null)
+      setShowBody(false)
+      // マッチ案件��得
+      setMatchLoading(true)
+      axios.get(`/api/v1/engineer-mails/${id}/matched-projects`).then(mres => {
+        setMatchedProjects(mres.data.data ?? [])
+      }).catch(() => {}).finally(() => setMatchLoading(false))
+      // スレッド取得
+      setThreadLoading(true)
+      axios.get(`/api/v1/engineer-mails/${id}/thread`).then(tres => {
+        setThreadItems(tres.data.thread ?? [])
+      }).catch(() => setThreadItems([])).finally(() => setThreadLoading(false))
+    }).catch(() => {})
+    router.replace('/engineer-mails')
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 選択時に詳細取得
   const handleSelect = async (item: EngineerMail) => {
