@@ -68,6 +68,7 @@ export default function EmailsPage() {
   const [syncMessage, setSyncMessage] = useState('')
   const [newEmailCount, setNewEmailCount] = useState(0)
   const [markingAllRead, setMarkingAllRead] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   const fetchEmailsRef = useRef<() => void>(() => {})
 
@@ -155,10 +156,16 @@ export default function EmailsPage() {
   // メール選択
   const handleSelectEmail = async (email: Email) => {
     const wasUnread = !email.is_read
-    const res = await axios.get(`/api/v1/emails/${email.id}`)
-    setSelectedEmail(res.data)
-    setEmails(prev => prev ? { ...prev, data: prev.data.map(e => e.id === email.id ? { ...e, is_read: true } : e) } : null)
-    if (wasUnread) window.dispatchEvent(new CustomEvent('emails:mark-all-read'))
+    setDetailLoading(true)
+    setSelectedEmail(null)
+    try {
+      const res = await axios.get(`/api/v1/emails/${email.id}`)
+      setSelectedEmail(res.data)
+      setEmails(prev => prev ? { ...prev, data: prev.data.map(e => e.id === email.id ? { ...e, is_read: true } : e) } : null)
+      if (wasUnread) window.dispatchEvent(new CustomEvent('emails:mark-all-read'))
+    } finally {
+      setDetailLoading(false)
+    }
   }
 
   const handleDownloadAttachment = async (emailId: number, attachmentId: number, filename: string, mimeType: string | null) => {
@@ -383,7 +390,7 @@ export default function EmailsPage() {
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-400">
-            <p className="text-sm">メールを選択してください</p>
+            <p className="text-sm">{detailLoading ? '読み込み中...' : 'メールを選択してください'}</p>
           </div>
         )}
       </div>

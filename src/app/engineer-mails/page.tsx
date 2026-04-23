@@ -192,6 +192,7 @@ export default function EngineerMailsPage() {
   // マッチ案件・提案送信
   const [matchedProjects, setMatchedProjects] = useState<MatchedProject[]>([])
   const [matchLoading, setMatchLoading] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [proposalModal, setProposalModal] = useState<ProposalModal | null>(null)
   const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
   const [dropOver, setDropOver] = useState(false)
@@ -219,14 +220,20 @@ export default function EngineerMailsPage() {
 
   // 選択時に詳細取得
   const handleSelect = async (item: EngineerMail) => {
-    const res = await axios.get(`/api/v1/engineer-mails/${item.id}`)
-    setSelected(res.data)
-    setForm(res.data)
-    setSkillInput('')
-    setSaveMsg(null)
-    setShowBody(false)
+    setDetailLoading(true)
+    setSelected(null)
     setMatchedProjects([])
     setProposalModal(null)
+    try {
+      const res = await axios.get(`/api/v1/engineer-mails/${item.id}`)
+      setSelected(res.data)
+      setForm(res.data)
+      setSkillInput('')
+      setSaveMsg(null)
+      setShowBody(false)
+    } finally {
+      setDetailLoading(false)
+    }
     // マッチ案件を非同期取得
     setMatchLoading(true)
     try {
@@ -894,7 +901,7 @@ export default function EngineerMailsPage() {
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center h-full text-gray-400">
-            <p className="text-sm">技術者メールを選択してください</p>
+            <p className="text-sm">{detailLoading ? '読み込み中...' : '技術者メールを選択してください'}</p>
           </div>
         )}
       </div>

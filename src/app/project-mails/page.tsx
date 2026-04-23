@@ -128,6 +128,7 @@ export default function ProjectMailsPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [expandedItem, setExpandedItem] = useState<ProjectMail | null>(null)
   const [expandLoading, setExpandLoading] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   const fetchList = useCallback(async () => {
     const sf = SCORE_FILTERS.find(f => f.value === scoreFilter) ?? SCORE_FILTERS[0]
@@ -148,11 +149,17 @@ export default function ProjectMailsPage() {
 
   // 選択時に詳細取得
   const handleSelect = async (item: ProjectMail) => {
-    const res = await axios.get(`/api/v1/project-mails/${item.id}`)
-    setSelected(res.data)
-    setForm(res.data)
-    setSaveMsg(null)
-    setShowBody(false)
+    setDetailLoading(true)
+    setSelected(null)
+    try {
+      const res = await axios.get(`/api/v1/project-mails/${item.id}`)
+      setSelected(res.data)
+      setForm(res.data)
+      setSaveMsg(null)
+      setShowBody(false)
+    } finally {
+      setDetailLoading(false)
+    }
   }
 
   // 要確認モード: アコーディオン展開
@@ -735,7 +742,7 @@ export default function ProjectMailsPage() {
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center h-full text-gray-400">
-            <p className="text-sm">案件メールを選択してください</p>
+            <p className="text-sm">{detailLoading ? '読み込み中...' : '案件メールを選択してください'}</p>
           </div>
         )}
       </div>
