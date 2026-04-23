@@ -76,6 +76,52 @@ type EmailBodyTemplate = {
 
 type DeliveryType = 'project' | 'engineer'
 
+type ThreadLastActivity = {
+  type: 'sent' | 'received'
+  subject: string | null
+  datetime: string
+}
+
+type ProposalThread = {
+  id: number
+  type: 'project' | 'engineer'
+  source_id: number
+  customer_name: string | null
+  title: string | null
+  status: string
+  partner_email: string
+  partner_name: string | null
+  last_activity: ThreadLastActivity | null
+  thread_count: number
+  has_unread_reply: boolean
+}
+
+type PaginatedThreads = {
+  data: ProposalThread[]
+  current_page: number
+  last_page: number
+  total: number
+}
+
+const THREAD_STATUS_COLORS: Record<string, string> = {
+  new: 'bg-blue-100 text-blue-700 border-blue-200',
+  review: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  proposed: 'bg-purple-100 text-purple-700 border-purple-200',
+  interview: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  won: 'bg-green-100 text-green-700 border-green-200',
+  lost: 'bg-red-100 text-red-700 border-red-200',
+  excluded: 'bg-gray-100 text-gray-500 border-gray-200',
+  registered: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+  proposing: 'bg-purple-100 text-purple-700 border-purple-200',
+  working: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+}
+
+const THREAD_STATUS_LABELS: Record<string, string> = {
+  new: '新着', review: '要確認', proposed: '提案済', interview: '面談',
+  won: '成約', lost: '失注', excluded: '除外',
+  registered: '登録済', proposing: '提案中', working: '稼働中',
+}
+
 // ベーステンプレート（<送信者>等はapplyTemplate内で置換、<%Name%>はバックエンドで置換）
 const TEMPLATE_PROJECT = `<%Name%>様
 
@@ -188,7 +234,7 @@ function applyTemplate(base: string, tpl: EmailBodyTemplate | null): string {
   return body
 }
 
-type Tab = 'addresses' | 'campaigns' | 'send'
+type Tab = 'addresses' | 'campaigns' | 'threads' | 'send'
 
 // ── デモ用モックデータ ─────────────────────────────────────
 
@@ -255,6 +301,34 @@ export default function DeliveriesPage() {
     else { setAddrSortBy(field); setAddrSortOrder('asc') }
     setAddrPage(1)
   }
+  // 提案スレッド
+  const [threads, setThreads] = useState<PaginatedThreads | null>(null)
+  const [threadPage, setThreadPage] = useState(1)
+  const [threadTypeFilter, setThreadTypeFilter] = useState<'' | 'project' | 'engineer'>('')
+  const [threadStatusFilter, setThreadStatusFilter] = useState('')
+  const [threadSearch, setThreadSearch] = useState('')
+  const [threadLoading, setThreadLoading] = useState(false)
+
+  const fetchThreads = useCallback(async () => {
+    setThreadLoading(true)
+    try {
+      const res = await axios.get('/api/v1/proposal-threads', {
+        params: {
+          page: threadPage, per_page: 30,
+          type: threadTypeFilter || undefined,
+          status: threadStatusFilter || undefined,
+          search: threadSearch || undefined,
+        },
+      })
+      setThreads(res.data)
+    } catch { setThreads(null) }
+    finally { setThreadLoading(false) }
+  }, [threadPage, threadTypeFilter, threadStatusFilter, threadSearch])
+
+  useEffect(() => {
+    if (tab === 'threads') fetchThreads()
+  }, [tab, fetchThreads])
+
   const [importing, setImporting] = useState(false)
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null)
   const [importResult, setImportResult] = useState<string | null>(null)
@@ -332,6 +406,7 @@ export default function DeliveriesPage() {
         date_to:       campDateTo        || undefined,
         user_id:       campUserId        || undefined,
         delivery_type: campDeliveryType  || undefined,
+        exclude_proposals: 1,
         sort_by:       campSortBy,
         sort_dir:      campSortDir,
       },
@@ -610,7 +685,8 @@ export default function DeliveriesPage() {
   // ── タブラベル ────────────────────────────────────────
   const tabs: { key: Tab; label: string }[] = [
     { key: 'addresses', label: '配信先一覧' },
-    { key: 'campaigns', label: 'キャンペーン履歴' },
+    { key: 'campaigns', label: '一斉配信履歴' },
+    { key: 'threads',   label: '提案スレッド' },
     { key: 'send',      label: '新規配信' },
   ]
 
@@ -1036,6 +1112,95 @@ export default function DeliveriesPage() {
         </div>
       )}
 
+      {/* ── 提案スレッドタブ ────────────────────────────── */}
+      {tab === 'threads' && (
+        <div>
+          {/* フィルタ */}
+          <div className="flex items-center gap-3 flex-wrap mb-4">
+            <select value={threadTypeFilter} onChange={e => { setThreadTypeFilter(e.target.value as '' | 'project' | 'engineer'); setThreadPage(1) }}
+              className="text-sm border border-gray-300 rounded-md px-3 py-1.5">
+              <option value="">全タイプ</option>
+              <option value="project">案件メール</option>
+              <option value="engineer">技術者メール</option>
+            </select>
+            <select value={threadStatusFilter} onChange={e => { setThreadStatusFilter(e.target.value); setThreadPage(1) }}
+              className="text-sm border border-gray-300 rounded-md px-3 py-1.5">
+              <option value="">全ステータス</option>
+              <option value="new">新着</option>
+              <option value="review">要確認</option>
+              <option value="proposed">提案済</option>
+              <option value="interview">面談</option>
+              <option value="won">成約</option>
+              <option value="lost">失注</option>
+            </select>
+            <input type="text" placeholder="顧客名・技術者名で検索" value={threadSearch}
+              onChange={e => { setThreadSearch(e.target.value); setThreadPage(1) }}
+              className="text-sm border border-gray-300 rounded-md px-3 py-1.5 w-64" />
+            {threads && <span className="text-xs text-gray-400 ml-auto">{threads.total}件</span>}
+          </div>
+
+          {/* 一覧 */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            {threadLoading && (
+              <div className="flex items-center justify-center h-40 text-gray-400 text-sm">読み込み中...</div>
+            )}
+            {!threadLoading && (!threads || threads.data.length === 0) && (
+              <div className="flex items-center justify-center h-40 text-gray-400 text-sm">提案スレッドはありません</div>
+            )}
+            {!threadLoading && threads && threads.data.map(t => (
+              <div key={`${t.type}-${t.source_id}`}
+                onClick={() => router.push(t.type === 'project' ? `/project-mails?select=${t.source_id}` : `/engineer-mails?select=${t.source_id}`)}
+                className={`px-5 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${t.has_unread_reply ? 'bg-yellow-50/60' : ''}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${t.type === 'project' ? 'bg-blue-100 text-blue-700' : 'bg-teal-100 text-teal-700'}`}>
+                    {t.type === 'project' ? '案' : '技'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-800 truncate">
+                        {t.customer_name ?? t.partner_name ?? t.partner_email}
+                      </span>
+                      {t.has_unread_reply && (
+                        <span className="text-xs bg-orange-100 text-orange-700 border border-orange-200 rounded px-1.5 py-0.5 font-bold flex-shrink-0">未確認</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{t.title ?? '—'}</p>
+                    {t.last_activity && (
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <span className={`text-xs font-bold ${t.last_activity.type === 'sent' ? 'text-blue-600' : 'text-gray-600'}`}>
+                          {t.last_activity.type === 'sent' ? '→' : '←'}
+                        </span>
+                        <span className="text-xs text-gray-400">{formatDateTime(t.last_activity.datetime)}</span>
+                        <span className="text-xs text-gray-600 truncate">{t.last_activity.subject}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    <span className={`text-xs px-2 py-0.5 rounded border font-medium ${THREAD_STATUS_COLORS[t.status] ?? 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                      {THREAD_STATUS_LABELS[t.status] ?? t.status}
+                    </span>
+                    <span className="text-xs text-gray-400">💬 {t.thread_count}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ページネーション */}
+          {threads && threads.last_page > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-xs text-gray-500">{threads.current_page} / {threads.last_page} ページ</span>
+              <div className="flex gap-2">
+                <button disabled={threads.current_page <= 1} onClick={() => setThreadPage(p => p - 1)}
+                  className="text-xs border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">前へ</button>
+                <button disabled={threads.current_page >= threads.last_page} onClick={() => setThreadPage(p => p + 1)}
+                  className="text-xs border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">次へ</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── 新規配信タブ ────────────────────────────────── */}
       {tab === 'send' && (
         <div className="max-w-2xl overflow-hidden">
@@ -1395,4 +1560,14 @@ export default function DeliveriesPage() {
       )}
     </div>
   )
+}
+
+function formatDateTime(raw: string): string {
+  try {
+    if (!raw) return '—'
+    const s = raw.endsWith('Z') ? raw : raw.includes('T') ? raw + 'Z' : raw.replace(' ', 'T') + 'Z'
+    const d = new Date(s)
+    if (isNaN(d.getTime())) return '—'
+    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  } catch { return '—' }
 }

@@ -36,7 +36,6 @@ export default function Sidebar() {
     { label: '案件メール',     path: '/project-mails',   icon: '📨',  badge: 0,            sesOnly: true  },
     { label: '技術者メール',   path: '/engineer-mails',  icon: '👤',  badge: 0,            sesOnly: true  },
     { label: '配信管理',       path: '/deliveries',      icon: '📤',  badge: 0,            sesOnly: true  },
-    { label: '提案スレッド',   path: '/proposal-threads', icon: '💬',  badge: 0,            sesOnly: true  },
     { label: '活動履歴',       path: '/activities',      icon: '🕐',  badge: 0,            sesOnly: false },
     { label: 'タスク管理',     path: '/tasks',          icon: '☑',   badge: overdueCount, sesOnly: false },
     { label: '名刺管理',       path: '/business-cards', icon: '🪪',  badge: 0,            sesOnly: false },
