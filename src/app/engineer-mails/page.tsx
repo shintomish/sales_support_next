@@ -54,6 +54,23 @@ type Paginated = {
   total: number
 }
 
+type ThreadItem = {
+  type: 'sent' | 'received'
+  campaign_id?: number
+  history_id?: number
+  email_id?: number
+  to?: string
+  to_name?: string
+  from?: string
+  from_name?: string
+  subject: string
+  body?: string
+  body_text?: string
+  sent_at?: string
+  received_at?: string
+  status?: string
+}
+
 type MatchedProject = {
   project_id: number
   project_title: string
@@ -198,6 +215,13 @@ export default function EngineerMailsPage() {
   const [dropOver, setDropOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // スレッド
+  const [threadItems, setThreadItems] = useState<ThreadItem[]>([])
+  const [threadLoading, setThreadLoading] = useState(false)
+  const [threadExpanded, setThreadExpanded] = useState<number | null>(null)
+  const [replyForm, setReplyForm] = useState<{ to: string; subject: string; body: string } | null>(null)
+  const [replySending, setReplySending] = useState(false)
+
   useEffect(() => {
     axios.get('/api/v1/email-body-templates/me').then(res => {
       if (res.data) setEmailTemplate(res.data)
@@ -224,6 +248,8 @@ export default function EngineerMailsPage() {
     setSelected(null)
     setMatchedProjects([])
     setProposalModal(null)
+    setThreadItems([])
+    setReplyForm(null)
     try {
       const res = await axios.get(`/api/v1/engineer-mails/${item.id}`)
       setSelected(res.data)
@@ -242,6 +268,39 @@ export default function EngineerMailsPage() {
     } catch { /* silent */ } finally {
       setMatchLoading(false)
     }
+    // スレッド取得（非同期）
+    setThreadLoading(true)
+    try {
+      const tres = await axios.get(`/api/v1/engineer-mails/${item.id}/thread`)
+      setThreadItems(tres.data.thread ?? [])
+    } catch { setThreadItems([]) }
+    finally { setThreadLoading(false) }
+  }
+
+  // スレッド再取得
+  const fetchThread = async (id: number) => {
+    setThreadLoading(true)
+    try {
+      const tres = await axios.get(`/api/v1/engineer-mails/${id}/thread`)
+      setThreadItems(tres.data.thread ?? [])
+    } catch { /* silent */ }
+    finally { setThreadLoading(false) }
+  }
+
+  // 返信送信
+  const handleReply = async () => {
+    if (!selected || !replyForm) return
+    setReplySending(true)
+    try {
+      await axios.post(`/api/v1/engineer-mails/${selected.id}/send-proposal`, {
+        to: replyForm.to,
+        subject: replyForm.subject,
+        body: replyForm.body,
+      })
+      setReplyForm(null)
+      fetchThread(selected.id)
+    } catch { /* silent */ }
+    finally { setReplySending(false) }
   }
 
   // 提案文生成
@@ -871,6 +930,188 @@ export default function EngineerMailsPage() {
               ))}
             </div>
 
+            {/* スレッド会話履歴 */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-700">提案・やり取り履歴</h2>
+                {threadLoading && <span className="text-xs text-gray-400 animate-pulse">取得中...</span>}
+              </div>
+              <div className="p-4 space-y-3">
+                {!threadLoading && threadItems.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-3">提案履歴はありません</p>
+                )}
+                {threadItems.map((ti, idx) => {
+                  const isSent = ti.type === 'sent'
+                  const datetime = isSent ? ti.sent_at : ti.received_at
+                  const isExpanded = threadExpanded === idx
+                  return (
+                    <div key={idx} className={`rounded-lg border p-3 ${isSent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+                      <div className="flex items-center gap-2 cursor-pointer" onClick={() => setThreadExpanded(isExpanded ? null : idx)}>
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${isSent ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>
+                          {isSent ? '→ 送信' : '← 受信'}
+                        </span>
+                        {isSent && ti.status === 'replied' && (
+                          <span className="text-xs bg-green-100 text-green-700 border border-green-200 rounded px-1.5 py-0.5">返信あり</span>
+                        )}
+                        <span className="text-xs text-gray-600 truncate flex-1">{ti.subject}</span>
+                        <span className="text-xs text-gray-400 flex-shrink-0">
+                          {datetime ? formatDateTime(datetime) : '—'}
+                        </span>
+                        <span className="text-xs text-gray-400">{isExpanded ? '▲' : '▼'}</span>
+                      </div>
+                      {isExpanded && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <div className="text-xs text-gray-500 mb-1">
+                            {isSent ? `宛先: ${ti.to_name ?? ''} <${ti.to ?? ''}>` : `差出人: ${ti.from_name ?? ''} <${ti.from ?? ''}>`}
+                          </div>
+                          <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-60 overflow-y-auto">
+                            {isSent ? ti.body : ti.body_text}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+
+                {/* 返信フォーム */}
+                {replyForm ? (
+                  <div className="border border-teal-300 rounded-lg p-4 bg-teal-50/50 space-y-3">
+                    <p className="text-sm font-semibold text-teal-700">返信を作成</p>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">宛先</label>
+                      <input type="email" value={replyForm.to} onChange={e => setReplyForm(f => f ? { ...f, to: e.target.value } : f)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">件名</label>
+                      <input type="text" value={replyForm.subject} onChange={e => setReplyForm(f => f ? { ...f, subject: e.target.value } : f)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">本文</label>
+                      <textarea value={replyForm.body} onChange={e => setReplyForm(f => f ? { ...f, body: e.target.value } : f)}
+                        rows={6} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 font-mono" />
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={handleReply} disabled={replySending || !replyForm.to || !replyForm.subject || !replyForm.body}
+                        className="text-sm bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 disabled:opacity-50 font-medium">
+                        {replySending ? '送信中...' : '送信'}
+                      </button>
+                      <button onClick={() => setReplyForm(null)}
+                        className="text-sm border border-gray-300 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50">
+                        キャンセル
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-end">
+                    <button onClick={() => {
+                      const lastReceived = [...threadItems].reverse().find(t => t.type === 'received')
+                      setReplyForm({
+                        to: lastReceived?.from ?? selected.email?.from_address ?? '',
+                        subject: lastReceived ? `Re: ${lastReceived.subject.replace(/^Re:\s*/i, '')}` : `Re: ${selected.email?.subject ?? ''}`,
+                        body: '',
+                      })
+                    }}
+                      className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg hover:bg-teal-700 font-medium">
+                      返信を作成
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* スレッド会話履歴 */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-700">提案・やり取り履歴</h2>
+                {threadLoading && <span className="text-xs text-gray-400 animate-pulse">取得中...</span>}
+              </div>
+              <div className="p-4 space-y-3">
+                {!threadLoading && threadItems.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-3">提案履歴はありません</p>
+                )}
+                {threadItems.map((ti, idx) => {
+                  const isSent = ti.type === 'sent'
+                  const datetime = isSent ? ti.sent_at : ti.received_at
+                  const isExpanded = threadExpanded === idx
+                  return (
+                    <div key={idx} className={`rounded-lg border p-3 ${isSent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+                      <div className="flex items-center gap-2 cursor-pointer" onClick={() => setThreadExpanded(isExpanded ? null : idx)}>
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${isSent ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>
+                          {isSent ? '→ 送信' : '← 受信'}
+                        </span>
+                        {isSent && ti.status === 'replied' && (
+                          <span className="text-xs bg-green-100 text-green-700 border border-green-200 rounded px-1.5 py-0.5">返信あり</span>
+                        )}
+                        <span className="text-xs text-gray-600 truncate flex-1">{ti.subject}</span>
+                        <span className="text-xs text-gray-400 flex-shrink-0">
+                          {datetime ? formatDateTime(datetime) : '—'}
+                        </span>
+                        <span className="text-xs text-gray-400">{isExpanded ? '▲' : '▼'}</span>
+                      </div>
+                      {isExpanded && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <div className="text-xs text-gray-500 mb-1">
+                            {isSent ? `宛先: ${ti.to_name ?? ''} <${ti.to ?? ''}>` : `差出人: ${ti.from_name ?? ''} <${ti.from ?? ''}>`}
+                          </div>
+                          <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-60 overflow-y-auto">
+                            {isSent ? ti.body : ti.body_text}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+
+                {/* 返信フォーム */}
+                {replyForm ? (
+                  <div className="border border-teal-300 rounded-lg p-4 bg-teal-50/50 space-y-3">
+                    <p className="text-sm font-semibold text-teal-700">返信を作成</p>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">宛先</label>
+                      <input type="email" value={replyForm.to} onChange={e => setReplyForm(f => f ? { ...f, to: e.target.value } : f)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">件名</label>
+                      <input type="text" value={replyForm.subject} onChange={e => setReplyForm(f => f ? { ...f, subject: e.target.value } : f)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">本文</label>
+                      <textarea value={replyForm.body} onChange={e => setReplyForm(f => f ? { ...f, body: e.target.value } : f)}
+                        rows={6} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 font-mono" />
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={handleReply} disabled={replySending || !replyForm.to || !replyForm.subject || !replyForm.body}
+                        className="text-sm bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 disabled:opacity-50 font-medium">
+                        {replySending ? '送信中...' : '送信'}
+                      </button>
+                      <button onClick={() => setReplyForm(null)}
+                        className="text-sm border border-gray-300 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50">
+                        キャンセル
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-end">
+                    <button onClick={() => {
+                      const lastReceived = [...threadItems].reverse().find(t => t.type === 'received')
+                      setReplyForm({
+                        to: lastReceived?.from ?? selected.email?.from_address ?? '',
+                        subject: lastReceived ? `Re: ${lastReceived.subject.replace(/^Re:\s*/i, '')}` : `Re: ${selected.email?.subject ?? ''}`,
+                        body: '',
+                      })
+                    }}
+                      className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg hover:bg-teal-700 font-medium">
+                      返信を作成
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* 元メール */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <button onClick={() => setShowBody(v => !v)}
@@ -1300,5 +1541,20 @@ function formatReceivedAt(raw: string): string {
     const d = new Date(s)
     if (isNaN(d.getTime())) return '—'
     return formatDistanceToNow(d, { locale: ja, addSuffix: true })
+  } catch { return '—' }
+}
+
+function formatDateTime(raw: string): string {
+  try {
+    if (!raw) return '—'
+    const s = raw.endsWith('Z') ? raw : raw.includes('T') ? raw + 'Z' : raw.replace(' ', 'T') + 'Z'
+    const d = new Date(s)
+    if (isNaN(d.getTime())) return '—'
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const h = String(d.getHours()).padStart(2, '0')
+    const min = String(d.getMinutes()).padStart(2, '0')
+    return `${y}/${m}/${day} ${h}:${min}`
   } catch { return '—' }
 }
