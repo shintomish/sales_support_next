@@ -28,7 +28,7 @@ interface DashboardData {
 
 // ───────── 定数 ─────────
 const PIPELINE_COLORS: Record<string, string> = {
-  新規: '#94A3B8', 提案: '#3B82F6', 交渉: '#FF8C00', 成約: '#10B981', 失注: '#EF4444',
+  新規: '#94A3B8', 提案: '#3B82F6', 交渉: '#FF8C00', 成約: '#10B981', 稼働中: '#8B5CF6', 失注: '#EF4444',
 };
 const ACTIVITY_ICONS: Record<string, { icon: string; bg: string; color: string }> = {
   訪問:  { icon: '🚶', bg: '#EFF6FF', color: '#2563EB' },
