@@ -69,6 +69,7 @@ export default function EmailsPage() {
   const [newEmailCount, setNewEmailCount] = useState(0)
   const [markingAllRead, setMarkingAllRead] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [searchBody, setSearchBody] = useState(false)
 
   const fetchEmailsRef = useRef<() => void>(() => {})
 
@@ -93,6 +94,7 @@ export default function EmailsPage() {
     const res = await axios.get('/api/v1/emails', {
       params: {
         search,
+        search_body: searchBody ? 1 : undefined,
         unread:   unreadOnly ? 1 : undefined,
         category: categoryFilter || undefined,
         page,
@@ -101,7 +103,7 @@ export default function EmailsPage() {
     })
     setEmails(res.data)
     setNewEmailCount(0)
-  }, [search, unreadOnly, categoryFilter, page])
+  }, [search, searchBody, unreadOnly, categoryFilter, page])
 
   useEffect(() => { fetchEmailsRef.current = fetchEmails }, [fetchEmails])
   useEffect(() => { fetchEmails() }, [fetchEmails])
@@ -222,11 +224,16 @@ export default function EmailsPage() {
 
           {syncMessage && <p className="text-xs text-green-600 mb-2">{syncMessage}</p>}
 
-          <input type="text" placeholder="差出人・件名・本文で検索" value={search}
+          <input type="text" placeholder={searchBody ? '差出人・件名・本文で検索' : '差出人・件名で検索'} value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
             className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
 
           <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={searchBody}
+                onChange={e => { setSearchBody(e.target.checked); setPage(1) }} className="rounded" />
+              本文も検索
+            </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={unreadOnly}
                 onChange={e => { setUnreadOnly(e.target.checked); setPage(1) }} className="rounded" />
