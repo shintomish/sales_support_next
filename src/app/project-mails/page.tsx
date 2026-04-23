@@ -322,7 +322,7 @@ export default function ProjectMailsPage() {
               ))}
             </div>
             <input type="text" placeholder="検索"
-              value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+              value={search} onChange={e => { setSearch(e.target.value); setPage(1); if (!e.target.value) { setSelected(null); setForm({}) } }}
               className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48" />
             <button onClick={handleRescoreAll} disabled={rescoring || extracting}
               className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
@@ -399,7 +399,7 @@ export default function ProjectMailsPage() {
           {scoreMsg && <p className="text-xs text-blue-700 font-medium">{scoreMsg}</p>}
 
           <input type="text" placeholder="件名・顧客名・勤務地で検索"
-            value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+            value={search} onChange={e => { setSearch(e.target.value); setPage(1); if (!e.target.value) { setSelected(null); setForm({}) } }}
             className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
 
           <ProcessingBar

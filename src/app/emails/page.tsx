@@ -225,7 +225,7 @@ export default function EmailsPage() {
           {syncMessage && <p className="text-xs text-green-600 mb-2">{syncMessage}</p>}
 
           <input type="text" placeholder={searchBody ? '差出人・件名・本文で検索' : '差出人・件名で検索'} value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1) }}
+            onChange={e => { setSearch(e.target.value); setPage(1); if (!e.target.value) setSelectedEmail(null) }}
             className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
 
           <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
