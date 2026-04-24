@@ -256,6 +256,9 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
   const [toAddress, setToAddress] = useState(draft.to_address)
   const [body, setBody] = useState(draft.body)
   const [subject, setSubject] = useState(draft.subject)
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleToNameChange = (name: string) => {
     setToName(name)
@@ -278,14 +281,16 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
     if (!confirm(`${toName || toAddress} に送信しますか？`)) return
     setSending(true)
     try {
-      await axios.post(`/api/v1/project-mails/${draft.project_mail_id}/send-proposal`, {
-        to: toAddress,
-        to_name: toName,
-        subject,
-        body,
+      const formData = new FormData()
+      formData.append('to', toAddress)
+      formData.append('to_name', toName)
+      formData.append('subject', subject)
+      formData.append('body', body)
+      attachments.forEach(f => formData.append('attachments[]', f))
+      await axios.post(`/api/v1/project-mails/${draft.project_mail_id}/send-proposal`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
       setSent(true)
-      setTimeout(() => onClose(), 2000)
       setTimeout(() => onClose(), 1500)
     } catch {
       alert('送信に失敗しました')
@@ -356,12 +361,52 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
         </div>
 
         {/* 本文 */}
-        <div style={{ padding: '16px 20px', flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '16px 20px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <textarea
             value={body}
             onChange={e => setBody(e.target.value)}
             style={{ width: '100%', fontSize: 13, color: '#374151', lineHeight: 1.7, fontFamily: 'sans-serif', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', resize: 'vertical', minHeight: 280, boxSizing: 'border-box' }}
           />
+
+          {/* 添付ファイル D&D */}
+          <div
+            onDragOver={e => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }}
+            onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setIsDragging(false) }}
+            onDrop={e => {
+              e.preventDefault(); e.stopPropagation(); setIsDragging(false)
+              const files = Array.from(e.dataTransfer.files)
+              if (files.length) setAttachments(prev => [...prev, ...files])
+            }}
+            style={{
+              border: `2px dashed ${isDragging ? '#3b82f6' : '#d1d5db'}`,
+              borderRadius: 8,
+              padding: '12px 16px',
+              textAlign: 'center',
+              background: isDragging ? '#eff6ff' : '#f9fafb',
+              transition: 'all 0.2s',
+            }}
+          >
+            <p style={{ fontSize: 12, color: '#2563eb', margin: '0 0 6px' }}>スキルシート等をドラッグ＆ドロップ、またはファイルを選択</p>
+            <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }} onChange={e => {
+              const files = Array.from(e.target.files ?? [])
+              if (files.length) setAttachments(prev => [...prev, ...files])
+              if (fileInputRef.current) fileInputRef.current.value = ''
+            }} />
+            <button onClick={() => fileInputRef.current?.click()}
+              style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #93c5fd', background: '#fff', cursor: 'pointer', fontSize: 12, color: '#1d4ed8' }}>
+              ファイルを選択
+            </button>
+            {attachments.length > 0 && (
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {attachments.map((f, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, background: '#fff', borderRadius: 4, padding: '4px 8px', border: '1px solid #e5e7eb' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {f.name} ({(f.size / 1024).toFixed(1)}KB)</span>
+                    <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', marginLeft: 8 }}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* フッター */}
