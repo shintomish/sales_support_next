@@ -540,7 +540,7 @@ export default function EngineerMailsPage() {
             <div className="flex flex-wrap gap-1">
               {STATUS_TABS.map(tab => (
                 <button key={tab.value}
-                  onClick={() => { setStatusFilter(tab.value); setPage(1); setExpandedId(null); setSelected(null) }}
+                  onClick={() => { setStatusFilter(tab.value); setScoreFilter('all'); setPage(1); setExpandedId(null); setSelected(null) }}
                   className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
                     statusFilter === tab.value ? tab.color + ' font-semibold' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
                   }`}>
@@ -642,7 +642,7 @@ export default function EngineerMailsPage() {
           <div className="flex flex-wrap gap-1">
             {STATUS_TABS.map(tab => (
               <button key={tab.value}
-                onClick={() => { setStatusFilter(tab.value); setPage(1); setSelected(null) }}
+                onClick={() => { setStatusFilter(tab.value); setScoreFilter('all'); setPage(1); setSelected(null) }}
                 className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
                   statusFilter === tab.value
                     ? tab.color + ' font-semibold'
