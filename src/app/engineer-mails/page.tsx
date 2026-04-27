@@ -141,6 +141,38 @@ _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
   return `${greeting}\n\n${intro}\n\n${mainContent}\n\nお忙しいところ大変恐れ入りますが、ご検討いただけますと幸いでございます。\n何卒よろしくお願いいたします。\n${sig}`
 }
 
+function buildSignature(tpl: EmailBodyTemplate | null): string {
+  if (!tpl) return ''
+  if (tpl.body_text) {
+    const idx = tpl.body_text.indexOf('（本文）')
+    if (idx >= 0) return tpl.body_text.slice(idx + '（本文）'.length).replace(/^\s*\n/, '')
+  }
+  return `_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+　　株式会社アイゼン・ソリューション
+　${tpl.department ?? ''}
+　${tpl.position ?? ''}
+　${tpl.name}${tpl.name_en ? `（${tpl.name_en}）` : ''}
+
+　〒332-0017
+　埼玉県川口市栄町3-12-11 コスモ川口栄町2F
+　Tel：048-253-3922　Fax：048-271-9355
+
+　E-Mail：${tpl.email ?? ''}
+　Mobile：${tpl.mobile ?? ''}
+
+　URL:https://www.aizen-sol.co.jp
+_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
+}
+
+function buildReplyBody(recipientName: string, originalBody: string, tpl: EmailBodyTemplate | null): string {
+  const greeting = recipientName ? `${recipientName}様\n\n\n` : ''
+  const quoted = originalBody
+    ? originalBody.replace(/\r\n/g, '\n').split('\n').map(l => `> ${l}`).join('\n')
+    : ''
+  const sig = buildSignature(tpl)
+  return `${greeting}${quoted}${sig ? `\n\n${sig}` : ''}`
+}
+
 // ── 定数 ─────────────────────────────────────────────────
 
 const STATUS_TABS = [
@@ -1074,10 +1106,12 @@ export default function EngineerMailsPage() {
                   <div className="flex justify-end">
                     <button onClick={() => {
                       const lastReceived = [...threadItems].reverse().find(t => t.type === 'received')
+                      const recipientName = lastReceived?.from_name ?? selected.email?.from_name ?? ''
+                      const quotedSource = lastReceived?.body_text ?? selected.email?.body_text ?? ''
                       setReplyForm({
                         to: lastReceived?.from ?? selected.email?.from_address ?? '',
                         subject: lastReceived ? `Re: ${lastReceived.subject.replace(/^Re:\s*/i, '')}` : `Re: ${selected.email?.subject ?? ''}`,
-                        body: '',
+                        body: buildReplyBody(recipientName, quotedSource, emailTemplate),
                       })
                     }}
                       className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg hover:bg-teal-700 font-medium">
