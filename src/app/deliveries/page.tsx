@@ -769,8 +769,20 @@ export default function DeliveriesPage() {
     }, 2000)
   }
 
+  // 未置換プレースホルダ検出（<%Name%> は除外: 送信時にバックエンドで配信先名に置換される）
+  const findUnresolvedPlaceholders = (text: string): string[] => {
+    const matches = text.match(/<送信者[^>]*>/g)
+    return matches ? Array.from(new Set(matches)) : []
+  }
+
+  const unresolvedPlaceholders = findUnresolvedPlaceholders((sendForm.subject ?? '') + '\n' + (sendForm.body ?? ''))
+
   const handleSend = async () => {
     if (!sendForm.subject || !sendForm.body) return
+    if (unresolvedPlaceholders.length > 0) {
+      alert(`未置換のプレースホルダがあります:\n${unresolvedPlaceholders.join(' / ')}\n\nメール署名設定（/settings/email-template）を確認してください。`)
+      return
+    }
     if (!confirm(`配信先リスト全員（有効件数）にメールを送信します。よろしいですか？`)) return
     setSending(true)
     setSendResult(null)
@@ -1738,11 +1750,23 @@ export default function DeliveriesPage() {
               )}
             </div>
 
+            {/* 未置換プレースホルダ警告 */}
+            {unresolvedPlaceholders.length > 0 && (
+              <div className="px-4 py-3 rounded bg-red-50 border border-red-200 text-sm text-red-700">
+                <p className="font-semibold mb-1">⚠ 未置換のプレースホルダがあります</p>
+                <p className="text-xs">
+                  {unresolvedPlaceholders.join(' / ')} がそのまま残っています。
+                  <a href="/settings/email-template" className="underline ml-1">メール署名設定</a>
+                  を確認してください。
+                </p>
+              </div>
+            )}
+
             {/* 配信ボタン */}
             <div className="flex items-center gap-4 pt-2">
               <button
                 onClick={handleSend}
-                disabled={sending || !!sendProgress || !sendForm.subject || !sendForm.body}
+                disabled={sending || !!sendProgress || !sendForm.subject || !sendForm.body || unresolvedPlaceholders.length > 0}
                 className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-6 py-2.5 rounded"
               >
                 {sending ? '送信準備中...' : '配信先リストへ一括送信'}
