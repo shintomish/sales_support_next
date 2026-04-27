@@ -404,6 +404,19 @@ export default function ProjectMailsPage() {
                 </button>
               ))}
             </div>
+            <div className="flex gap-1">
+              {SCORE_FILTERS.map(sf => (
+                <button key={sf.value}
+                  onClick={() => { setScoreFilter(sf.value); setPage(1); setExpandedId(null) }}
+                  className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                    scoreFilter === sf.value
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                  }`}>
+                  {sf.label}
+                </button>
+              ))}
+            </div>
             <input type="text" placeholder="検索"
               value={search} onChange={e => { setSearch(e.target.value); setPage(1); if (!e.target.value) { setSelected(null); setForm({}) } }}
               className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48" />
