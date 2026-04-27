@@ -194,7 +194,7 @@ export default function ProjectMailsPage() {
   const [threadItems, setThreadItems] = useState<ThreadItem[]>([])
   const [threadLoading, setThreadLoading] = useState(false)
   const [threadExpanded, setThreadExpanded] = useState<number | null>(null)
-  const [replyForm, setReplyForm] = useState<{ to: string; subject: string; body: string } | null>(null)
+  const [replyForm, setReplyForm] = useState<{ name: string; to: string; subject: string; body: string } | null>(null)
   const [replySending, setReplySending] = useState(false)
   const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
 
@@ -285,6 +285,7 @@ export default function ProjectMailsPage() {
     try {
       await axios.post(`/api/v1/project-mails/${selected.id}/send-proposal`, {
         to: replyForm.to,
+        to_name: replyForm.name || undefined,
         subject: replyForm.subject,
         body: replyForm.body,
       })
@@ -901,6 +902,11 @@ export default function ProjectMailsPage() {
                   <div className="border border-blue-300 rounded-lg p-4 bg-blue-50/50 space-y-3">
                     <p className="text-sm font-semibold text-blue-700">返信を作成</p>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">宛名</label>
+                      <input type="text" value={replyForm.name} onChange={e => setReplyForm(f => f ? { ...f, name: e.target.value } : f)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">宛先</label>
                       <input type="email" value={replyForm.to} onChange={e => setReplyForm(f => f ? { ...f, to: e.target.value } : f)}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
@@ -933,8 +939,9 @@ export default function ProjectMailsPage() {
                       const recipientName = lastReceived?.from_name ?? selected.email?.from_name ?? ''
                       const quotedSource = lastReceived?.body_text ?? selected.email?.body_text ?? ''
                       setReplyForm({
+                        name: recipientName,
                         to: lastReceived?.from ?? selected.email?.from_address ?? '',
-                        subject: lastReceived ? `Re: ${lastReceived.subject.replace(/^Re:\s*/i, '')}` : `Re: ${selected.email?.subject ?? ''}`,
+                        subject: `Re: ${(selected.email?.subject ?? '').replace(/^Re:\s*/i, '')}`,
                         body: buildReplyBody(recipientName, quotedSource, emailTemplate),
                       })
                     }}

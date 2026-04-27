@@ -260,7 +260,7 @@ export default function EngineerMailsPage() {
   const [threadItems, setThreadItems] = useState<ThreadItem[]>([])
   const [threadLoading, setThreadLoading] = useState(false)
   const [threadExpanded, setThreadExpanded] = useState<number | null>(null)
-  const [replyForm, setReplyForm] = useState<{ to: string; subject: string; body: string } | null>(null)
+  const [replyForm, setReplyForm] = useState<{ name: string; to: string; subject: string; body: string } | null>(null)
   const [replySending, setReplySending] = useState(false)
 
   useEffect(() => {
@@ -365,6 +365,7 @@ export default function EngineerMailsPage() {
     try {
       await axios.post(`/api/v1/engineer-mails/${selected.id}/send-proposal`, {
         to: replyForm.to,
+        to_name: replyForm.name || undefined,
         subject: replyForm.subject,
         body: replyForm.body,
       })
@@ -1077,6 +1078,11 @@ export default function EngineerMailsPage() {
                   <div className="border border-teal-300 rounded-lg p-4 bg-teal-50/50 space-y-3">
                     <p className="text-sm font-semibold text-teal-700">返信を作成</p>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">宛名</label>
+                      <input type="text" value={replyForm.name} onChange={e => setReplyForm(f => f ? { ...f, name: e.target.value } : f)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">宛先</label>
                       <input type="email" value={replyForm.to} onChange={e => setReplyForm(f => f ? { ...f, to: e.target.value } : f)}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
@@ -1109,8 +1115,9 @@ export default function EngineerMailsPage() {
                       const recipientName = lastReceived?.from_name ?? selected.email?.from_name ?? ''
                       const quotedSource = lastReceived?.body_text ?? selected.email?.body_text ?? ''
                       setReplyForm({
+                        name: recipientName,
                         to: lastReceived?.from ?? selected.email?.from_address ?? '',
-                        subject: lastReceived ? `Re: ${lastReceived.subject.replace(/^Re:\s*/i, '')}` : `Re: ${selected.email?.subject ?? ''}`,
+                        subject: `Re: ${(selected.email?.subject ?? '').replace(/^Re:\s*/i, '')}`,
                         body: buildReplyBody(recipientName, quotedSource, emailTemplate),
                       })
                     }}
