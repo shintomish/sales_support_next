@@ -936,12 +936,13 @@ export default function ProjectMailsPage() {
                   <div className="flex justify-end">
                     <button onClick={() => {
                       const lastReceived = [...threadItems].reverse().find(t => t.type === 'received')
+                      const latest = threadItems.length > 0 ? threadItems[threadItems.length - 1] : null
                       const recipientName = lastReceived?.from_name ?? selected.email?.from_name ?? ''
                       const quotedSource = lastReceived?.body_text ?? selected.email?.body_text ?? ''
                       setReplyForm({
                         name: recipientName,
                         to: lastReceived?.from ?? selected.email?.from_address ?? '',
-                        subject: `Re: ${selected.email?.subject ?? ''}`,
+                        subject: `Re: ${latest?.subject ?? selected.email?.subject ?? ''}`,
                         body: buildReplyBody(recipientName, quotedSource, emailTemplate),
                       })
                     }}
