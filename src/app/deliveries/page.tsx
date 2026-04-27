@@ -15,11 +15,20 @@ type DeliveryAddress = {
   is_active: boolean
 }
 
+type SavedAddressState = {
+  label: string
+  created_at: string | null
+  count: number
+}
+
 type PaginatedAddresses = {
   data: DeliveryAddress[]
   current_page: number
   last_page: number
   total: number
+  all_count?: number
+  active_count?: number
+  saved_state?: SavedAddressState | null
 }
 
 type Campaign = {
@@ -657,14 +666,35 @@ export default function DeliveriesPage() {
   }
 
   const handleSaveState = async () => {
-    if (!confirm('現在の有効/無効状態を保存します（ラベル "A"）。よろしいですか？')) return
+    if (!confirm('現在の有効/無効状態をラベル "A" で保存します（既存の保存状態は上書きされます）。よろしいですか？')) return
     setBulkBusy(true)
     setBulkMsg(null)
     try {
       const res = await axios.post('/api/v1/delivery-addresses/save-state', { label: 'A' })
       setBulkMsg(res.data?.message ?? '状態を保存しました')
+      fetchAddresses()
     } catch {
       setBulkMsg('状態の保存に失敗しました')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const handleRestoreState = async () => {
+    const saved = addresses?.saved_state
+    if (!saved) {
+      alert('保存された状態がありません。先に「現在の状態を保存」してください。')
+      return
+    }
+    if (!confirm(`保存状態「${saved.label}」(${saved.count}件) に復元します。現在の有効/無効は上書きされます。よろしいですか？`)) return
+    setBulkBusy(true)
+    setBulkMsg(null)
+    try {
+      const res = await axios.post('/api/v1/delivery-addresses/restore-state')
+      setBulkMsg(res.data?.message ?? '状態を復元しました')
+      fetchAddresses()
+    } catch {
+      setBulkMsg('状態の復元に失敗しました')
     } finally {
       setBulkBusy(false)
     }
@@ -819,7 +849,9 @@ export default function DeliveriesPage() {
               className="border border-gray-300 rounded px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
             <span className="text-sm text-gray-500">
-              {addresses ? `全 ${addresses.total} 件` : ''}
+              {addresses
+                ? `全 ${addresses.all_count ?? addresses.total} 件 / 有効 ${addresses.active_count ?? '-'} 件`
+                : ''}
             </span>
             <div className="ml-auto flex items-center gap-2">
               <button
@@ -827,6 +859,15 @@ export default function DeliveriesPage() {
                 disabled={bulkBusy}
                 className="border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm px-3 py-2 rounded">
                 💾 現在の状態を保存
+              </button>
+              <button
+                onClick={handleRestoreState}
+                disabled={bulkBusy || !addresses?.saved_state}
+                title={addresses?.saved_state
+                  ? `保存日時: ${addresses.saved_state.created_at ? new Date(addresses.saved_state.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '不明'}（${addresses.saved_state.count}件）`
+                  : '保存された状態がありません'}
+                className="border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm px-3 py-2 rounded">
+                ↩ 保存状態{addresses?.saved_state ? `「${addresses.saved_state.label}」` : 'A'}に戻す
               </button>
               <button
                 onClick={() => handleBulkSetActive(true)}
