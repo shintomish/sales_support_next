@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import axios from '@/lib/axios'
-import { useRouter, useParams, useSearchParams } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 
 // ── 型定義 ────────────────────────────────────────────────
 
@@ -29,73 +29,6 @@ type Campaign = {
   success_count: number
   failed_count: number
   histories: SendHistory[]
-}
-
-// ── デモ用モックデータ ─────────────────────────────────────
-
-const DEMO_CAMPAIGN: Campaign = {
-  id: 9001,
-  project_mail_id: 1372,
-  project_title: 'Java/Spring バックエンド開発（六本木）',
-  subject: '【エンジニアご紹介】即日稼働可能なJavaエンジニア3名のご案内',
-  body: '営業ご担当者様\n\nいつも大変お世話になっております。\n株式会社アイゼン・ソリューションの新冨です。\n\nこの度、貴社のご要件に合致するエンジニアをご紹介させていただきたく...',
-  sent_at: '2026-04-11T10:00:00+09:00',
-  sent_by: '新冨 泰明',
-  total_count: 5,
-  success_count: 5,
-  failed_count: 0,
-  histories: [
-    {
-      id: 90011,
-      email: 'tanaka@techrecruit.co.jp',
-      name: '田中 博史',
-      status: 'replied',
-      replied_at: '2026-04-11T14:23:00+09:00',
-      reply_subject: 'Re: 【エンジニアご紹介】即日稼働可能なJavaエンジニア3名のご案内',
-      reply_received_at: '2026-04-11T14:23:00+09:00',
-      reply_body_snippet: 'ご連絡ありがとうございます。ご紹介いただいた3名の中で、Aさんのスキルシートを拝見したく存じます。また、来週面談の時間をいただけますでしょうか。',
-    },
-    {
-      id: 90012,
-      email: 'sato@nextsystems.co.jp',
-      name: '佐藤 健二',
-      status: 'sent',
-      replied_at: null,
-      reply_subject: null,
-      reply_received_at: null,
-      reply_body_snippet: null,
-    },
-    {
-      id: 90013,
-      email: 'yamamoto@itstaff.jp',
-      name: '山本 友紀',
-      status: 'replied',
-      replied_at: '2026-04-12T09:05:00+09:00',
-      reply_subject: 'Re: 【エンジニアご紹介】即日稼働可能なJavaエンジニア3名のご案内',
-      reply_received_at: '2026-04-12T09:05:00+09:00',
-      reply_body_snippet: 'ご紹介ありがとうございます。現在、類似要件でお断りした経緯があるため、今回はご遠慮させていただきます。今後ともよろしくお願いいたします。',
-    },
-    {
-      id: 90014,
-      email: 'ito@bridge-tech.co.jp',
-      name: '伊藤 美咲',
-      status: 'sent',
-      replied_at: null,
-      reply_subject: null,
-      reply_received_at: null,
-      reply_body_snippet: null,
-    },
-    {
-      id: 90015,
-      email: 'kato@cloud-works.jp',
-      name: '加藤 直樹',
-      status: 'replied',
-      replied_at: '2026-04-12T11:30:00+09:00',
-      reply_subject: 'Re: 【エンジニアご紹介】即日稼働可能なJavaエンジニア3名のご案内',
-      reply_received_at: '2026-04-12T11:30:00+09:00',
-      reply_body_snippet: '早速のご紹介ありがとうございます。ぜひ詳細をお聞きしたいです。今週中にお電話でご相談できますでしょうか。',
-    },
-  ],
 }
 
 // ── 返信本文モーダル ──────────────────────────────────────
@@ -153,26 +86,21 @@ function ReplyModal({ h, campaignSubject, onClose }: { h: SendHistory; campaignS
 // ── メインページ ──────────────────────────────────────────
 
 export default function CampaignDetailPage() {
-  const router       = useRouter()
-  const { id }       = useParams<{ id: string }>()
-  const searchParams = useSearchParams()
+  const router = useRouter()
+  const { id } = useParams<{ id: string }>()
 
   const [campaign, setCampaign] = useState<Campaign | null>(null)
-  const [showDemo, setShowDemo] = useState(searchParams.get('demo') === '1')
   const [statusFilter, setStatusFilter] = useState<'' | 'sent' | 'failed' | 'replied'>('')
   const [search, setSearch] = useState('')
   const [replyModal, setReplyModal] = useState<SendHistory | null>(null)
 
   useEffect(() => {
-    if (showDemo) return   // デモモードはAPIを呼ばない
     axios.get(`/api/v1/delivery-campaigns/${id}`)
       .then(res => setCampaign(res.data))
       .catch(() => router.push('/deliveries'))
-  }, [id, showDemo])
+  }, [id, router])
 
-  const displayCampaign = showDemo ? DEMO_CAMPAIGN : campaign
-
-  const filtered = displayCampaign?.histories.filter(h => {
+  const filtered = campaign?.histories.filter(h => {
     if (statusFilter && h.status !== statusFilter) return false
     if (search) {
       const s = search.toLowerCase()
@@ -181,22 +109,22 @@ export default function CampaignDetailPage() {
     return true
   }) ?? []
 
-  const repliedCount = displayCampaign?.histories.filter(h => h.status === 'replied').length ?? 0
-  const replyRate = displayCampaign && displayCampaign.success_count > 0
-    ? Math.round(repliedCount / displayCampaign.success_count * 100)
+  const repliedCount = campaign?.histories.filter(h => h.status === 'replied').length ?? 0
+  const replyRate = campaign && campaign.success_count > 0
+    ? Math.round(repliedCount / campaign.success_count * 100)
     : 0
 
-  if (!campaign && !showDemo) {
+  if (!campaign) {
     return <div className="p-6 text-gray-400">読み込み中...</div>
   }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* 返信モーダル */}
-      {replyModal && displayCampaign && (
+      {replyModal && (
         <ReplyModal
           h={replyModal}
-          campaignSubject={displayCampaign.subject}
+          campaignSubject={campaign.subject}
           onClose={() => setReplyModal(null)}
         />
       )}
@@ -207,75 +135,49 @@ export default function CampaignDetailPage() {
           ← キャンペーン一覧
         </button>
         <h1 className="text-xl font-bold text-gray-800">キャンペーン詳細</h1>
-        <div className="ml-auto">
-          <button
-            onClick={() => setShowDemo(v => !v)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-              showDemo
-                ? 'bg-amber-50 border-amber-300 text-amber-700'
-                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <span>{showDemo ? '🔶' : '👁'}</span>
-            {showDemo ? '返信紐づけ デモ表示中' : '返信紐づけ後のイメージを見る'}
-          </button>
-        </div>
       </div>
-
-      {/* デモバナー */}
-      {showDemo && (
-        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-          <p className="font-semibold mb-1">🔶 デモ表示モード</p>
-          <p className="text-xs leading-relaxed">
-            モックデータを表示しています。<strong>「返信あり」</strong>をクリックすると返信内容のプレビューが開きます。
-            実装時は受信メールの <code className="bg-amber-100 px-1 rounded">from_address</code> と
-            送信先の <code className="bg-amber-100 px-1 rounded">email</code> を照合して自動紐づけします。
-          </p>
-        </div>
-      )}
 
       {/* サマリーカード */}
       <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
         <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
           <div>
             <span className="text-gray-500">件名</span>
-            <p className="font-medium text-gray-800 mt-0.5">{displayCampaign?.subject}</p>
+            <p className="font-medium text-gray-800 mt-0.5">{campaign.subject}</p>
           </div>
           <div>
             <span className="text-gray-500">送信者</span>
-            <p className="font-medium text-gray-800 mt-0.5">{displayCampaign?.sent_by ?? '-'}</p>
+            <p className="font-medium text-gray-800 mt-0.5">{campaign.sent_by ?? '-'}</p>
           </div>
           <div>
             <span className="text-gray-500">送信日時</span>
             <p className="font-medium text-gray-800 mt-0.5">
-              {displayCampaign?.sent_at ? new Date(displayCampaign.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}
+              {campaign.sent_at ? new Date(campaign.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}
             </p>
           </div>
           <div>
             <span className="text-gray-500">紐づき案件</span>
-            <p className="font-medium text-gray-800 mt-0.5">{displayCampaign?.project_title ?? '-'}</p>
+            <p className="font-medium text-gray-800 mt-0.5">{campaign.project_title ?? '-'}</p>
           </div>
         </div>
 
         {/* 集計バー */}
         <div className="flex gap-6 border-t border-gray-100 pt-4">
           <div className="text-center">
-            <p className="text-2xl font-bold text-gray-800">{displayCampaign?.total_count}</p>
+            <p className="text-2xl font-bold text-gray-800">{campaign.total_count}</p>
             <p className="text-xs text-gray-500 mt-0.5">送信数</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-green-600">{displayCampaign?.success_count}</p>
+            <p className="text-2xl font-bold text-green-600">{campaign.success_count}</p>
             <p className="text-xs text-gray-500 mt-0.5">成功</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-red-500">{displayCampaign?.failed_count}</p>
+            <p className="text-2xl font-bold text-red-500">{campaign.failed_count}</p>
             <p className="text-xs text-gray-500 mt-0.5">失敗</p>
           </div>
           <div className="text-center">
             <p className="text-2xl font-bold text-blue-600">{repliedCount}</p>
             <p className="text-xs text-gray-500 mt-0.5">返信あり</p>
           </div>
-          {/* 返信率（デモ or 実データどちらでも表示） */}
           <div className="text-center ml-auto">
             <p className="text-2xl font-bold text-indigo-600">{replyRate}%</p>
             <p className="text-xs text-gray-500 mt-0.5">返信率</p>
@@ -283,11 +185,11 @@ export default function CampaignDetailPage() {
         </div>
 
         {/* 返信率プログレスバー */}
-        {(displayCampaign?.success_count ?? 0) > 0 && (
+        {campaign.success_count > 0 && (
           <div className="mt-3">
             <div className="flex justify-between text-xs text-gray-500 mb-1">
               <span>返信率</span>
-              <span>{repliedCount} / {displayCampaign?.success_count} 件</span>
+              <span>{repliedCount} / {campaign.success_count} 件</span>
             </div>
             <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
               <div
@@ -329,10 +231,7 @@ export default function CampaignDetailPage() {
               <th className="px-4 py-3 text-left">名前</th>
               <th className="px-4 py-3 text-left">メールアドレス</th>
               <th className="px-4 py-3 text-center">状態</th>
-              <th className="px-4 py-3 text-left">
-                返信
-                {showDemo && <span className="ml-1 text-xs text-amber-600 font-normal">（デモ）</span>}
-              </th>
+              <th className="px-4 py-3 text-left">返信</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">

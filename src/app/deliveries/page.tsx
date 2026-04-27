@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import axios from '@/lib/axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import SortableHeader from '@/components/SortableHeader'
@@ -34,7 +34,22 @@ type Campaign = {
   success_count: number
   failed_count: number
   replied_count?: number
-  _isDemo?: true
+}
+
+type SendHistory = {
+  id: number
+  email: string
+  name: string | null
+  status: 'sent' | 'failed' | 'replied'
+  replied_at: string | null
+  reply_subject: string | null
+  reply_received_at: string | null
+  reply_body_snippet?: string | null
+}
+
+type CampaignDetail = Campaign & {
+  body: string
+  histories: SendHistory[]
 }
 
 type PaginatedCampaigns = {
@@ -253,47 +268,6 @@ function applyTemplate(base: string, tpl: EmailBodyTemplate | null): string {
 
 type Tab = 'addresses' | 'campaigns' | 'threads' | 'send'
 
-// ── デモ用モックデータ ─────────────────────────────────────
-
-const DEMO_CAMPAIGNS: Campaign[] = [
-  {
-    id: 9001, _isDemo: true,
-    project_mail_id: 1372, engineer_mail_source_id: null,
-    project_title: 'Java/Spring バックエンド開発（六本木）',
-    subject: '【エンジニアご紹介】即日稼働可能なJavaエンジニア3名のご案内',
-    sent_at: '2026-04-11T10:00:00+09:00',
-    sent_by: '新冨 泰明',
-    total_count: 5,
-    success_count: 5,
-    failed_count: 0,
-    replied_count: 3,
-  },
-  {
-    id: 9002, _isDemo: true,
-    project_mail_id: 1366, engineer_mail_source_id: null,
-    project_title: 'Python/Django データ基盤開発',
-    subject: '【ご紹介】Python・データエンジニア2名のご案内',
-    sent_at: '2026-04-10T14:30:00+09:00',
-    sent_by: '新冨 泰明',
-    total_count: 8,
-    success_count: 8,
-    failed_count: 0,
-    replied_count: 1,
-  },
-  {
-    id: 9003, _isDemo: true,
-    project_mail_id: null, engineer_mail_source_id: null,
-    project_title: null,
-    subject: '【定期配信】4月の稼働可能エンジニアご案内',
-    sent_at: '2026-04-01T09:00:00+09:00',
-    sent_by: '新冨 泰明',
-    total_count: 42,
-    success_count: 40,
-    failed_count: 2,
-    replied_count: 7,
-  },
-]
-
 // ── メインコンポーネント ──────────────────────────────────
 
 export default function DeliveriesPage() {
@@ -304,7 +278,6 @@ export default function DeliveriesPage() {
   const initEngineerMailId = searchParams.get('engineer_mail_id')
   const initDeliveryType = searchParams.get('delivery_type') as DeliveryType | null
   const [tab, setTab] = useState<Tab>(initTab || 'addresses')
-  const [showCampDemo, setShowCampDemo] = useState(false)
 
   // 配信先一覧
   const [addresses, setAddresses] = useState<PaginatedAddresses | null>(null)
@@ -481,6 +454,30 @@ export default function DeliveriesPage() {
   useEffect(() => {
     if (tab === 'campaigns') fetchCampaigns()
   }, [tab, fetchCampaigns])
+
+  // 配信履歴のアコーディオン展開
+  const [expandedCampId, setExpandedCampId] = useState<number | null>(null)
+  const [campDetailCache, setCampDetailCache] = useState<Record<number, CampaignDetail>>({})
+  const [campDetailLoadingId, setCampDetailLoadingId] = useState<number | null>(null)
+
+  const handleToggleCamp = async (id: number) => {
+    if (expandedCampId === id) {
+      setExpandedCampId(null)
+      return
+    }
+    setExpandedCampId(id)
+    if (!campDetailCache[id]) {
+      setCampDetailLoadingId(id)
+      try {
+        const res = await axios.get<CampaignDetail>(`/api/v1/delivery-campaigns/${id}`)
+        setCampDetailCache(prev => ({ ...prev, [id]: res.data }))
+      } catch {
+        // 取得失敗時はキャッシュに空データを入れず、再試行可能にする
+      } finally {
+        setCampDetailLoadingId(null)
+      }
+    }
+  }
 
   // 送信者一覧取得
   useEffect(() => {
@@ -1041,36 +1038,12 @@ export default function DeliveriesPage() {
             )}
           </div>
 
-          {/* デモ切替ボタン */}
-          <div className="flex justify-end mb-3">
-            <button
-              onClick={() => setShowCampDemo(v => !v)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                showCampDemo
-                  ? 'bg-amber-50 border-amber-300 text-amber-700'
-                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <span>{showCampDemo ? '🔶' : '👁'}</span>
-              {showCampDemo ? '返信紐づけ デモ表示中' : '返信紐づけ後のイメージを見る'}
-            </button>
-          </div>
-
-          {/* デモバナー */}
-          {showCampDemo && (
-            <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-              <p className="font-semibold mb-1">🔶 デモ表示モード</p>
-              <p className="text-xs leading-relaxed">
-                上部3件はモックデータです。「詳細」を押すとキャンペーン詳細ページで返信内容のイメージを確認できます。
-              </p>
-            </div>
-          )}
-
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
                 <tr>
+                  <th className="px-2 py-3 w-8" />
                   {(
                     [
                       { col: 'sent_at' as CampSortBy, label: '送信日時' },
@@ -1098,57 +1071,129 @@ export default function DeliveriesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {[...(showCampDemo ? DEMO_CAMPAIGNS : []), ...(campaigns?.data ?? [])].map((camp, idx) => (
-                  <tr key={camp.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        {camp._isDemo && (
-                          <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium shrink-0">デモ</span>
-                        )}
-                        {camp.sent_at ? new Date(camp.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-800 whitespace-nowrap">{camp.sent_by ?? '-'}</td>
-                    <td className="px-4 py-3 w-44">
-                      <div className="truncate max-w-[176px] text-gray-800" title={camp.subject}>{camp.subject}</div>
-                    </td>
-                    <td className="px-4 py-3 w-32">
-                      <div className="truncate max-w-[128px] text-gray-500 text-xs" title={camp.project_title ?? ''}>{camp.project_title ?? '-'}</div>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {camp.engineer_mail_source_id != null
-                        ? <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">技術者</span>
-                        : <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">案件</span>
-                      }
-                    </td>
-                    <td className="px-4 py-3 text-center text-gray-700">{camp.total_count}</td>
-                    <td className="px-4 py-3 text-center text-green-600 font-medium">{camp.success_count}</td>
-                    <td className="px-4 py-3 text-center text-red-500">{camp.failed_count}</td>
-                    <td className="px-4 py-3 text-center">
-                      {camp.replied_count != null && camp.success_count > 0 ? (
-                        <div className="flex flex-col items-center gap-0.5">
-                          <span className="text-blue-600 font-medium text-xs">
-                            {Math.round(camp.replied_count / camp.success_count * 100)}%
-                          </span>
-                          <span className="text-gray-400 text-xs">{camp.replied_count}件</span>
-                        </div>
-                      ) : (
-                        <span className="text-gray-300 text-xs">—</span>
+                {(campaigns?.data ?? []).map((camp, idx) => {
+                  const isExpanded = expandedCampId === camp.id
+                  const isDetailLoading = campDetailLoadingId === camp.id
+                  const detail = campDetailCache[camp.id]
+                  return (
+                    <Fragment key={camp.id}>
+                      <tr
+                        onClick={() => handleToggleCamp(camp.id)}
+                        className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 cursor-pointer`}>
+                        <td className="px-2 py-3 text-center text-gray-400 text-xs">
+                          <span className={`inline-block transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          {camp.sent_at ? new Date(camp.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-800 whitespace-nowrap">{camp.sent_by ?? '-'}</td>
+                        <td className="px-4 py-3 w-44">
+                          <div className="truncate max-w-[176px] text-gray-800" title={camp.subject}>{camp.subject}</div>
+                        </td>
+                        <td className="px-4 py-3 w-32">
+                          <div className="truncate max-w-[128px] text-gray-500 text-xs" title={camp.project_title ?? ''}>{camp.project_title ?? '-'}</div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {camp.engineer_mail_source_id != null
+                            ? <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">技術者</span>
+                            : <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">案件</span>
+                          }
+                        </td>
+                        <td className="px-4 py-3 text-center text-gray-700">{camp.total_count}</td>
+                        <td className="px-4 py-3 text-center text-green-600 font-medium">{camp.success_count}</td>
+                        <td className="px-4 py-3 text-center text-red-500">{camp.failed_count}</td>
+                        <td className="px-4 py-3 text-center">
+                          {camp.replied_count != null && camp.success_count > 0 ? (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className="text-blue-600 font-medium text-xs">
+                                {Math.round(camp.replied_count / camp.success_count * 100)}%
+                              </span>
+                              <span className="text-gray-400 text-xs">{camp.replied_count}件</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={e => {
+                              e.stopPropagation()
+                              router.push(`/deliveries/campaigns/${camp.id}`)
+                            }}
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            詳細
+                          </button>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="bg-gray-50">
+                          <td colSpan={11} className="px-6 py-4 border-t border-gray-200">
+                            {isDetailLoading && (
+                              <div className="text-xs text-gray-400">読み込み中...</div>
+                            )}
+                            {!isDetailLoading && !detail && (
+                              <div className="text-xs text-gray-400">読み込みに失敗しました</div>
+                            )}
+                            {!isDetailLoading && detail && (
+                              <div className="space-y-3">
+                                {detail.histories.length === 0 ? (
+                                  <div className="text-xs text-gray-400">送信履歴がありません</div>
+                                ) : (
+                                  <table className="min-w-full text-xs bg-white border border-gray-200 rounded">
+                                    <thead className="bg-gray-100 text-gray-600">
+                                      <tr>
+                                        <th className="px-3 py-2 text-left">名前</th>
+                                        <th className="px-3 py-2 text-left">メールアドレス</th>
+                                        <th className="px-3 py-2 text-center">状態</th>
+                                        <th className="px-3 py-2 text-left">返信</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                      {detail.histories.map(h => (
+                                        <tr key={h.id} className={h.status === 'replied' ? 'bg-blue-50' : ''}>
+                                          <td className="px-3 py-2 text-gray-800">{h.name ?? '-'}</td>
+                                          <td className="px-3 py-2 text-gray-600">{h.email}</td>
+                                          <td className="px-3 py-2 text-center">
+                                            {{
+                                              sent:    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">送信済</span>,
+                                              failed:  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">失敗</span>,
+                                              replied: <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">返信あり</span>,
+                                            }[h.status]}
+                                          </td>
+                                          <td className="px-3 py-2">
+                                            {h.status === 'replied' && h.replied_at ? (
+                                              <div>
+                                                <p className="text-blue-700 font-medium truncate max-w-[320px]">📩 {h.reply_subject ?? '（件名なし）'}</p>
+                                                <p className="text-[11px] text-gray-400 mt-0.5">
+                                                  {new Date(h.replied_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                                                </p>
+                                                {h.reply_body_snippet && (
+                                                  <p className="text-[11px] text-gray-600 mt-1 line-clamp-2 max-w-[420px]">
+                                                    {h.reply_body_snippet}
+                                                  </p>
+                                                )}
+                                              </div>
+                                            ) : (
+                                              <span className="text-gray-300">—</span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => router.push(camp._isDemo ? `/deliveries/campaigns/demo?demo=1` : `/deliveries/campaigns/${camp.id}`)}
-                        className="text-xs text-blue-600 hover:underline"
-                      >
-                        詳細
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                    </Fragment>
+                  )
+                })}
                 {campaigns?.data.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={11} className="px-4 py-8 text-center text-gray-400">
                       キャンペーン履歴がありません。
                     </td>
                   </tr>
