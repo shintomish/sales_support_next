@@ -11,7 +11,22 @@ type DeliveryAddress = {
   id: number
   email: string
   name: string | null
+  zip_code: string | null
+  prefecture: string | null
+  address: string | null
+  tel: string | null
   occupation: string | null
+  is_active: boolean
+}
+
+type EditAddressForm = {
+  email: string
+  name: string
+  zip_code: string
+  prefecture: string
+  address: string
+  tel: string
+  occupation: string
   is_active: boolean
 }
 
@@ -726,6 +741,53 @@ export default function DeliveriesPage() {
     }
   }
 
+  // ── 編集モーダル ─────────────────────────────────────
+  const [editingAddrId, setEditingAddrId] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState<EditAddressForm>({
+    email: '', name: '', zip_code: '', prefecture: '', address: '', tel: '', occupation: '', is_active: true,
+  })
+  const [editFormError, setEditFormError] = useState<string | null>(null)
+  const [editFormSaving, setEditFormSaving] = useState(false)
+
+  const startEditAddress = (addr: DeliveryAddress) => {
+    setEditingAddrId(addr.id)
+    setEditForm({
+      email:      addr.email,
+      name:       addr.name ?? '',
+      zip_code:   addr.zip_code ?? '',
+      prefecture: addr.prefecture ?? '',
+      address:    addr.address ?? '',
+      tel:        addr.tel ?? '',
+      occupation: addr.occupation ?? '',
+      is_active:  addr.is_active,
+    })
+    setEditFormError(null)
+  }
+
+  const handleEditSave = async () => {
+    if (!editingAddrId || !editForm.email) return
+    setEditFormSaving(true)
+    setEditFormError(null)
+    try {
+      await axios.patch(`/api/v1/delivery-addresses/${editingAddrId}`, {
+        email:      editForm.email,
+        name:       editForm.name || null,
+        zip_code:   editForm.zip_code || null,
+        prefecture: editForm.prefecture || null,
+        address:    editForm.address || null,
+        tel:        editForm.tel || null,
+        occupation: editForm.occupation || null,
+        is_active:  editForm.is_active,
+      })
+      setEditingAddrId(null)
+      fetchAddresses()
+    } catch (err: any) {
+      setEditFormError(err.response?.data?.message ?? 'エラーが発生しました。')
+    } finally {
+      setEditFormSaving(false)
+    }
+  }
+
   // ── 名前インライン編集 ────────────────────────────────
   const [editingNameId, setEditingNameId] = useState<number | null>(null)
   const [editingNameValue, setEditingNameValue] = useState('')
@@ -1037,12 +1099,20 @@ export default function DeliveriesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => toggleActive(addr)}
-                        className="text-xs text-blue-600 hover:underline"
-                      >
-                        {addr.is_active ? '無効にする' : '有効にする'}
-                      </button>
+                      <div className="flex items-center justify-center gap-3">
+                        <button
+                          onClick={() => startEditAddress(addr)}
+                          className="text-xs text-gray-700 hover:underline"
+                        >
+                          編集
+                        </button>
+                        <button
+                          onClick={() => toggleActive(addr)}
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          {addr.is_active ? '無効にする' : '有効にする'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1778,6 +1848,122 @@ export default function DeliveriesPage() {
           </div>
         </div>
       )}
+      {/* ── 編集モーダル ──────────────────────────────── */}
+      {editingAddrId !== null && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">配信先を編集</h2>
+
+            {editFormError && (
+              <div className="mb-3 px-3 py-2 bg-red-50 text-red-700 text-sm rounded">
+                {editFormError}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  メールアドレス <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={editForm.email}
+                  onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">職種</label>
+                <input
+                  type="text"
+                  value={editForm.occupation}
+                  onChange={e => setEditForm(f => ({ ...f, occupation: e.target.value }))}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">郵便番号</label>
+                  <input
+                    type="text"
+                    value={editForm.zip_code}
+                    onChange={e => setEditForm(f => ({ ...f, zip_code: e.target.value }))}
+                    placeholder="332-0017"
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">都道府県</label>
+                  <input
+                    type="text"
+                    value={editForm.prefecture}
+                    onChange={e => setEditForm(f => ({ ...f, prefecture: e.target.value }))}
+                    placeholder="埼玉県"
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">住所</label>
+                <input
+                  type="text"
+                  value={editForm.address}
+                  onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">電話番号</label>
+                <input
+                  type="text"
+                  value={editForm.tel}
+                  onChange={e => setEditForm(f => ({ ...f, tel: e.target.value }))}
+                  placeholder="048-253-3922"
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={editForm.is_active}
+                    onChange={e => setEditForm(f => ({ ...f, is_active: e.target.checked }))}
+                    className="rounded border-gray-300"
+                  />
+                  有効（一斉配信に含める）
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setEditingAddrId(null)}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleEditSave}
+                disabled={editFormSaving || !editForm.email}
+                className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
+              >
+                {editFormSaving ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── 新規登録モーダル ──────────────────────────── */}
       {showNewModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
