@@ -75,7 +75,7 @@ type ThreadItem = {
 
 const STATUS_TABS = [
   { value: 'review', label: '要確認', color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
-  { value: 'new',    label: '新着案件', color: 'text-blue-700 bg-blue-50 border-blue-300' },
+  { value: 'new',    label: '新着',     color: 'text-blue-700 bg-blue-50 border-blue-300' },
   { value: 'proposed',  label: '提案済', color: 'text-purple-700 bg-purple-50 border-purple-300' },
   { value: 'interview', label: '面談',   color: 'text-indigo-700 bg-indigo-50 border-indigo-300' },
   { value: 'won',       label: '成約',   color: 'text-green-700 bg-green-50 border-green-300' },
@@ -85,7 +85,7 @@ const STATUS_TABS = [
 
 const STATUS_NEXT: Record<string, { label: string; value: string; cls: string }[]> = {
   review:   [
-    { label: '案件確定', value: 'new',      cls: 'bg-blue-600 text-white hover:bg-blue-700' },
+    { label: '新着にする', value: 'new',      cls: 'bg-blue-600 text-white hover:bg-blue-700' },
     { label: '除外',     value: 'excluded', cls: 'bg-gray-200 text-gray-700 hover:bg-gray-300' },
   ],
   new:      [
@@ -1044,7 +1044,7 @@ function ReviewRow({
           <button
             onClick={() => onQuickStatus(item.id, 'new')}
             className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium whitespace-nowrap">
-            案件確定
+            新着にする
           </button>
           <button
             onClick={() => onQuickStatus(item.id, 'excluded')}
@@ -1113,7 +1113,7 @@ function ReviewRow({
                 <button
                   onClick={() => onQuickStatus(item.id, 'new')}
                   className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium">
-                  ✓ 案件確定
+                  ✓ 新着にする
                 </button>
                 <button
                   onClick={() => onQuickStatus(item.id, 'excluded')}

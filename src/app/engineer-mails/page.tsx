@@ -154,7 +154,7 @@ const STATUS_TABS = [
 
 const STATUS_NEXT: Record<string, { label: string; value: string; cls: string }[]> = {
   review:     [
-    { label: '技術者確定', value: 'new',      cls: 'bg-teal-600 text-white hover:bg-teal-700' },
+    { label: '新着にする', value: 'new',      cls: 'bg-teal-600 text-white hover:bg-teal-700' },
     { label: '除外',       value: 'excluded', cls: 'bg-gray-200 text-gray-700 hover:bg-gray-300' },
   ],
   new:        [
@@ -1344,7 +1344,7 @@ function ReviewRow({
           <button
             onClick={() => onQuickStatus(item.id, 'new')}
             className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg hover:bg-teal-700 font-medium whitespace-nowrap">
-            技術者確定
+            新着にする
           </button>
           <button
             onClick={() => onQuickStatus(item.id, 'excluded')}
@@ -1435,7 +1435,7 @@ function ReviewRow({
                 <button
                   onClick={() => onQuickStatus(item.id, 'new')}
                   className="text-sm bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 font-medium">
-                  ✓ 技術者確定
+                  ✓ 新着にする
                 </button>
                 <button
                   onClick={() => onQuickStatus(item.id, 'excluded')}
