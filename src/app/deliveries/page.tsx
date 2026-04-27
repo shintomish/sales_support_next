@@ -1246,6 +1246,16 @@ export default function DeliveriesPage() {
                           </div>
                         )}
                       </div>
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation()
+                          router.push(t.type === 'project' ? `/project-mails?select=${t.source_id}` : `/engineer-mails?select=${t.source_id}`)
+                        }}
+                        className="text-xs border border-gray-300 bg-white text-gray-700 rounded px-2 py-1 hover:bg-gray-50 flex-shrink-0 self-center whitespace-nowrap"
+                        title={t.type === 'project' ? '案件メールを開く' : '技術者メールを開く'}>
+                        {t.type === 'project' ? '案件メール' : '技術者メール'} →
+                      </button>
                       <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                         <span className={`text-xs px-2 py-0.5 rounded border font-medium ${THREAD_STATUS_COLORS[t.status] ?? 'bg-gray-100 text-gray-500 border-gray-200'}`}>
                           {THREAD_STATUS_LABELS[t.status] ?? t.status}
