@@ -636,6 +636,40 @@ export default function DeliveriesPage() {
     fetchAddresses()
   }
 
+  // ── 全有効・全無効・状態保存 ────────────────────────
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkMsg, setBulkMsg] = useState<string | null>(null)
+
+  const handleBulkSetActive = async (active: boolean) => {
+    const label = active ? '全有効' : '全無効'
+    if (!confirm(`配信先全件を ${label} にします。よろしいですか？`)) return
+    setBulkBusy(true)
+    setBulkMsg(null)
+    try {
+      const res = await axios.post('/api/v1/delivery-addresses/bulk-set-active', { is_active: active })
+      setBulkMsg(res.data?.message ?? `${label}に更新しました`)
+      fetchAddresses()
+    } catch {
+      setBulkMsg('一括更新に失敗しました')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const handleSaveState = async () => {
+    if (!confirm('現在の有効/無効状態を保存します（ラベル "A"）。よろしいですか？')) return
+    setBulkBusy(true)
+    setBulkMsg(null)
+    try {
+      const res = await axios.post('/api/v1/delivery-addresses/save-state', { label: 'A' })
+      setBulkMsg(res.data?.message ?? '状態を保存しました')
+    } catch {
+      setBulkMsg('状態の保存に失敗しました')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   // ── 新規登録モーダル ──────────────────────────────────
   const [showNewModal, setShowNewModal] = useState(false)
   const [newForm, setNewForm] = useState({ email: '', name: '', occupation: '' })
@@ -789,6 +823,25 @@ export default function DeliveriesPage() {
             </span>
             <div className="ml-auto flex items-center gap-2">
               <button
+                onClick={handleSaveState}
+                disabled={bulkBusy}
+                className="border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm px-3 py-2 rounded">
+                💾 現在の状態を保存
+              </button>
+              <button
+                onClick={() => handleBulkSetActive(true)}
+                disabled={bulkBusy}
+                className="border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-700 text-sm px-3 py-2 rounded">
+                全有効
+              </button>
+              <button
+                onClick={() => handleBulkSetActive(false)}
+                disabled={bulkBusy}
+                className="border border-gray-300 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 text-gray-600 text-sm px-3 py-2 rounded">
+                全無効
+              </button>
+              <span className="w-px h-6 bg-gray-200 mx-1" />
+              <button
                 onClick={() => { setShowNewModal(true); setNewFormError(null) }}
                 className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded"
               >
@@ -810,6 +863,12 @@ export default function DeliveriesPage() {
               </button>
             </div>
           </div>
+
+          {bulkMsg && (
+            <div className="mb-2 px-4 py-2 rounded text-sm bg-blue-50 text-blue-700 border border-blue-200">
+              {bulkMsg}
+            </div>
+          )}
 
           {importing && importProgress && (
             <div className="mb-4">
