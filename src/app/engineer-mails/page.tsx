@@ -1117,7 +1117,7 @@ export default function EngineerMailsPage() {
                       setReplyForm({
                         name: recipientName,
                         to: lastReceived?.from ?? selected.email?.from_address ?? '',
-                        subject: `Re: ${(selected.email?.subject ?? '').replace(/^Re:\s*/i, '')}`,
+                        subject: `Re: ${selected.email?.subject ?? ''}`,
                         body: buildReplyBody(recipientName, quotedSource, emailTemplate),
                       })
                     }}
