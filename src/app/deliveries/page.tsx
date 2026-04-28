@@ -1344,7 +1344,7 @@ export default function DeliveriesPage() {
                                     </span>
                                   </div>
                                   <p className="text-sm font-semibold text-gray-800 mb-1">{detail.subject}</p>
-                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans break-words">{detail.body}</pre>
+                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans break-words">{detail.body?.replace(/<%Name%>/g, '（各配信先名）')}</pre>
                                 </div>
 
                                 {/* 返信一覧 */}
