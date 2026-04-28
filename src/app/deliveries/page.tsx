@@ -1358,7 +1358,7 @@ export default function DeliveriesPage() {
                                     {detail.histories.filter(h => h.status === 'replied').map(h => (
                                       <div key={h.id} className="rounded-lg border p-3 bg-white border-gray-200 mr-8">
                                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                          <span className="text-xs font-bold text-gray-700">← 受信</span>
+                                          <span className="text-xs font-bold text-red-600">← 受信</span>
                                           <span className="text-xs text-gray-400">
                                             {h.replied_at ? new Date(h.replied_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : ''}
                                           </span>
@@ -1495,7 +1495,7 @@ export default function DeliveriesPage() {
                         )}
                         {t.last_received && (
                           <div className="flex items-center gap-1.5 mt-1">
-                            <span className="text-xs font-bold text-gray-700">← 受信</span>
+                            <span className="text-xs font-bold text-red-600">← 受信</span>
                             <span className="text-xs text-gray-400">{formatDateTime(t.last_received.datetime)}</span>
                             <span className="text-xs text-gray-600 truncate">{t.last_received.subject}</span>
                           </div>
@@ -1533,7 +1533,7 @@ export default function DeliveriesPage() {
                           {detail.map((m, i) => (
                             <div key={i} className={`rounded-lg border p-3 ${m.type === 'sent' ? 'bg-blue-50 border-blue-100 ml-8' : 'bg-white border-gray-200 mr-8'}`}>
                               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                <span className={`text-xs font-bold ${m.type === 'sent' ? 'text-blue-600' : 'text-gray-700'}`}>
+                                <span className={`text-xs font-bold ${m.type === 'sent' ? 'text-blue-600' : 'text-red-600'}`}>
                                   {m.type === 'sent' ? '→ 送信' : '← 受信'}
                                 </span>
                                 <span className="text-xs text-gray-400">
