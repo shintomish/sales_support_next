@@ -363,7 +363,7 @@ export default function DeliveriesPage() {
     }
     setExpandedThreadKey(key)
 
-    if (!threadCache[key]) {
+    {
       setThreadDetailLoadingKey(key)
       try {
         const path = t.type === 'project'
