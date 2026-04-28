@@ -70,6 +70,9 @@ type SendHistory = {
   reply_subject: string | null
   reply_received_at: string | null
   reply_body_snippet?: string | null
+  reply_body_text?: string | null
+  reply_from?: string | null
+  reply_from_name?: string | null
 }
 
 type CampaignDetail = Campaign & {
@@ -1321,51 +1324,56 @@ export default function DeliveriesPage() {
                             )}
                             {!isDetailLoading && detail && (
                               <div className="space-y-3">
-                                {detail.histories.length === 0 ? (
-                                  <div className="text-xs text-gray-400">送信履歴がありません</div>
-                                ) : (
-                                  <table className="min-w-full text-xs bg-white border border-gray-200 rounded">
-                                    <thead className="bg-gray-100 text-gray-600">
-                                      <tr>
-                                        <th className="px-3 py-2 text-left">名前</th>
-                                        <th className="px-3 py-2 text-left">メールアドレス</th>
-                                        <th className="px-3 py-2 text-center">状態</th>
-                                        <th className="px-3 py-2 text-left">返信</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                      {detail.histories.map(h => (
-                                        <tr key={h.id} className={h.status === 'replied' ? 'bg-blue-50' : ''}>
-                                          <td className="px-3 py-2 text-gray-800">{h.name ?? '-'}</td>
-                                          <td className="px-3 py-2 text-gray-600">{h.email}</td>
-                                          <td className="px-3 py-2 text-center">
-                                            {{
-                                              sent:    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">送信済</span>,
-                                              failed:  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">失敗</span>,
-                                              replied: <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">返信あり</span>,
-                                            }[h.status]}
-                                          </td>
-                                          <td className="px-3 py-2">
-                                            {h.status === 'replied' && h.replied_at ? (
-                                              <div>
-                                                <p className="text-blue-700 font-medium truncate max-w-[320px]">📩 {h.reply_subject ?? '（件名なし）'}</p>
-                                                <p className="text-[11px] text-gray-400 mt-0.5">
-                                                  {new Date(h.replied_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
-                                                </p>
-                                                {h.reply_body_snippet && (
-                                                  <p className="text-[11px] text-gray-600 mt-1 line-clamp-2 max-w-[420px]">
-                                                    {h.reply_body_snippet}
-                                                  </p>
-                                                )}
-                                              </div>
-                                            ) : (
-                                              <span className="text-gray-300">—</span>
-                                            )}
-                                          </td>
-                                        </tr>
+                                {/* 送信メール */}
+                                <div className="rounded-lg border p-3 bg-blue-50 border-blue-100 ml-8">
+                                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                    <span className="text-xs font-bold text-blue-600">→ 送信</span>
+                                    <span className="text-xs text-gray-400">
+                                      {detail.sent_at ? new Date(detail.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : ''}
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                      送信数: {detail.total_count}件（成功: {detail.success_count} / 失敗: {detail.failed_count}）
+                                    </span>
+                                  </div>
+                                  <p className="text-sm font-semibold text-gray-800 mb-1">{detail.subject}</p>
+                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans break-words">{detail.body}</pre>
+                                </div>
+
+                                {/* 返信一覧 */}
+                                {detail.histories.filter(h => h.status === 'replied').length > 0 && (
+                                  <div className="space-y-3">
+                                    {detail.histories.filter(h => h.status === 'replied').map(h => (
+                                      <div key={h.id} className="rounded-lg border p-3 bg-white border-gray-200 mr-8">
+                                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                          <span className="text-xs font-bold text-gray-700">← 受信</span>
+                                          <span className="text-xs text-gray-400">
+                                            {h.replied_at ? new Date(h.replied_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : ''}
+                                          </span>
+                                          <span className="text-xs text-gray-500">
+                                            From: {h.reply_from_name ?? h.reply_from ?? h.name ?? h.email}
+                                          </span>
+                                        </div>
+                                        <p className="text-sm font-semibold text-gray-800 mb-1">{h.reply_subject ?? '（件名なし）'}</p>
+                                        <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans break-words">
+                                          {h.reply_body_text ?? h.reply_body_snippet ?? ''}
+                                        </pre>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* 送信先サマリー（失敗があれば表示） */}
+                                {detail.histories.some(h => h.status === 'failed') && (
+                                  <div className="mt-2">
+                                    <p className="text-xs font-medium text-red-600 mb-1">送信失敗:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {detail.histories.filter(h => h.status === 'failed').map(h => (
+                                        <span key={h.id} className="text-xs bg-red-50 text-red-600 border border-red-200 rounded px-2 py-0.5">
+                                          {h.name ?? h.email}
+                                        </span>
                                       ))}
-                                    </tbody>
-                                  </table>
+                                    </div>
+                                  </div>
                                 )}
                               </div>
                             )}
