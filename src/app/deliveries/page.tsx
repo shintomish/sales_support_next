@@ -161,6 +161,9 @@ type ThreadMessage = {
   sent_at?: string | null
   received_at?: string | null
   status?: string
+  total_count?: number
+  success_count?: number
+  failed_count?: number
 }
 
 const THREAD_STATUS_COLORS: Record<string, string> = {
@@ -1529,9 +1532,16 @@ export default function DeliveriesPage() {
                                 <span className="text-xs text-gray-400">
                                   {formatDateTime((m.sent_at ?? m.received_at) ?? '')}
                                 </span>
-                                <span className="text-xs text-gray-500 truncate">
-                                  {m.type === 'sent' ? `To: ${m.to_name ?? m.to ?? ''}` : `From: ${m.from_name ?? m.from ?? ''}`}
-                                </span>
+                                {m.type === 'sent' && m.total_count != null && (
+                                  <span className="text-xs text-gray-500">
+                                    送信数: {m.total_count}件（成功: {m.success_count ?? 0} / 失敗: {m.failed_count ?? 0}）
+                                  </span>
+                                )}
+                                {m.type !== 'sent' && (
+                                  <span className="text-xs text-gray-500 truncate">
+                                    From: {m.from_name ?? m.from ?? ''}
+                                  </span>
+                                )}
                               </div>
                               <p className="text-sm font-semibold text-gray-800 mb-1">{m.subject}</p>
                               <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans break-words">
