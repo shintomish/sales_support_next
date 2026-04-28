@@ -2070,7 +2070,8 @@ export default function DeliveriesPage() {
 function formatDateTime(raw: string): string {
   try {
     if (!raw) return '—'
-    const s = raw.endsWith('Z') ? raw : raw.includes('T') ? raw + 'Z' : raw.replace(' ', 'T') + 'Z'
+    const hasTimezone = raw.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(raw)
+    const s = hasTimezone ? raw : raw.includes('T') ? raw + 'Z' : raw.replace(' ', 'T') + 'Z'
     const d = new Date(s)
     if (isNaN(d.getTime())) return '—'
     return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
