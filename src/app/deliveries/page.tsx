@@ -926,13 +926,13 @@ export default function DeliveriesPage() {
       </div>
 
       {/* スクロールコンテンツ */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6 pt-4">
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
 
       {/* ── 配信先一覧タブ ─────────────────────────────── */}
       {tab === 'addresses' && (
         <div>
           {/* 操作バー */}
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-4 mb-4 sticky top-0 bg-white z-10 py-3">
             <input
               type="text"
               placeholder="メール・名前で検索"
@@ -1169,7 +1169,7 @@ export default function DeliveriesPage() {
       {tab === 'campaigns' && (
         <div>
           {/* フィルターバー */}
-          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap gap-3 items-end">
+          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap gap-3 items-end sticky top-0 z-10">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs text-gray-500 mb-1">件名・案件・受信者で検索</label>
               <input
@@ -1438,7 +1438,7 @@ export default function DeliveriesPage() {
       {tab === 'threads' && (
         <div>
           {/* フィルタ */}
-          <div className="flex items-center gap-3 flex-wrap mb-4">
+          <div className="flex items-center gap-3 flex-wrap mb-4 sticky top-0 bg-white z-10 py-3">
             <select value={threadTypeFilter} onChange={e => { setThreadTypeFilter(e.target.value as '' | 'project' | 'engineer'); setThreadPage(1) }}
               className="text-sm border border-gray-300 rounded-md px-3 py-1.5">
               <option value="">全タイプ</option>
