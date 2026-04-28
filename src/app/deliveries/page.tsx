@@ -585,10 +585,11 @@ export default function DeliveriesPage() {
         } catch {}
         const baseBody = applyTemplate(TEMPLATE_ENGINEER, tpl)
         const commentBlock = comment ? `\n${comment}\n` : '\n'
-        const updatedBody = baseBody.replace(
-          /【技術者情報】\n-{3,}\n[\s\S]*?(?=\nぜひ一度)/,
-          `【技術者情報】\n-----------------------------------------------------------------------\n${engineerInfo}\n${commentBlock}`
-        )
+        const infoReplacement = `【技術者情報】\n-----------------------------------------------------------------------\n${engineerInfo}\n${commentBlock}`
+        const infoPattern = /【技術者情報】\n-{3,}\n[\s\S]*?(?=\nぜひ一度)/
+        const updatedBody = infoPattern.test(baseBody)
+          ? baseBody.replace(infoPattern, infoReplacement)
+          : baseBody
         setSendForm({
           project_mail_id: '',
           engineer_mail_source_id: initEngineerMailId,
@@ -1697,10 +1698,15 @@ export default function DeliveriesPage() {
                       setSendForm(f => {
                         const infoBlock = `【技術者情報】\n-----------------------------------------------------------------------\n${engineerInfo}\n`
                         const commentBlock = comment ? `\n${comment}\n` : '\n'
-                        const body = f.body.replace(
-                          /【技術者情報】\n-{3,}\n[\s\S]*?(?=\nぜひ一度)/,
-                          `${infoBlock}${commentBlock}`
-                        )
+                        const pattern = /【技術者情報】\n-{3,}\n[\s\S]*?(?=\nぜひ一度)/
+                        let body = f.body
+                        if (pattern.test(body)) {
+                          body = body.replace(pattern, `${infoBlock}${commentBlock}`)
+                        } else {
+                          // 正規表現がマッチしない場合、テンプレートから再構築
+                          const base = applyTemplate(TEMPLATE_ENGINEER, emailTemplate)
+                          body = base.replace(pattern, `${infoBlock}${commentBlock}`)
+                        }
                         return { ...f, body }
                       })
                     } catch {}
