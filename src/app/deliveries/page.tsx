@@ -51,6 +51,7 @@ type Campaign = {
   project_mail_id: number | null
   engineer_mail_source_id: number | null
   project_title: string | null
+  engineer_mail_title: string | null
   subject: string
   sent_at: string | null
   sent_by: string | null
@@ -1274,7 +1275,7 @@ export default function DeliveriesPage() {
                           <div className="truncate max-w-[176px] text-gray-800" title={camp.subject}>{camp.subject}</div>
                         </td>
                         <td className="px-4 py-3 w-32">
-                          <div className="truncate max-w-[128px] text-gray-500 text-xs" title={camp.project_title ?? ''}>{camp.project_title ?? '-'}</div>
+                          <div className="truncate max-w-[128px] text-gray-500 text-xs" title={camp.project_title ?? camp.engineer_mail_title ?? ''}>{camp.project_title ?? camp.engineer_mail_title ?? '-'}</div>
                         </td>
                         <td className="px-4 py-3 text-center">
                           {camp.engineer_mail_source_id != null
