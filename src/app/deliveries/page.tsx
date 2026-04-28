@@ -338,7 +338,7 @@ export default function DeliveriesPage() {
     try {
       const res = await axios.get('/api/v1/proposal-threads', {
         params: {
-          page: threadPage, per_page: 30,
+          page: threadPage, per_page: 50,
           type: threadTypeFilter || undefined,
           status: threadStatusFilter || undefined,
           search: threadSearch || undefined,
@@ -473,6 +473,7 @@ export default function DeliveriesPage() {
     const res = await axios.get('/api/v1/delivery-campaigns', {
       params: {
         page:          campPage,
+        per_page:      50,
         search:        campSearch        || undefined,
         date_from:     campDateFrom      || undefined,
         date_to:       campDateTo        || undefined,
@@ -1538,7 +1539,7 @@ export default function DeliveriesPage() {
                         <div className="text-xs text-gray-400 py-2">やり取りはありません</div>
                       )}
                       {!isDetailLoading && detail && detail.length > 0 && (
-                        <div className="space-y-3">
+                        <div className="space-y-3 max-h-[500px] overflow-y-auto">
                           {detail.map((m, i) => (
                             <div key={i} className={`rounded-lg border p-3 ${m.type === 'sent' ? 'bg-blue-50 border-blue-100 ml-8' : 'bg-white border-gray-200 mr-8'}`}>
                               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
