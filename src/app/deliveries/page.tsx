@@ -903,11 +903,13 @@ export default function DeliveriesPage() {
   ]
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">配信管理</h1>
+    <div className="flex flex-col h-screen max-w-7xl mx-auto">
+      <div className="flex-shrink-0 px-6 pt-6">
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">配信管理</h1>
+      </div>
 
       {/* タブ */}
-      <div className="flex border-b border-gray-200 mb-6">
+      <div className="flex-shrink-0 px-6 flex border-b border-gray-200">
         {tabs.map(t => (
           <button
             key={t.key}
@@ -922,6 +924,9 @@ export default function DeliveriesPage() {
           </button>
         ))}
       </div>
+
+      {/* スクロールコンテンツ */}
+      <div className="flex-1 overflow-y-auto px-6 pb-6 pt-4">
 
       {/* ── 配信先一覧タブ ─────────────────────────────── */}
       {tab === 'addresses' && (
@@ -2080,6 +2085,7 @@ export default function DeliveriesPage() {
           </div>
         </div>
       )}
+      </div>{/* スクロールコンテンツ end */}
     </div>
   )
 }
