@@ -1282,8 +1282,16 @@ export default function DeliveriesPage() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           {camp.engineer_mail_source_id != null
-                            ? <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">技術者</span>
-                            : <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">案件</span>
+                            ? <span
+                                onClick={e => { e.stopPropagation(); router.push(`/engineer-mails?select=${camp.engineer_mail_source_id}`) }}
+                                className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium cursor-pointer hover:bg-purple-200 transition-colors"
+                              >技術者</span>
+                            : camp.project_mail_id != null
+                              ? <span
+                                  onClick={e => { e.stopPropagation(); router.push(`/project-mails?select=${camp.project_mail_id}`) }}
+                                  className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium cursor-pointer hover:bg-blue-200 transition-colors"
+                                >案件</span>
+                              : <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">配信</span>
                           }
                         </td>
                         <td className="px-4 py-3 text-center text-gray-700">{camp.total_count}</td>
