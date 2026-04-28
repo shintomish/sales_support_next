@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import axios from '@/lib/axios'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
+import EmailHtmlFrame from '@/components/EmailHtmlFrame'
 
 // ── 型定義 ─────────────────────────────────────────────────
 
@@ -1148,8 +1149,7 @@ export default function EngineerMailsPage() {
                       )}
                     </pre>
                   ) : selected.email?.body_html ? (
-                    <div className="prose prose-sm max-w-none text-gray-800 text-sm"
-                      dangerouslySetInnerHTML={{ __html: selected.email.body_html }} />
+                    <EmailHtmlFrame html={selected.email.body_html} />
                   ) : (
                     <p className="text-sm text-gray-400">(本文なし)</p>
                   )}

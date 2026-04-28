@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { supabase } from '@/lib/supabase'
+import EmailHtmlFrame from '@/components/EmailHtmlFrame'
 
 // ── 型定義 ────────────────────────────────────────────────
 
@@ -385,8 +386,7 @@ export default function EmailsPage() {
               {/* 本文 */}
               <div className="bg-white rounded-lg border border-gray-200 p-5">
                 {selectedEmail.body_html ? (
-                  <div className="prose prose-sm max-w-none text-gray-800"
-                    dangerouslySetInnerHTML={{ __html: selectedEmail.body_html }} />
+                  <EmailHtmlFrame html={selectedEmail.body_html} />
                 ) : (
                   <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans">
                     {selectedEmail.body_text || '(本文なし)'}
