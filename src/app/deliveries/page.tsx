@@ -135,6 +135,8 @@ type ProposalThread = {
   partner_email: string
   partner_name: string | null
   last_activity: ThreadLastActivity | null
+  last_sent: ThreadLastActivity | null
+  last_received: ThreadLastActivity | null
   thread_count: number
   has_unread_reply: boolean
 }
@@ -1484,13 +1486,18 @@ export default function DeliveriesPage() {
                           )}
                         </div>
                         <p className="text-xs text-gray-500 truncate mt-0.5">{t.title ?? '—'}</p>
-                        {t.last_activity && (
+                        {t.last_sent && (
                           <div className="flex items-center gap-1.5 mt-1.5">
-                            <span className={`text-xs font-bold ${t.last_activity.type === 'sent' ? 'text-blue-600' : 'text-gray-600'}`}>
-                              {t.last_activity.type === 'sent' ? '→' : '←'}
-                            </span>
-                            <span className="text-xs text-gray-400">{formatDateTime(t.last_activity.datetime)}</span>
-                            <span className="text-xs text-gray-600 truncate">{t.last_activity.subject}</span>
+                            <span className="text-xs font-bold text-blue-600">→ 送信</span>
+                            <span className="text-xs text-gray-400">{formatDateTime(t.last_sent.datetime)}</span>
+                            <span className="text-xs text-gray-600 truncate">{t.last_sent.subject}</span>
+                          </div>
+                        )}
+                        {t.last_received && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="text-xs font-bold text-gray-700">← 受信</span>
+                            <span className="text-xs text-gray-400">{formatDateTime(t.last_received.datetime)}</span>
+                            <span className="text-xs text-gray-600 truncate">{t.last_received.subject}</span>
                           </div>
                         )}
                       </div>
