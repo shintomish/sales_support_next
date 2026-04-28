@@ -330,6 +330,7 @@ export default function DeliveriesPage() {
   const [threadTypeFilter, setThreadTypeFilter] = useState<'' | 'project' | 'engineer'>('')
   const [threadStatusFilter, setThreadStatusFilter] = useState('')
   const [threadSearch, setThreadSearch] = useState('')
+  const [threadUserId, setThreadUserId] = useState('')
   const [threadLoading, setThreadLoading] = useState(false)
 
   const fetchThreads = useCallback(async () => {
@@ -341,12 +342,13 @@ export default function DeliveriesPage() {
           type: threadTypeFilter || undefined,
           status: threadStatusFilter || undefined,
           search: threadSearch || undefined,
+          user_id: threadUserId || undefined,
         },
       })
       setThreads(res.data)
     } catch { setThreads(null) }
     finally { setThreadLoading(false) }
-  }, [threadPage, threadTypeFilter, threadStatusFilter, threadSearch])
+  }, [threadPage, threadTypeFilter, threadStatusFilter, threadSearch, threadUserId])
 
   useEffect(() => {
     if (tab === 'threads') fetchThreads()
@@ -1446,6 +1448,13 @@ export default function DeliveriesPage() {
               <option value="interview">面談</option>
               <option value="won">成約</option>
               <option value="lost">失注</option>
+            </select>
+            <select value={threadUserId} onChange={e => { setThreadUserId(e.target.value); setThreadPage(1) }}
+              className="text-sm border border-gray-300 rounded-md px-3 py-1.5">
+              <option value="">全担当者</option>
+              {salesUsers.map(u => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
             </select>
             <input type="text" placeholder="顧客名・技術者名で検索" value={threadSearch}
               onChange={e => { setThreadSearch(e.target.value); setThreadPage(1) }}
