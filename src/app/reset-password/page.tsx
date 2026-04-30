@@ -5,6 +5,24 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
+function toJapaneseAuthError(err: unknown): string {
+  const code = (err as { code?: string } | null)?.code;
+  const message = err instanceof Error ? err.message : '';
+  switch (code) {
+    case 'weak_password':
+      return 'このパスワードは漏洩データに含まれているか、推測されやすいため使用できません。別のパスワードを設定してください。';
+    case 'same_password':
+      return '現在のパスワードと同じものは設定できません。別のパスワードを入力してください。';
+    case 'session_not_found':
+    case 'session_expired':
+      return 'セッションの有効期限が切れました。再度パスワード再設定リンクを取得してください。';
+  }
+  if (/weak|easy to guess|pwned|leaked/i.test(message)) {
+    return 'このパスワードは漏洩データに含まれているか、推測されやすいため使用できません。別のパスワードを設定してください。';
+  }
+  return message || 'パスワード更新に失敗しました';
+}
+
 export default function ResetPasswordPage() {
   const router = useRouter();
   const [password, setPassword]               = useState('');
@@ -86,8 +104,7 @@ export default function ResetPasswordPage() {
       setSubmitted(true);
       setTimeout(() => router.push('/login'), 2000);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'パスワード更新に失敗しました';
-      setError(msg);
+      setError(toJapaneseAuthError(err));
     } finally {
       setLoading(false);
     }
