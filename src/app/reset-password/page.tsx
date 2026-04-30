@@ -15,22 +15,44 @@ export default function ResetPasswordPage() {
   const [submitted, setSubmitted]             = useState(false);
 
   // メール内のリンクから来た場合、URLハッシュにrecoveryトークンが含まれる。
-  // Supabase JS SDKは onAuthStateChange("PASSWORD_RECOVERY") でこれを検知する。
+  // supabase クライアント側で detectSessionInUrl=false にしているため、
+  // ここで明示的にハッシュをパースして setSession を呼ぶ。
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setSessionReady('ok');
-      }
-    });
+    const hash = window.location.hash.startsWith('#')
+      ? window.location.hash.slice(1)
+      : window.location.hash;
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    const type = params.get('type');
+    const errorDescription = params.get('error_description');
 
-    // フォールバック: 既にセッション確立済みかも
+    if (errorDescription) {
+      setSessionReady('invalid');
+      return;
+    }
+
+    if (accessToken && refreshToken && type === 'recovery') {
+      supabase.auth
+        .setSession({ access_token: accessToken, refresh_token: refreshToken })
+        .then(({ error }) => {
+          if (!error) {
+            setSessionReady('ok');
+            window.history.replaceState(null, '', window.location.pathname);
+          } else {
+            setSessionReady('invalid');
+          }
+        });
+      return;
+    }
+
+    // ハッシュが無い/不正: 既にセッションが残っているかフォールバック確認
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setSessionReady('ok');
       } else {
-        // 短いタイマー: ハッシュ処理は同期的に走るので、それでも未確立なら無効
         timeoutId = setTimeout(() => {
           setSessionReady((prev) => (prev === 'checking' ? 'invalid' : prev));
         }, 1500);
@@ -38,7 +60,6 @@ export default function ResetPasswordPage() {
     });
 
     return () => {
-      subscription.unsubscribe();
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, []);
