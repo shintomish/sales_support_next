@@ -5,7 +5,7 @@ import Sidebar from '@/components/Sidebar';
 import RealtimeToast from '@/components/RealtimeToast';
 import { useAuthStore } from '@/store/authStore';
 
-const NO_SIDEBAR_PATHS = ['/login'];
+const NO_SIDEBAR_PATHS = ['/login', '/forgot-password', '/reset-password'];
 
 export default function SidebarWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
