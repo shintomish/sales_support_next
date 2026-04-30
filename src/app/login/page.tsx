@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 
 export default function LoginPage() {
@@ -144,16 +145,23 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* ログイン状態を保持する */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 24 }}>
-              <input
-                type="checkbox" id="remember" checked={remember}
-                onChange={e => setRemember(e.target.checked)}
-                style={{ width: 16, height: 16, accentColor: '#f97316', cursor: 'pointer' }}
-              />
-              <label htmlFor="remember" style={{ fontSize: 13, color: '#6b7280', cursor: 'pointer' }}>
-                ログイン状態を保持する
-              </label>
+            {/* ログイン状態を保持する / パスワードを忘れた */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox" id="remember" checked={remember}
+                  onChange={e => setRemember(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: '#f97316', cursor: 'pointer' }}
+                />
+                <label htmlFor="remember" style={{ fontSize: 13, color: '#6b7280', cursor: 'pointer' }}>
+                  ログイン状態を保持する
+                </label>
+              </div>
+              <Link href="/forgot-password" style={{
+                fontSize: 13, color: '#f97316', textDecoration: 'none', fontWeight: 600,
+              }}>
+                パスワードを忘れた方
+              </Link>
             </div>
 
             {/* ログインボタン */}
