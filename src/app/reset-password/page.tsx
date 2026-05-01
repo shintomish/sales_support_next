@@ -5,6 +5,19 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
+function checkPasswordRequirements(pw: string) {
+  return {
+    length:    pw.length >= 8,
+    uppercase: /[A-Z]/.test(pw),
+    lowercase: /[a-z]/.test(pw),
+    digit:     /[0-9]/.test(pw),
+  };
+}
+function isPasswordValid(pw: string): boolean {
+  const c = checkPasswordRequirements(pw);
+  return c.length && c.uppercase && c.lowercase && c.digit;
+}
+
 function toJapaneseAuthError(err: unknown): string {
   const code = (err as { code?: string } | null)?.code;
   const message = err instanceof Error ? err.message : '';
@@ -86,8 +99,8 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError('');
 
-    if (password.length < 8) {
-      setError('パスワードは8文字以上で設定してください');
+    if (!isPasswordValid(password)) {
+      setError('パスワードは8文字以上で、大文字・小文字・数字をそれぞれ1文字以上含めてください');
       return;
     }
     if (password !== passwordConfirm) {
@@ -212,7 +225,7 @@ export default function ResetPasswordPage() {
                 </label>
                 <input
                   type="password" value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="8文字以上" required minLength={8}
+                  placeholder="8文字以上、大文字・小文字・数字を含む" required minLength={8}
                   style={{
                     width: '100%', padding: '11px 12px',
                     border: '1.5px solid #e5e7eb', borderRadius: 8,
@@ -221,6 +234,30 @@ export default function ResetPasswordPage() {
                   onFocus={e => e.target.style.borderColor = '#f97316'}
                   onBlur={e => e.target.style.borderColor = '#e5e7eb'}
                 />
+                {/* リアルタイムパスワード強度チェッカー */}
+                {(() => {
+                  const c = checkPasswordRequirements(password);
+                  const Item = ({ ok, label }: { ok: boolean; label: string }) => (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: ok ? '#10b981' : '#9ca3af' }}>
+                      <span style={{ fontWeight: 700, width: 14, display: 'inline-block', textAlign: 'center' }}>{ok ? '✓' : '・'}</span>
+                      <span>{label}</span>
+                    </div>
+                  );
+                  return (
+                    <div style={{ marginTop: 8, padding: '8px 10px', background: '#f9fafb', borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <Item ok={c.length}    label="8文字以上" />
+                      <Item ok={c.uppercase} label="大文字を含む（A-Z）" />
+                      <Item ok={c.lowercase} label="小文字を含む（a-z）" />
+                      <Item ok={c.digit}     label="数字を含む（0-9）" />
+                    </div>
+                  );
+                })()}
+                {/* 漏洩パスワード注記 */}
+                <div style={{ marginTop: 8, padding: '8px 10px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, fontSize: 11, color: '#78350f', lineHeight: 1.6 }}>
+                  ⚠ ありふれた漏洩パスワードは使用できません<br />
+                  <span style={{ color: '#b91c1c' }}>✕ 不可例: <code>Password123</code>, <code>Aizen2026</code>, <code>Qwerty12345</code></span><br />
+                  <span style={{ color: '#065f46' }}>✓ 推奨例: <code>MyDog2026Sun</code>, <code>Aiz2026Sales</code>（独自フレーズ＋数字）</span>
+                </div>
               </div>
 
               <div style={{ marginBottom: 24 }}>
@@ -238,20 +275,30 @@ export default function ResetPasswordPage() {
                   onFocus={e => e.target.style.borderColor = '#f97316'}
                   onBlur={e => e.target.style.borderColor = '#e5e7eb'}
                 />
+                {passwordConfirm.length > 0 && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: password === passwordConfirm ? '#10b981' : '#ef4444' }}>
+                    {password === passwordConfirm ? '✓ 一致しています' : '・ パスワードが一致していません'}
+                  </div>
+                )}
               </div>
 
-              <button
-                type="submit" disabled={loading}
-                style={{
-                  width: '100%', padding: '13px',
-                  background: loading ? '#fdba74' : 'linear-gradient(135deg, #f97316, #ea580c)',
-                  color: '#fff', border: 'none', borderRadius: 8,
-                  fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 14px rgba(249,115,22,0.4)',
-                }}
-              >
-                {loading ? '更新中...' : 'パスワードを更新'}
-              </button>
+              {(() => {
+                const canSubmit = isPasswordValid(password) && password === passwordConfirm && !loading;
+                return (
+                  <button
+                    type="submit" disabled={!canSubmit}
+                    style={{
+                      width: '100%', padding: '13px',
+                      background: canSubmit ? 'linear-gradient(135deg, #f97316, #ea580c)' : '#fdba74',
+                      color: '#fff', border: 'none', borderRadius: 8,
+                      fontSize: 15, fontWeight: 700, cursor: canSubmit ? 'pointer' : 'not-allowed',
+                      boxShadow: canSubmit ? '0 4px 14px rgba(249,115,22,0.4)' : 'none',
+                    }}
+                  >
+                    {loading ? '更新中...' : 'パスワードを更新'}
+                  </button>
+                );
+              })()}
             </form>
           )}
         </div>
