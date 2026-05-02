@@ -13,6 +13,7 @@ interface TimesheetRow {
   customer_id: number | null;
   customer_name: string | null;
   engineer_name: string | null;
+  category: 'engineer' | 'project';
   timesheet_received_date: string | null;
   actual_hours: string | null;
   absence_days: string | null;
@@ -27,6 +28,9 @@ const yen = (n: string | number | null | undefined) =>
   n == null || n === '' ? '-' : `¥${Number(n).toLocaleString()}`;
 
 const fmtDate = (v: string | null): string => v?.slice(0, 10) ?? '-';
+
+const categoryLabel = (c: 'engineer' | 'project'): '案件' | '技術者' =>
+  c === 'engineer' ? '技術者' : '案件';
 
 /** 直近12ヶ月の YYYY-MM 配列を新しい順で返す */
 const recentMonths = (): string[] => {
@@ -47,6 +51,7 @@ export default function TimesheetsPage() {
   const [loading,   setLoading]   = useState(false);
   const [sortBy,    setSortBy]    = useState<string>('customer');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [includeProjects, setIncludeProjects] = useState<boolean>(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -67,11 +72,17 @@ export default function TimesheetsPage() {
     else { setSortBy(field); setSortOrder('asc'); }
   };
 
+  const filteredItems = useMemo(
+    () => includeProjects ? items : items.filter((r) => r.category === 'engineer'),
+    [items, includeProjects]
+  );
+
   const sortedItems = useMemo(() => {
-    const arr = [...items];
+    const arr = [...filteredItems];
     const get = (r: TimesheetRow): string | number => {
       switch (sortBy) {
         case 'customer':         return r.customer_name ?? '';
+        case 'category':         return r.category;
         case 'deal':             return r.deal_title ?? '';
         case 'engineer':         return r.engineer_name ?? '';
         case 'received':         return r.timesheet_received_date ?? '';
@@ -89,10 +100,10 @@ export default function TimesheetsPage() {
       return 0;
     });
     return arr;
-  }, [items, sortBy, sortOrder]);
+  }, [filteredItems, sortBy, sortOrder]);
 
-  const receivedCount   = items.filter((r) => r.timesheet_received_date).length;
-  const unreceivedCount = items.length - receivedCount;
+  const receivedCount   = filteredItems.filter((r) => r.timesheet_received_date).length;
+  const unreceivedCount = filteredItems.length - receivedCount;
 
   return (
     <div className="h-full flex flex-col p-6 max-w-7xl mx-auto w-full">
@@ -128,10 +139,19 @@ export default function TimesheetsPage() {
         </div>
 
         <div className="text-sm text-gray-500 self-center flex gap-3">
-          <span>全 {items.length} 件</span>
+          <span>{includeProjects ? '全' : '技術者'} {filteredItems.length} 件</span>
           <span className="text-green-600">受領 {receivedCount}</span>
           <span className="text-orange-600">未受領 {unreceivedCount}</span>
         </div>
+
+        <label className="self-center inline-flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={includeProjects}
+            onChange={(e) => setIncludeProjects(e.target.checked)}
+          />
+          案件も表示
+        </label>
 
         <div className="flex items-end gap-2">
           <Button variant="outline" onClick={fetchData} disabled={loading}>
@@ -147,6 +167,7 @@ export default function TimesheetsPage() {
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
                 <SortableHeader label="取引先"   field="customer" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[140px]" />
+                <SortableHeader label="分類"     field="category" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[70px]" />
                 <SortableHeader label="案件"     field="deal"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[140px]" />
                 <SortableHeader label="技術者"   field="engineer" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
                 <SortableHeader label="受領日"   field="received" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
@@ -160,13 +181,20 @@ export default function TimesheetsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
+                <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
               ) : sortedItems.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">該当データなし</td></tr>
+                <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">該当データなし</td></tr>
               ) : (
-                sortedItems.map((r, idx) => (
+                sortedItems.map((r, idx) => {
+                  const cat = categoryLabel(r.category);
+                  return (
                   <tr key={r.deal_id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
                     <td className="px-2 py-3 text-gray-800 truncate" title={r.customer_name ?? ''}>{r.customer_name ?? '-'}</td>
+                    <td className="px-2 py-3 text-center">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                        cat === '技術者' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+                      }`}>{cat}</span>
+                    </td>
                     <td className="px-2 py-3 truncate" title={r.deal_title ?? ''}>{r.deal_title}</td>
                     <td className="px-2 py-3 text-gray-600 truncate" title={r.engineer_name ?? ''}>{r.engineer_name ?? '-'}</td>
                     <td className={`px-2 py-3 ${r.timesheet_received_date ? 'text-green-700' : 'text-orange-600'}`}>
@@ -187,7 +215,8 @@ export default function TimesheetsPage() {
                       >✏️ 編集</Link>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -13,6 +13,7 @@ const selectCls = inputCls;
 const labelCls = 'text-xs text-gray-500 mb-1 block';
 
 interface FormData {
+  category: 'engineer' | 'project';
   engineer_name: string;
   customer_name: string;
   project_name: string;
@@ -87,6 +88,7 @@ export default function SesContractEditPage() {
       const res = await apiClient.get(`/api/v1/ses-contracts/${id}`);
       const d = res.data.data;
       setForm({
+        category:                    (d.category === 'engineer' || d.category === 'project') ? d.category : 'project',
         engineer_name:               toStr(d.engineer_name),
         customer_name:               toStr(d.customer_name),
         project_name:                toStr(d.project_name),
@@ -243,7 +245,14 @@ export default function SesContractEditPage() {
             <CardHeader><CardTitle className="text-base text-gray-700">基本情報</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className={labelCls}>氏名 <span className="text-red-500">*</span></label>
+                <label className={labelCls}>分類</label>
+                <select value={form.category} onChange={set('category')} className={selectCls}>
+                  <option value="engineer">技術者</option>
+                  <option value="project">案件</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>{form.category === 'engineer' ? '氏名' : '案件名（技術者欄）'} <span className="text-red-500">*</span></label>
                 <Input value={form.engineer_name} onChange={set('engineer_name')}
                   className={errors.engineer_name ? 'border-red-400' : ''} />
                 {errors.engineer_name && <p className="text-xs text-red-500 mt-1">{errors.engineer_name}</p>}

@@ -29,12 +29,16 @@ export function useUnreadEmailCount() {
       )
       .subscribe();
 
+    // 15分ごとに再取得（取りこぼし防止のフォールバック）
+    const intervalId = setInterval(fetchUnreadCount, 15 * 60 * 1000);
+
     // 全件既読ボタン押下時のカスタムイベントを受信
     const handleMarkAllRead = () => { fetchUnreadCount(); };
     window.addEventListener('emails:mark-all-read', handleMarkAllRead);
 
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(intervalId);
       window.removeEventListener('emails:mark-all-read', handleMarkAllRead);
     };
   }, [fetchUnreadCount]);

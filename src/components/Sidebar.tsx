@@ -164,8 +164,8 @@ export default function Sidebar() {
         <span>{it.icon}</span>
         <span className="flex-1">{it.label}</span>
         {it.badge != null && it.badge > 0 && (
-          <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
-            {it.badge > 99 ? '99+' : it.badge}
+          <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center tabular-nums">
+            {it.badge}
           </span>
         )}
       </button>
@@ -186,7 +186,7 @@ export default function Sidebar() {
           <span className="flex-1 font-semibold">{g.label}</span>
           {!isOpen && sumBadge > 0 && (
             <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
-              {sumBadge > 99 ? '99+' : sumBadge}
+              {sumBadge}
             </span>
           )}
           <span className="text-gray-500 text-xs">{isOpen ? '▾' : '▸'}</span>
