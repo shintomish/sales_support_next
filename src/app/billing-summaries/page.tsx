@@ -152,7 +152,12 @@ export default function BillingSummariesPage() {
           <Button variant="outline" onClick={fetchData} disabled={loading}>
             {loading ? '更新中...' : '更新'}
           </Button>
-          <Button onClick={downloadCsv} className="bg-blue-600 hover:bg-blue-700 text-white">
+          <Button
+            onClick={downloadCsv}
+            disabled={loading || items.length === 0}
+            className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
+            title={items.length === 0 ? '該当データがありません' : ''}
+          >
             CSVダウンロード
           </Button>
         </div>
