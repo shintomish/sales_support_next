@@ -31,6 +31,7 @@ export default function Sidebar() {
     { label: '担当者管理',     path: '/contacts',       icon: '👤',  badge: 0,            sesOnly: false },
     { label: '商談管理',       path: '/deals',          icon: '💼',  badge: 0,            sesOnly: false },
     { label: 'SES台帳',        path: '/ses-contracts',   icon: '📋',  badge: 0,            sesOnly: true  },
+    { label: '請求集計',       path: '/billing-summaries', icon: '💴',  badge: 0,           sesOnly: true  },
     { label: '技術者管理',     path: '/engineers',       icon: '🧑‍💻', badge: 0,            sesOnly: true  },
     { label: '案件マーケット', path: '/public-projects', icon: '🔍',  badge: 0,            sesOnly: true  },
     { label: '案件メール',     path: '/project-mails',   icon: '📨',  badge: 0,            sesOnly: true  },
