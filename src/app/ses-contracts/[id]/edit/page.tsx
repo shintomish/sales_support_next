@@ -214,6 +214,10 @@ export default function SesContractEditPage() {
             className="border-blue-300 text-blue-600 hover:bg-blue-50">
             {promoting ? '登録中...' : '💼 商談管理に登録'}
           </Button>
+          <Button variant="outline" onClick={() => router.push(`/ses-contracts/${id}/timesheets`)}
+            className="border-emerald-300 text-emerald-600 hover:bg-emerald-50">
+            📅 月別勤務表
+          </Button>
           <Button variant="outline" onClick={() => router.push('/ses-contracts')}>← 戻る</Button>
         </div>
       </div>
