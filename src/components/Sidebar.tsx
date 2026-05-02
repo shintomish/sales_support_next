@@ -47,6 +47,12 @@ export default function Sidebar() {
     (item) => !item.sesOnly || user?.tenant?.ses_enabled
   );
 
+  // 管理メニュー（super_admin / tenant_admin のみ表示）
+  const adminMenuItems = [
+    { label: 'ユーザー管理', path: '/admin/users', icon: '🛡️' },
+  ];
+  const showAdminMenu = user?.role === 'super_admin' || user?.role === 'tenant_admin';
+
   return (
     <>
       {/* トースト通知 */}
@@ -81,6 +87,26 @@ export default function Sidebar() {
               )}
             </button>
           ))}
+
+          {showAdminMenu && (
+            <>
+              <p className="text-xs text-gray-500 px-2 mt-6 mb-2 tracking-widest">管理</p>
+              {adminMenuItems.map((item) => (
+                <button
+                  key={item.path}
+                  onClick={() => router.push(item.path)}
+                  className={`w-full text-left px-4 py-2 rounded-md text-sm transition-colors flex items-center gap-3 ${
+                    pathname.startsWith(item.path)
+                      ? 'bg-gray-700 text-white border-l-2 border-blue-400'
+                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                  }`}
+                >
+                  <span>{item.icon}</span>
+                  <span className="flex-1">{item.label}</span>
+                </button>
+              ))}
+            </>
+          )}
         </nav>
 
         {/* 期限切れサマリー（件数がある場合のみ表示） */}
