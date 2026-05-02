@@ -28,6 +28,7 @@ interface DealRow {
   tax_rate: number;
   invoice_id: number | null;
   invoice_status: 'draft' | 'issued' | null;
+  invoice_pdf_path: string | null;
 }
 
 interface CustomerRow {
@@ -253,7 +254,7 @@ export default function BillingSummariesPage() {
                 <th className="text-right px-2 py-3 font-semibold w-[80px]">小計</th>
                 <th className="text-right px-2 py-3 font-semibold w-[70px]">消費税</th>
                 <SortableHeader label="請求合計" field="total" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[100px]" />
-                {group === 'deal' && <th className="text-center px-2 py-3 font-semibold w-[190px]">操作</th>}
+                {group === 'deal' && <th className="text-center px-2 py-3 font-semibold w-[220px]">操作</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -288,6 +289,17 @@ export default function BillingSummariesPage() {
                           title="案件・契約を編集"
                           className="text-xs px-2 py-1 rounded text-gray-700 hover:bg-gray-100"
                         >⚙️</Link>
+                        {r.invoice_status === 'issued' && r.invoice_pdf_path ? (
+                          <a
+                            href={r.invoice_pdf_path}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="請求書PDFをダウンロード"
+                            className="text-xs px-2 py-1 rounded text-gray-700 hover:bg-gray-100 inline-block w-[32px] text-center"
+                          >📥</a>
+                        ) : (
+                          <span className="inline-block w-[32px]" aria-hidden="true" />
+                        )}
                         {r.invoice_id ? (
                           <Link
                             href={`/invoices/${r.invoice_id}`}
