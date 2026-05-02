@@ -257,17 +257,17 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               </tbody>
               <tfoot className="bg-gray-50">
                 <tr>
-                  <td colSpan={5} className="px-2 py-2 text-right text-gray-600">小計（プレビュー）</td>
+                  <td colSpan={5} className="px-2 py-2 text-right text-gray-600">小計</td>
                   <td className="px-2 py-2 text-right tabular-nums">{yen(preview.subtotal)}</td>
                   <td></td>
                 </tr>
                 <tr>
-                  <td colSpan={5} className="px-2 py-2 text-right text-gray-600">消費税（プレビュー）</td>
+                  <td colSpan={5} className="px-2 py-2 text-right text-gray-600">消費税</td>
                   <td className="px-2 py-2 text-right tabular-nums">{yen(preview.tax)}</td>
                   <td></td>
                 </tr>
                 <tr className="font-semibold">
-                  <td colSpan={5} className="px-2 py-2 text-right">合計（プレビュー）</td>
+                  <td colSpan={5} className="px-2 py-2 text-right">合計</td>
                   <td className="px-2 py-2 text-right tabular-nums text-blue-700">{yen(preview.total)}</td>
                   <td></td>
                 </tr>
