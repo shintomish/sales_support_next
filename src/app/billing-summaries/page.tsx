@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import SortableHeader from '@/components/SortableHeader';
 
 type GroupType = 'deal' | 'customer';
 
@@ -23,6 +26,8 @@ interface DealRow {
   tax: number;
   total: number;
   tax_rate: number;
+  invoice_id: number | null;
+  invoice_status: 'draft' | 'issued' | null;
 }
 
 interface CustomerRow {
@@ -60,6 +65,7 @@ const recentMonths = (): string[] => {
 };
 
 export default function BillingSummariesPage() {
+  const router = useRouter();
   const months = recentMonths();
   const [yearMonth, setYearMonth] = useState<string>(months[0]);
   const [group,     setGroup]     = useState<GroupType>('deal');
@@ -67,6 +73,9 @@ export default function BillingSummariesPage() {
   const [items,     setItems]     = useState<(DealRow | CustomerRow)[]>([]);
   const [totals,    setTotals]    = useState<Totals | null>(null);
   const [loading,   setLoading]   = useState(false);
+  const [issuingId, setIssuingId] = useState<number | null>(null);
+  const [sortBy,    setSortBy]    = useState<string>('customer');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -82,6 +91,57 @@ export default function BillingSummariesPage() {
   }, [yearMonth, group, q]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleSort = (field: string) => {
+    if (sortBy === field) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(field); setSortOrder('asc'); }
+  };
+
+  const sortedItems = useMemo(() => {
+    const arr = [...items];
+    const get = (r: DealRow | CustomerRow): string | number => {
+      switch (sortBy) {
+        case 'customer':       return r.customer_name ?? '';
+        case 'invoice_code':   return r.invoice_code ?? '';
+        case 'deal':           return (r as DealRow).deal_title ?? '';
+        case 'engineer':       return (r as DealRow).engineer_name ?? '';
+        case 'deal_count':     return (r as CustomerRow).deal_count ?? 0;
+        case 'actual_hours':   return Number(r.actual_hours ?? 0);
+        case 'basic':          return Number(r.basic);
+        case 'deduction':      return Number(r.deduction);
+        case 'overtime':       return Number(r.overtime);
+        case 'transportation': return Number(r.transportation);
+        case 'subtotal':       return Number(r.subtotal);
+        case 'tax':            return Number(r.tax);
+        case 'total':          return Number(r.total);
+        default:               return r.customer_name ?? '';
+      }
+    };
+    arr.sort((a, b) => {
+      const ka = get(a), kb = get(b);
+      if (ka < kb) return sortOrder === 'asc' ? -1 : 1;
+      if (ka > kb) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [items, sortBy, sortOrder]);
+
+  const issueInvoice = async (dealId: number, customerName: string | null) => {
+    if (!confirm(`${customerName ?? ''}+${yearMonth} の請求書（下書き）を発行します。よろしいですか？`)) return;
+    setIssuingId(dealId);
+    try {
+      const res = await apiClient.post<{ id: number }>('/api/v1/invoices', {
+        deal_id:    dealId,
+        year_month: yearMonth,
+      });
+      router.push(`/invoices/${res.data.id}`);
+    } catch (err: unknown) {
+      const data = (err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } })?.response?.data;
+      const msg = data?.errors?.deal_id?.[0] ?? data?.message ?? '請求書の発行に失敗しました';
+      alert(msg);
+      setIssuingId(null);
+    }
+  };
 
   const downloadCsv = async () => {
     const params = new URLSearchParams({ year_month: yearMonth, group });
@@ -148,15 +208,17 @@ export default function BillingSummariesPage() {
           />
         </div>
 
+        <span className="text-sm text-gray-500 self-center">全 {sortedItems.length} 件</span>
+
         <div className="flex items-end gap-2">
           <Button variant="outline" onClick={fetchData} disabled={loading}>
             {loading ? '更新中...' : '更新'}
           </Button>
           <Button
             onClick={downloadCsv}
-            disabled={loading || items.length === 0}
+            disabled={loading || sortedItems.length === 0}
             className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
-            title={items.length === 0 ? '該当データがありません' : ''}
+            title={sortedItems.length === 0 ? '該当データがありません' : ''}
           >
             CSVダウンロード
           </Button>
@@ -164,76 +226,111 @@ export default function BillingSummariesPage() {
       </div>
 
       {/* テーブル */}
-      <div className="flex-1 min-h-0 flex flex-col bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-auto">
-          <table className="w-full text-sm">
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+          <table className="table-fixed w-full text-sm">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
                 {group === 'deal' ? (
                   <>
-                    <th className="text-left px-3 py-3 font-semibold">取引先</th>
-                    <th className="text-left px-3 py-3 font-semibold">請求書コード</th>
-                    <th className="text-left px-3 py-3 font-semibold">案件</th>
-                    <th className="text-left px-3 py-3 font-semibold">技術者</th>
+                    <SortableHeader label="取引先"       field="customer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[120px]" />
+                    <SortableHeader label="請求書コード" field="invoice_code" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[90px]" />
+                    <SortableHeader label="案件"         field="deal"         sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
+                    <SortableHeader label="技術者"       field="engineer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[80px]" />
                   </>
                 ) : (
                   <>
-                    <th className="text-left px-3 py-3 font-semibold">取引先</th>
-                    <th className="text-left px-3 py-3 font-semibold">請求書コード</th>
-                    <th className="text-right px-3 py-3 font-semibold">案件数</th>
+                    <SortableHeader label="取引先"       field="customer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[180px]" />
+                    <SortableHeader label="請求書コード" field="invoice_code" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
+                    <th className="text-right px-2 py-3 font-semibold w-[70px]">案件数</th>
                   </>
                 )}
-                <th className="text-right px-3 py-3 font-semibold">実時間</th>
-                <th className="text-right px-3 py-3 font-semibold">基本額</th>
-                <th className="text-right px-3 py-3 font-semibold">控除</th>
-                <th className="text-right px-3 py-3 font-semibold">超過</th>
-                <th className="text-right px-3 py-3 font-semibold">交通費</th>
-                <th className="text-right px-3 py-3 font-semibold">小計</th>
-                <th className="text-right px-3 py-3 font-semibold">消費税</th>
-                <th className="text-right px-3 py-3 font-semibold">請求合計</th>
+                <th className="text-right px-2 py-3 font-semibold w-[60px]">実時間</th>
+                <th className="text-right px-2 py-3 font-semibold w-[80px]">基本額</th>
+                <th className="text-right px-2 py-3 font-semibold w-[70px]">控除</th>
+                <th className="text-right px-2 py-3 font-semibold w-[70px]">超過</th>
+                <th className="text-right px-2 py-3 font-semibold w-[70px]">交通費</th>
+                <th className="text-right px-2 py-3 font-semibold w-[80px]">小計</th>
+                <th className="text-right px-2 py-3 font-semibold w-[70px]">消費税</th>
+                <SortableHeader label="請求合計" field="total" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[100px]" />
+                {group === 'deal' && <th className="text-center px-2 py-3 font-semibold w-[190px]">操作</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
-              ) : items.length === 0 ? (
-                <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">該当データなし</td></tr>
+                <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
+              ) : sortedItems.length === 0 ? (
+                <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-400">該当データなし</td></tr>
               ) : group === 'deal' ? (
-                (items as DealRow[]).map((r) => (
-                  <tr key={r.deal_id} className="hover:bg-gray-50">
-                    <td className="px-3 py-2">{r.customer_name ?? '-'}</td>
-                    <td className="px-3 py-2 text-gray-500 text-xs">{r.invoice_code ?? '-'}</td>
-                    <td className="px-3 py-2">{r.deal_title}</td>
-                    <td className="px-3 py-2 text-gray-600">{r.engineer_name ?? '-'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{r.actual_hours ?? '-'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{yen(r.basic)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-red-600">{r.deduction ? `-${yen(r.deduction).slice(1)}` : '-'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{r.overtime ? yen(r.overtime) : '-'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{r.transportation ? yen(r.transportation) : '-'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{yen(r.subtotal)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{yen(r.tax)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-semibold">{yen(r.total)}</td>
+                (sortedItems as DealRow[]).map((r, idx) => (
+                  <tr key={r.deal_id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
+                    <td className="px-2 py-3 text-gray-800 truncate" title={r.customer_name ?? ''}>{r.customer_name ?? '-'}</td>
+                    <td className="px-2 py-3 text-gray-500 text-xs truncate" title={r.invoice_code ?? ''}>{r.invoice_code ?? '-'}</td>
+                    <td className="px-2 py-3 truncate" title={r.deal_title ?? ''}>{r.deal_title}</td>
+                    <td className="px-2 py-3 text-gray-600 truncate" title={r.engineer_name ?? ''}>{r.engineer_name ?? '-'}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{r.actual_hours ?? '-'}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{yen(r.basic)}</td>
+                    <td className="px-2 py-3 text-right tabular-nums text-red-600">{r.deduction ? `-${yen(r.deduction).slice(1)}` : '-'}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{r.overtime ? yen(r.overtime) : '-'}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{r.transportation ? yen(r.transportation) : '-'}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{yen(r.subtotal)}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{yen(r.tax)}</td>
+                    <td className="px-2 py-3 text-right tabular-nums font-semibold">{yen(r.total)}</td>
+                    <td className="px-2 py-3 text-center whitespace-nowrap">
+                      <div className="inline-flex items-center gap-1">
+                        <Link
+                          href={`/ses-contracts/${r.deal_id}/timesheets`}
+                          title="勤務表を編集"
+                          className="text-xs px-2 py-1 rounded text-gray-700 hover:bg-gray-100"
+                        >✏️</Link>
+                        <Link
+                          href={`/ses-contracts/${r.deal_id}/edit`}
+                          title="案件・契約を編集"
+                          className="text-xs px-2 py-1 rounded text-gray-700 hover:bg-gray-100"
+                        >⚙️</Link>
+                        {r.invoice_id ? (
+                          <Link
+                            href={`/invoices/${r.invoice_id}`}
+                            title={r.invoice_status === 'issued' ? '発行済の請求書を表示' : '下書きの請求書を編集'}
+                            className={`text-xs px-2 py-1 rounded text-white inline-block w-[72px] text-center ${
+                              r.invoice_status === 'issued' ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'
+                            }`}
+                          >
+                            {r.invoice_status === 'issued' ? '📋 発行済' : '📋 下書き'}
+                          </Link>
+                        ) : (
+                          <button
+                            onClick={() => issueInvoice(r.deal_id, r.customer_name)}
+                            disabled={issuingId === r.deal_id || !r.invoice_code}
+                            title={!r.invoice_code ? '取引先に請求書コードが未設定です' : '請求書を発行'}
+                            className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-block w-[72px] text-center"
+                          >
+                            {issuingId === r.deal_id ? '...' : '📄 発行'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))
               ) : (
-                (items as CustomerRow[]).map((r) => (
-                  <tr key={r.customer_id ?? 0} className="hover:bg-gray-50">
-                    <td className="px-3 py-2">{r.customer_name ?? '-'}</td>
-                    <td className="px-3 py-2 text-gray-500 text-xs">{r.invoice_code ?? '-'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{r.deal_count}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{r.actual_hours}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{yen(r.basic)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-red-600">{r.deduction ? `-${yen(r.deduction).slice(1)}` : '-'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{r.overtime ? yen(r.overtime) : '-'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{r.transportation ? yen(r.transportation) : '-'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{yen(r.subtotal)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{yen(r.tax)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-semibold">{yen(r.total)}</td>
+                (sortedItems as CustomerRow[]).map((r, idx) => (
+                  <tr key={r.customer_id ?? 0} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
+                    <td className="px-2 py-3 text-gray-800 truncate" title={r.customer_name ?? ''}>{r.customer_name ?? '-'}</td>
+                    <td className="px-2 py-3 text-gray-500 text-xs truncate" title={r.invoice_code ?? ''}>{r.invoice_code ?? '-'}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{r.deal_count}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{r.actual_hours}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{yen(r.basic)}</td>
+                    <td className="px-2 py-3 text-right tabular-nums text-red-600">{r.deduction ? `-${yen(r.deduction).slice(1)}` : '-'}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{r.overtime ? yen(r.overtime) : '-'}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{r.transportation ? yen(r.transportation) : '-'}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{yen(r.subtotal)}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{yen(r.tax)}</td>
+                    <td className="px-2 py-3 text-right tabular-nums font-semibold">{yen(r.total)}</td>
                   </tr>
                 ))
               )}
             </tbody>
-            {totals && items.length > 0 && (
+            {totals && sortedItems.length > 0 && (
               <tfoot className="bg-gray-50 sticky bottom-0">
                 <tr className="font-semibold">
                   <td className="px-3 py-3" colSpan={group === 'deal' ? 4 : 3}>合計</td>

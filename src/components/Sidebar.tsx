@@ -32,6 +32,7 @@ export default function Sidebar() {
     { label: '商談管理',       path: '/deals',          icon: '💼',  badge: 0,            sesOnly: false },
     { label: 'SES台帳',        path: '/ses-contracts',   icon: '📋',  badge: 0,            sesOnly: true  },
     { label: '請求集計',       path: '/billing-summaries', icon: '💴',  badge: 0,           sesOnly: true  },
+    { label: '請求書管理',     path: '/invoices',          icon: '🧾',  badge: 0,           sesOnly: true  },
     { label: '技術者管理',     path: '/engineers',       icon: '🧑‍💻', badge: 0,            sesOnly: true  },
     { label: '案件マーケット', path: '/public-projects', icon: '🔍',  badge: 0,            sesOnly: true  },
     { label: '案件メール',     path: '/project-mails',   icon: '📨',  badge: 0,            sesOnly: true  },
@@ -42,6 +43,7 @@ export default function Sidebar() {
     { label: '名刺管理',       path: '/business-cards', icon: '🪪',  badge: 0,            sesOnly: false },
     { label: 'メール',         path: '/emails',         icon: '✉️',  badge: unreadEmails, sesOnly: false },
     { label: 'メール署名設定', path: '/settings/email-template', icon: '✍️', badge: 0, sesOnly: false },
+    { label: '請求書発行元設定', path: '/settings/invoice-issuer', icon: '🏢', badge: 0, sesOnly: true  },
   ];
 
   const menuItems = allMenuItems.filter(
