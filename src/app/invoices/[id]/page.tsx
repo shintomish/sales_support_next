@@ -6,6 +6,7 @@ import Link from 'next/link';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import Toast from '@/components/Toast';
 
 interface InvoiceLine {
   id?: number;
@@ -52,6 +53,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy,    setBusy]    = useState(false);
+  const [toast,   setToast]   = useState<string | null>(null);
   const [issuedDate, setIssuedDate] = useState('');
   const [dueDate,    setDueDate]    = useState('');
   const [notes,      setNotes]      = useState('');
@@ -125,7 +127,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       if (newStatus) payload.status = newStatus;
       const res = await apiClient.put<Invoice>(`/api/v1/invoices/${id}`, payload);
       setInvoice(res.data);
-      alert('保存しました');
+      setToast(`${res.data.invoice_number}を保存しました`);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '保存に失敗しました';
       alert(msg);
@@ -169,6 +171,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="h-full flex flex-col p-6 max-w-6xl mx-auto w-full">
+      <Toast message={toast} onClose={() => setToast(null)} />
       <div className="flex-shrink-0 mb-4">
         <Link href="/invoices" className="text-sm text-blue-600 hover:underline">← 請求書一覧に戻る</Link>
         <div className="flex items-center justify-between mt-2">

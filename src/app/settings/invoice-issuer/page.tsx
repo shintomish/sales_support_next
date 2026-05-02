@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import Toast from '@/components/Toast';
 
 interface IssuerSettings {
   invoice_issuer_name: string | null;
@@ -30,6 +31,7 @@ export default function InvoiceIssuerSettingsPage() {
   const [form, setForm]       = useState<IssuerSettings>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy]       = useState(false);
+  const [toast, setToast]     = useState<string | null>(null);
 
   useEffect(() => {
     apiClient.get<IssuerSettings>('/api/v1/settings/invoice-issuer')
@@ -49,7 +51,7 @@ export default function InvoiceIssuerSettingsPage() {
     setBusy(true);
     try {
       await apiClient.put('/api/v1/settings/invoice-issuer', form);
-      alert('保存しました');
+      setToast('保存しました');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '保存に失敗しました';
       alert(msg);
@@ -62,6 +64,7 @@ export default function InvoiceIssuerSettingsPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto w-full">
+      <Toast message={toast} onClose={() => setToast(null)} />
       <h1 className="text-2xl font-bold text-gray-800 mb-2">請求書発行元設定</h1>
       <p className="text-xs text-gray-400 mb-6">請求書 PDF に印字される自社情報。発行時にスナップショットされ、後から編集してもPDF反映済みのものは変わりません。</p>
 
