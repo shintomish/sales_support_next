@@ -50,6 +50,7 @@ export default function Sidebar() {
   // 管理メニュー（super_admin / tenant_admin のみ表示）
   const adminMenuItems = [
     { label: 'ユーザー管理', path: '/admin/users', icon: '🛡️' },
+    { label: 'データ統計',   path: '/admin/stats', icon: '📊' },
   ];
   const showAdminMenu = user?.role === 'super_admin' || user?.role === 'tenant_admin';
 
