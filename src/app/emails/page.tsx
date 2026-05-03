@@ -138,6 +138,18 @@ export default function EmailsPage() {
     window.location.href = res.data.url
   }
 
+  const handleDisconnect = async () => {
+    if (!confirm('Gmail接続を切断します。再接続するまで同期できなくなりますがよろしいですか？')) return
+    try {
+      await axios.delete('/api/v1/gmail/disconnect')
+      setGmailConnected(false)
+      setGmailTokenExpired(false)
+      setSyncMessage('Gmail接続を切断しました。再接続してください。')
+    } catch {
+      setSyncMessage('切断に失敗しました')
+    }
+  }
+
   const handleSync = async () => {
     setSyncing(true); setSyncMessage('')
     try {
@@ -217,6 +229,11 @@ export default function EmailsPage() {
                     className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50 flex items-center gap-1.5">
                     {syncing && <Spinner size={12} />}
                     {syncing ? '同期中...' : '同期'}
+                  </button>
+                  <button onClick={handleDisconnect}
+                    title="Gmail接続を切断（スコープ変更や別アカウント切替に使用）"
+                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-red-100 hover:text-red-700">
+                    切断
                   </button>
                 </div>
               )}
