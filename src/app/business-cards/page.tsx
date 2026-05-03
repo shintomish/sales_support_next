@@ -217,6 +217,19 @@ export default function BusinessCardsPage() {
                             onClick={() => router.push(`/business-cards/${card.id}/edit`)}
                             className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-amber-100 hover:text-amber-600 transition-colors"
                           >✏️</button>
+                          <button
+                            title="削除"
+                            onClick={async () => {
+                              if (!confirm(`${card.person_name ?? card.company_name ?? 'この名刺'} を削除しますか？`)) return;
+                              try {
+                                await apiClient.delete(`/api/v1/cards/${card.id}`);
+                                fetchCards();
+                              } catch {
+                                alert('削除に失敗しました');
+                              }
+                            }}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
+                          >🗑</button>
                         </div>
                       </td>
                     </tr>
