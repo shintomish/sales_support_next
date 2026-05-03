@@ -338,6 +338,20 @@ export default function EmailsPage() {
                       {CATEGORY_BADGE[selectedEmail.category].label}
                     </span>
                   )}
+                  <button
+                    title="このメールを削除"
+                    onClick={async () => {
+                      if (!confirm(`「${selectedEmail.subject || '(件名なし)'}」を削除しますか？`)) return;
+                      try {
+                        await axios.delete(`/api/v1/emails/${selectedEmail.id}`);
+                        setEmails(prev => prev ? { ...prev, data: prev.data.filter(e => e.id !== selectedEmail.id) } : null);
+                        setSelectedEmail(null);
+                      } catch {
+                        alert('削除に失敗しました');
+                      }
+                    }}
+                    className="flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
+                  >🗑</button>
                 </div>
                 <div className="text-sm text-gray-600 space-y-1">
                   <p><span className="text-gray-400">差出人:</span> {fromLabel(selectedEmail)}</p>
