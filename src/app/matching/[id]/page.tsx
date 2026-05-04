@@ -1063,7 +1063,12 @@ export default function MatchingPage() {
   const allChecked = visibleEngineers.length > 0 && visibleEngineers.every(e => checked.has(e.engineer_id))
 
   const toggleCheck = (engId: number) => {
-    setChecked(prev => { const n = new Set(prev); n.has(engId) ? n.delete(engId) : n.add(engId); return n })
+    setChecked(prev => {
+      const n = new Set(prev)
+      if (n.has(engId)) n.delete(engId)
+      else n.add(engId)
+      return n
+    })
   }
   const toggleCheckAll = () => {
     if (allChecked) {

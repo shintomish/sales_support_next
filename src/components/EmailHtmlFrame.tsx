@@ -11,6 +11,9 @@ export default function EmailHtmlFrame({ html, className = '' }: Props) {
   const ref = useRef<HTMLIFrameElement>(null)
   const [height, setHeight] = useState(400)
 
+  // html が変わったら一旦既定値にリセット → onLoad で実コンテンツの高さを再計算する。
+  // setState を effect 内で呼ぶ意図的な使い方。
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setHeight(400) }, [html])
 
   const handleLoad = () => {

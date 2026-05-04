@@ -88,6 +88,9 @@ export default function EmailsPage() {
         router.replace('/emails')
       }).catch(() => {})
     }
+    // router は Next.js の安定参照のため依存配列に含めない（再実行されると
+    // クエリパラメータの初期処理が無駄に複数回走る）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // メール一覧取得

@@ -538,6 +538,10 @@ export default function DeliveriesPage() {
         setSendForm(f => ({ ...f, body: applyTemplate(currentBase, tpl) }))
       })
       .catch(() => {})
+    // deliveryType を依存に入れると配信タイプ切替時に不要な API 再呼び出しが
+    // 発生する。タイプ切替時は handleDeliveryTypeChange が個別に setSendForm を
+    // 呼ぶため、本 effect は tab='send' への切替時の初期化のみで十分。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 
   // クエリパラメータから案件メール自動選択

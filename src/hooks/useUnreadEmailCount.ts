@@ -17,6 +17,8 @@ export function useUnreadEmailCount() {
   }, []);
 
   useEffect(() => {
+    // マウント時の初回 fetch。fetchUnreadCount は useCallback で安定参照。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUnreadCount();
 
     // Realtime購読：新着メールのINSERTのみ検知（UPDATEは無限ループになるため除外）
