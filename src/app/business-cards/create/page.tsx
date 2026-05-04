@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -175,7 +176,13 @@ export default function BusinessCardCreatePage() {
     try {
       const fd = new FormData();
       fd.append('images[]', item.source, item.name);
-      const res = await apiClient.post<{ results: any[]; success_count: number; failure_count: number }>(
+      type CardUploadResult = {
+        success: boolean;
+        source_name?: string;
+        data?: { person_name?: string | null; company_name?: string | null };
+        error?: string;
+      };
+      const res = await apiClient.post<{ results: CardUploadResult[]; success_count: number; failure_count: number }>(
         '/api/v1/cards', fd, { headers: { 'Content-Type': 'multipart/form-data' } }
       );
       const r = res.data.results?.[0];
@@ -367,7 +374,7 @@ export default function BusinessCardCreatePage() {
                     return (
                       <tr key={it.id} className="hover:bg-gray-50">
                         <td className="px-3 py-2">
-                          <img src={it.preview} alt="" className="w-16 h-10 object-cover rounded" />
+                          <Image src={it.preview} alt="" width={64} height={40} unoptimized className="w-16 h-10 object-cover rounded" />
                         </td>
                         <td className="px-3 py-2 truncate max-w-[200px]" title={it.name}>{it.name}</td>
                         <td className="px-3 py-2">

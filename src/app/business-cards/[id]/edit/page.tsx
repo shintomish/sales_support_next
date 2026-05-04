@@ -163,7 +163,7 @@ export default function BusinessCardEditPage() {
                   <Input
                     id={name} name={name} type={type}
                     placeholder={placeholder}
-                    value={(form as any)[name] ?? ''}
+                    value={(form as Record<string, string | null | undefined>)[name] ?? ''}
                     onChange={handleChange}
                     className="border-gray-200"
                   />

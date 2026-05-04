@@ -60,7 +60,13 @@ const isToday = (s: string|null) => {
   return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth() && d.getDate()===n.getDate();
 };
 
-const RevenueTooltip = ({ active, payload, label }: any) => {
+// recharts Tooltip の content prop に渡される最小限のプロップ型
+type RevenueTooltipProps = {
+  active?: boolean;
+  payload?: { value: number | string }[];
+  label?: string;
+};
+const RevenueTooltip = ({ active, payload, label }: RevenueTooltipProps) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-md px-3 py-2 text-sm">

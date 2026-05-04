@@ -218,7 +218,14 @@ export default function EngineerDetailPage() {
       setGithub(e.profile?.github_url ?? '');
       setPortfolio(e.profile?.portfolio_url ?? '');
       setIsPublic(e.profile?.is_public ?? false);
-      setAddedSkills(e.skills.map((s: any) => ({
+      type EngineerSkillData = {
+        skill_id: number;
+        skill_name: string;
+        category: string | null;
+        experience_years?: number | string | null;
+        proficiency_level?: number | string | null;
+      };
+      setAddedSkills(e.skills.map((s: EngineerSkillData) => ({
         skill_id: s.skill_id, skill_name: s.skill_name, category: s.category,
         experience_years: s.experience_years?.toString() ?? '0',
         proficiency_level: s.proficiency_level?.toString() ?? '3',

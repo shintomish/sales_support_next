@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -164,14 +165,17 @@ export default function BusinessCardsPage() {
                     >
                       <td className="py-3 px-4">
                         {card.image_path ? (
-                          <img
+                          <Image
                             src={
                               card.image_path.startsWith('http')
                                 ? card.image_path  // Supabase URL
                                 : `${process.env.NEXT_PUBLIC_API_URL}/storage/${card.image_path}` // 旧ローカルパス
                             }
                             alt={`${card.person_name ?? ''}の名刺`}
+                            width={80}
+                            height={56}
                             className="h-14 w-20 object-cover rounded-md shadow-sm border border-gray-100"
+                            unoptimized
                           />
                         ) : (
                           <div className="h-14 w-20 bg-gray-100 rounded-md flex items-center justify-center border border-gray-200">

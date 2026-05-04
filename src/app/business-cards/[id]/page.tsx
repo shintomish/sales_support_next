@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import Image from 'next/image';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -107,12 +108,15 @@ export default function BusinessCardDetailPage() {
           </CardHeader>
           <CardContent>
             {card.image_path ? (
-              <img
+              <Image
                 src={card.image_path.startsWith('http')
                   ? card.image_path
                   : `${process.env.NEXT_PUBLIC_API_URL}/storage/${card.image_path}`}
                 alt={`${card.person_name ?? ''}の名刺`}
-                className="w-full rounded-lg border border-gray-100 shadow-sm"
+                width={800}
+                height={500}
+                className="w-full h-auto rounded-lg border border-gray-100 shadow-sm"
+                unoptimized
               />
             ) : (
               <div className="h-44 bg-gray-50 rounded-lg flex flex-col items-center justify-center gap-2 border border-dashed border-gray-200">
