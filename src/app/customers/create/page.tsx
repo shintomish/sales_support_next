@@ -17,6 +17,7 @@ const FIELDS = [
   { name: 'employee_count', label: '従業員数',     type: 'number', required: false, placeholder: '例：100',                      span: 1 },
   { name: 'phone',          label: '電話番号',     type: 'tel',    required: false, placeholder: '例：03-1234-5678',             span: 1 },
   { name: 'fax',            label: 'FAX',          type: 'tel',    required: false, placeholder: '例：03-1234-5679',             span: 1 },
+  { name: 'postal_code',    label: '郵便番号',     type: 'text',   required: false, placeholder: '例：100-0001',                 span: 1 },
   { name: 'address',        label: '住所',         type: 'text',   required: false, placeholder: '例：東京都千代田区丸の内1-1-1', span: 2 },
   { name: 'website',        label: 'ウェブサイト', type: 'url',    required: false, placeholder: '例：https://example.com',      span: 2 },
   { name: 'invoice_number', label: '適格請求書番号', type: 'text', required: false, placeholder: '例：T1234567890123',           span: 1 },

@@ -38,6 +38,7 @@ interface Customer {
   employee_count: number | null;
   phone: string | null;
   fax: string | null;
+  postal_code: string | null;
   address: string | null;
   website: string | null;
   notes: string | null;
@@ -162,6 +163,10 @@ export default function CustomerDetailPage() {
             <div>
               <p className="text-xs text-gray-400 mb-1">FAX</p>
               <p className="text-sm font-medium text-gray-800">{customer.fax ?? <Em />}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">郵便番号</p>
+              <p className="text-sm font-medium text-gray-800">{customer.postal_code ?? <Em />}</p>
             </div>
             <div>
               <p className="text-xs text-gray-400 mb-1">住所</p>
