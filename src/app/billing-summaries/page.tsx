@@ -68,13 +68,15 @@ const recentMonths = (): string[] => {
 export default function BillingSummariesPage() {
   const router = useRouter();
   const months = recentMonths();
-  const [yearMonth, setYearMonth] = useState<string>(months[0]);
+  // デフォルトは前月（当月 -1）。請求対象の中心が前月になるため
+  const [yearMonth, setYearMonth] = useState<string>(months[1] ?? months[0]);
   const [group,     setGroup]     = useState<GroupType>('deal');
   const [q,         setQ]         = useState<string>('');
   const [items,     setItems]     = useState<(DealRow | CustomerRow)[]>([]);
   const [totals,    setTotals]    = useState<Totals | null>(null);
   const [loading,   setLoading]   = useState(false);
-  const [issuingId, setIssuingId] = useState<number | null>(null);
+  const [issuingId,  setIssuingId]  = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [sortBy,    setSortBy]    = useState<string>('customer');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -141,6 +143,21 @@ export default function BillingSummariesPage() {
       const msg = data?.errors?.deal_id?.[0] ?? data?.message ?? '請求書の発行に失敗しました';
       alert(msg);
       setIssuingId(null);
+    }
+  };
+
+  const deleteInvoice = async (invoiceId: number, status: 'draft' | 'issued', customerName: string | null) => {
+    const label = status === 'issued' ? '発行済' : '下書き';
+    if (!confirm(`${customerName ?? ''} / ${yearMonth} の請求書（${label}）を削除します。\n誤発行のリカバリ用です。よろしいですか？`)) return;
+    setDeletingId(invoiceId);
+    try {
+      await apiClient.delete(`/api/v1/invoices/${invoiceId}`);
+      await fetchData();
+    } catch (err: unknown) {
+      const data = (err as { response?: { data?: { message?: string } } })?.response?.data;
+      alert(data?.message ?? '請求書の削除に失敗しました');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -254,7 +271,7 @@ export default function BillingSummariesPage() {
                 <th className="text-right px-2 py-3 font-semibold w-[80px]">小計</th>
                 <th className="text-right px-2 py-3 font-semibold w-[70px]">消費税</th>
                 <SortableHeader label="請求合計" field="total" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[100px]" />
-                {group === 'deal' && <th className="text-center px-2 py-3 font-semibold w-[220px]">操作</th>}
+                {group === 'deal' && <th className="text-center px-2 py-3 font-semibold w-[260px]">操作</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -301,15 +318,25 @@ export default function BillingSummariesPage() {
                           <span className="inline-block w-[32px]" aria-hidden="true" />
                         )}
                         {r.invoice_id ? (
-                          <Link
-                            href={`/invoices/${r.invoice_id}`}
-                            title={r.invoice_status === 'issued' ? '発行済の請求書を表示' : '下書きの請求書を編集'}
-                            className={`text-xs px-2 py-1 rounded text-white inline-block w-[72px] text-center ${
-                              r.invoice_status === 'issued' ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'
-                            }`}
-                          >
-                            {r.invoice_status === 'issued' ? '📋 発行済' : '📋 下書き'}
-                          </Link>
+                          <>
+                            <Link
+                              href={`/invoices/${r.invoice_id}`}
+                              title={r.invoice_status === 'issued' ? '発行済の請求書を表示' : '下書きの請求書を編集'}
+                              className={`text-xs px-2 py-1 rounded text-white inline-block w-[72px] text-center ${
+                                r.invoice_status === 'issued' ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'
+                              }`}
+                            >
+                              {r.invoice_status === 'issued' ? '📋 発行済' : '📋 下書き'}
+                            </Link>
+                            <button
+                              onClick={() => deleteInvoice(r.invoice_id!, r.invoice_status!, r.customer_name)}
+                              disabled={deletingId === r.invoice_id}
+                              title="請求書を削除（誤発行のリカバリ用）"
+                              className="text-xs px-2 py-1 rounded text-red-600 hover:bg-red-100 disabled:opacity-50"
+                            >
+                              {deletingId === r.invoice_id ? '...' : '🗑️'}
+                            </button>
+                          </>
                         ) : (
                           <button
                             onClick={() => issueInvoice(r.deal_id, r.customer_name)}

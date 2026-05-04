@@ -163,9 +163,19 @@ function EditDialog({ dealId, yearMonth, existing, onClose, onSaved }: {
   const submit = async () => {
     setBusy(true);
     try {
+      // 空文字フィールドは null として送信し、サーバ側で値をクリアできるようにする
+      // （以前は空欄を送らない実装だったため、誤入力した日付を消せなかった）
+      const NULLABLE = new Set([
+        'timesheet_received_date', 'invoice_received_date',
+        'actual_hours', 'absence_days', 'paid_leave_days',
+        'transportation_fee', 'notes',
+      ]);
       const payload: Record<string, unknown> = {};
       Object.entries(form).forEach(([k, v]) => {
-        if (v === '' || v === null) return;
+        if (v === '' || v === null) {
+          if (NULLABLE.has(k)) payload[k] = null;
+          return;
+        }
         payload[k] = v;
       });
       await apiClient.put(`/api/v1/deals/${dealId}/work-records/${yearMonth}`, payload);

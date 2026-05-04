@@ -45,7 +45,8 @@ const recentMonths = (): string[] => {
 
 export default function TimesheetsPage() {
   const months = recentMonths();
-  const [yearMonth, setYearMonth] = useState<string>(months[0]);
+  // デフォルトは前月（当月 -1）。集計対象の中心が前月になるため
+  const [yearMonth, setYearMonth] = useState<string>(months[1] ?? months[0]);
   const [q,         setQ]         = useState<string>('');
   const [items,     setItems]     = useState<TimesheetRow[]>([]);
   const [loading,   setLoading]   = useState(false);
