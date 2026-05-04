@@ -104,7 +104,12 @@ function ActivitiesPage() {
     setPage(1);
   };
 
-  const handleSearch = () => { setSearch(searchInput); setPage(1); };
+  // searchInput の変更を 300ms debounce で search に反映（リアルタイム検索）
+  useEffect(() => {
+    const timer = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const handleClear  = () => {
     setSearchInput(''); setSearch(''); setTypeFilter('');
     setCustomerFilter(''); setDateFrom(''); setDateTo(''); setPage(1);
@@ -159,8 +164,7 @@ function ActivitiesPage() {
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
               <Input className="pl-8 bg-white" placeholder="件名・内容・会社名で検索"
                 value={searchInput}
-                onChange={e => setSearchInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSearch()} />
+                onChange={e => setSearchInput(e.target.value)} />
             </div>
             <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(1); }} className={selectCls}>
               <option value="">全種別</option>
@@ -174,7 +178,6 @@ function ActivitiesPage() {
             <span className="text-gray-400 text-sm">〜</span>
             <Input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }} className="w-36 bg-white" />
             <UserFilter value={userFilter} onChange={v => { setUserFilter(v); setPage(1); }} className={selectCls} />
-            <Button onClick={handleSearch}>検索</Button>
             {hasFilter && (
               <Button variant="ghost" size="sm" onClick={handleClear} className="text-gray-400 hover:text-gray-600">✕ クリア</Button>
             )}

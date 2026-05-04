@@ -84,7 +84,12 @@ function ContactsPage() {
     updateUrl({ search, customer_id: customerFilter, page: String(page) });
   }, [search, customerFilter, page, updateUrl]);
 
-  const handleSearch = () => { setSearch(searchInput); setPage(1); };
+  // searchInput の変更を 300ms debounce で search に反映（リアルタイム検索）
+  useEffect(() => {
+    const timer = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const handleClear  = () => { setSearchInput(''); setSearch(''); setCustomerFilter(''); setPage(1); };
 
   const handleDelete = async (id: number) => {
@@ -133,14 +138,12 @@ function ContactsPage() {
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
               <Input className="pl-8 bg-white" placeholder="氏名・部署・役職・会社名で検索"
                 value={searchInput}
-                onChange={e => setSearchInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSearch()} />
+                onChange={e => setSearchInput(e.target.value)} />
             </div>
             <select value={customerFilter} onChange={e => { setCustomerFilter(e.target.value); setPage(1); }} className={`${selectCls} min-w-36`}>
               <option value="">全顧客</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
             </select>
-            <Button onClick={handleSearch}>検索</Button>
             {hasFilter && (
               <Button variant="ghost" size="sm" onClick={handleClear} className="text-gray-400 hover:text-gray-600">✕ クリア</Button>
             )}

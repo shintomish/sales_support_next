@@ -6,8 +6,7 @@ import Image from 'next/image';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useAuthStore } from '@/store/authStore';
-import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
+import { Input } from '@/components/ui/input';
 import SortableHeader from '@/components/SortableHeader';
 import type { ApiError } from '@/lib/error-helpers';
 
@@ -46,15 +45,19 @@ const ColGroup = () => (
 
 export default function BusinessCardsPage() {
   const [cards, setCards]     = useState<BusinessCard[]>([]);
-  const [grandTotal, setGrandTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const router = useRouter();
-  const { user } = useAuthStore();
-  const [userFilter, setUserFilter] = useState<string>('all');
-  useEffect(() => { setUserFilter(defaultUserFilter(user)); }, [user]);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch]           = useState('');
   const [sortField, setSortField] = useState<string>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // searchInput の変更を 300ms debounce で search に反映（リアルタイム検索）
+  useEffect(() => {
+    const timer = setTimeout(() => { setSearch(searchInput); }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const handleSort = (field: string) => {
     if (sortField === field) { setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); }
@@ -64,16 +67,17 @@ export default function BusinessCardsPage() {
   const fetchCards = useCallback(async () => {
     try {
       setError(null);
-      const res = await apiClient.get('/api/v1/cards', { params: { user_id: userFilter, sort_by: sortField, sort_order: sortOrder } });
+      const res = await apiClient.get('/api/v1/cards', {
+        params: { search: search || undefined, sort_by: sortField, sort_order: sortOrder },
+      });
       setCards(res.data.data);
-      if (userFilter === 'all') setGrandTotal(res.data.data.length);
     } catch (err: unknown) {
       if ((err as ApiError).response?.status === 401) router.push('/login');
       else setError('名刺の取得に失敗しました');
     } finally {
       setLoading(false);
     }
-  }, [router, userFilter, sortField, sortOrder]);
+  }, [router, search, sortField, sortOrder]);
 
   useEffect(() => { fetchCards(); }, [fetchCards]);
 
@@ -99,13 +103,18 @@ export default function BusinessCardsPage() {
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">名刺管理</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
-            {userFilter !== 'all' && grandTotal !== null ? `${grandTotal}件中 ${cards.length}件` : `全 ${cards.length}件`}
-          </p>
+          <p className="text-sm text-gray-400 mt-0.5">全 {cards.length}件</p>
         </div>
         <div className="flex items-center gap-2">
-          <UserFilter value={userFilter} onChange={setUserFilter}
-            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+            <Input
+              className="pl-8 bg-white w-64"
+              placeholder="会社名・氏名・部署・役職・メールで検索"
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+            />
+          </div>
           <Button onClick={() => router.push('/business-cards/create')} className="gap-1">
             <span className="text-base">↑</span> アップロード
           </Button>

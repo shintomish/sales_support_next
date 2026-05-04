@@ -54,6 +54,7 @@ export default function PublicProjectsPage() {
   const [projects, setProjects]       = useState<PublicProject[]>([]);
   const [meta, setMeta]               = useState<Meta>({ current_page: 1, last_page: 1, total: 0 });
   const [loading, setLoading]         = useState(true);
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch]           = useState('');
   const [workStyle, setWorkStyle]     = useState('');
   const [priceFilter, setPriceFilter] = useState('');
@@ -90,6 +91,12 @@ export default function PublicProjectsPage() {
   }, [search, workStyle, priceFilter, page, viewMode, sortField, sortOrder, router]);
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
+
+  // searchInput の変更を 300ms debounce で search に反映（リアルタイム検索）
+  useEffect(() => {
+    const timer = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const switchView = (v: ViewMode) => { setViewMode(v); setPage(1); };
 
@@ -131,9 +138,8 @@ export default function PublicProjectsPage() {
 
       {/* 検索フィルタ */}
       <div className="flex flex-wrap gap-3 mb-6">
-        <Input placeholder="案件名・説明で検索..." value={search}
-          onChange={e => setSearch(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { setPage(1); fetchProjects(); } }}
+        <Input placeholder="案件名・説明で検索..." value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
           className="max-w-xs" />
         <select value={workStyle} onChange={e => { setWorkStyle(e.target.value); setPage(1); }} className={selectCls}>
           <option value="">勤務形態：すべて</option>
@@ -148,7 +154,6 @@ export default function PublicProjectsPage() {
           <option value="70">70万円以上</option>
           <option value="80">80万円以上</option>
         </select>
-        <Button variant="outline" onClick={() => { setPage(1); fetchProjects(); }}>検索</Button>
       </div>
 
       {loading && (
