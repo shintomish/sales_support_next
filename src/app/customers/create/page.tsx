@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { ApiError } from '@/lib/error-helpers';
 
 const FIELDS = [
   { name: 'company_name',   label: '会社名',       type: 'text',   required: true,  placeholder: '例：株式会社サンプル',          span: 1 },
@@ -58,10 +59,10 @@ export default function CustomerCreatePage() {
     try {
       await apiClient.post('/api/v1/customers', { ...form, notes, is_supplier: isSupplier, is_customer: isCustomer });
       router.push('/customers');
-    } catch (err: any) {
-      if (err.response?.status === 422) {
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 422) {
         const serverErrors: FieldErrors = {};
-        Object.entries(err.response.data.errors ?? {}).forEach(([k, v]) => {
+        Object.entries((err as ApiError).response?.data?.errors ?? {}).forEach(([k, v]) => {
           serverErrors[k] = (v as string[])[0];
         });
         setErrors(serverErrors);

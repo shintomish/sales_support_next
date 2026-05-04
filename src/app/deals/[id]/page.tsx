@@ -9,6 +9,7 @@ import {
   Table, TableBody, TableCell,
   TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import type { ApiError } from '@/lib/error-helpers';
 
 interface Activity {
   id: number; type: string; subject: string;
@@ -47,9 +48,9 @@ export default function DealDetailPage() {
       setError(null);
       const res = await apiClient.get(`/api/v1/deals/${id}`);
       setDeal(res.data.data ?? res.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
-      else if (err.response?.status === 404) router.push('/deals');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
+      else if ((err as ApiError).response?.status === 404) router.push('/deals');
       else setError('商談情報の取得に失敗しました');
     } finally { setLoading(false); }
   }, [id, router]);

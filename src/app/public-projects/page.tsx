@@ -7,6 +7,7 @@ import SortableHeader from '@/components/SortableHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import type { ApiError } from '@/lib/error-helpers';
 
 interface RequiredSkill {
   skill_id: number; skill_name: string; category: string | null;
@@ -83,8 +84,8 @@ export default function PublicProjectsPage() {
       });
       setProjects(res.data.data);
       setMeta(res.data.meta);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
     } finally { setLoading(false); }
   }, [search, workStyle, priceFilter, page, viewMode, sortField, sortOrder, router]);
 

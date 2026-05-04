@@ -6,6 +6,7 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import type { ApiError } from '@/lib/error-helpers';
 
 const SES_STATUSES = ['稼働中', '更新交渉中', '新規', '提案', '交渉', '成約', '失注', '期限切れ'];
 
@@ -91,8 +92,8 @@ export default function SesContractCreatePage() {
       });
       await apiClient.post('/api/v1/ses-contracts', payload);
       router.push('/ses-contracts');
-    } catch (err: any) {
-      if (err.response?.data?.errors) setErrors(err.response.data.errors);
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.data?.errors) setErrors(((err as ApiError).response?.data?.errors ?? {}) as unknown as Record<string, string>);
       else alert('保存に失敗しました');
     } finally { setSaving(false); }
   };

@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import SortableHeader from '@/components/SortableHeader';
+import type { ApiError } from '@/lib/error-helpers';
 
 interface Customer {
   id: number; company_name: string; industry: string | null;
@@ -72,8 +73,8 @@ function CustomersPage() {
       setCustomers(res.data.data);
       setMeta(res.data.meta);
       setIndustries(indRes.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
       else setError('顧客データの取得に失敗しました');
     } finally { setLoading(false); }
   }, [search, industryFilter, typeFilter, page, sortField, sortOrder, router]);

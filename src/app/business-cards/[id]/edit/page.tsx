@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { ApiError } from '@/lib/error-helpers';
 
 interface BusinessCard {
   id: number;
@@ -38,8 +39,6 @@ const STATUS_OPTIONS = [
   { value: 'pending',    label: '保留中',   bg: '#F1F5F9', color: '#475569' },
 ];
 
-const selectCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
-
 // フィールドをグループに分けて表示
 const FIELD_GROUPS = [
   { title: '会社情報', fields: ['company_name', 'department', 'position'] },
@@ -60,8 +59,8 @@ export default function BusinessCardEditPage() {
     try {
       const res = await apiClient.get(`/api/v1/cards/${id}`);
       setForm(res.data.data ?? res.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
       else router.push('/business-cards');
     } finally { setLoading(false); }
   }, [id, router]);
@@ -86,9 +85,9 @@ export default function BusinessCardEditPage() {
       await apiClient.put(`/api/v1/cards/${id}`, form);
       setIsDirty(false);
       router.push(`/business-cards/${id}`);
-    } catch (err: any) {
-      if (err.response?.status === 422) {
-        const messages = Object.values(err.response.data.errors ?? {}).flat();
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 422) {
+        const messages = Object.values((err as ApiError).response?.data?.errors ?? {}).flat();
         setError(messages.join(' / ') as string);
       } else {
         setError('保存に失敗しました。時間をおいて再試行してください。');

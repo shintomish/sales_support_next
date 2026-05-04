@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { ApiError } from '@/lib/error-helpers';
 
 const FIELDS = [
   { name: 'company_name',   label: '会社名',       type: 'text',   required: true,  placeholder: '例：株式会社サンプル',          span: 1 },
@@ -64,8 +65,8 @@ export default function CustomerEditPage() {
       setIsCustomer(!!c.is_customer);
       setPrimaryContactId(c.primary_contact_id?.toString() ?? '');
       setContacts(c.contacts ?? []);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
       else router.push('/customers');
     } finally { setLoading(false); }
   }, [id, router]);
@@ -110,10 +111,10 @@ export default function CustomerEditPage() {
       });
       setIsDirty(false);
       router.push(`/customers/${id}`);
-    } catch (err: any) {
-      if (err.response?.status === 422) {
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 422) {
         const serverErrors: FieldErrors = {};
-        Object.entries(err.response.data.errors ?? {}).forEach(([k, v]) => {
+        Object.entries((err as ApiError).response?.data?.errors ?? {}).forEach(([k, v]) => {
           serverErrors[k] = (v as string[])[0];
         });
         setErrors(serverErrors);

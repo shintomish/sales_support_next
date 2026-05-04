@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import type { ApiError } from '@/lib/error-helpers';
 
 const inputCls = 'border border-gray-200 rounded-md px-3 py-2 text-sm bg-white w-full focus:outline-none focus:ring-2 focus:ring-blue-500';
 const labelCls = 'text-xs text-gray-500 mb-1 block';
@@ -138,8 +139,8 @@ export default function PublicProjectCreatePage() {
         })),
       });
       router.push(fromPath);
-    } catch (err: any) {
-      if (err.response?.data?.errors) setErrors(err.response.data.errors);
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.data?.errors) setErrors(((err as ApiError).response?.data?.errors ?? {}) as unknown as Record<string, string>);
       else alert('保存に失敗しました');
     } finally { setSaving(false); }
   };

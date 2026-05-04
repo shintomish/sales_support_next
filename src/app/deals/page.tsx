@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, Suspense, useRef } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/authStore';
 import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
 import SortableHeader from '@/components/SortableHeader';
+import type { ApiError } from '@/lib/error-helpers';
 
 
 interface Deal {
@@ -233,8 +234,8 @@ function DealsPage() {
       setCustomers(cRes.data.data);
       setAllDeals(allRes.data.data);
       if (userFilter === 'all') setGrandTotal(res.data.meta.total);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
       else setError('商談データの取得に失敗しました');
     } finally { setLoading(false); }
   }, [search, statusFilter, customerFilter, amountMin, amountMax, page, userFilter, sortField, sortOrder, router]);

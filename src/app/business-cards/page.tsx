@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useAuthStore } from '@/store/authStore';
 import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
 import SortableHeader from '@/components/SortableHeader';
+import type { ApiError } from '@/lib/error-helpers';
 
 interface BusinessCard {
   id: number;
@@ -65,8 +66,8 @@ export default function BusinessCardsPage() {
       const res = await apiClient.get('/api/v1/cards', { params: { user_id: userFilter, sort_by: sortField, sort_order: sortOrder } });
       setCards(res.data.data);
       if (userFilter === 'all') setGrandTotal(res.data.data.length);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
       else setError('名刺の取得に失敗しました');
     } finally {
       setLoading(false);

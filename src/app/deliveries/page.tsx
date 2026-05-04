@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import axios from '@/lib/axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import SortableHeader from '@/components/SortableHeader'
+import type { ApiError } from '@/lib/error-helpers'
 
 // ── 型定義 ────────────────────────────────────────────────
 
@@ -661,8 +662,8 @@ export default function DeliveriesPage() {
       setImportResult(res.data.message)
       setSkippedList(res.data.skipped_list ?? [])
       fetchAddresses()
-    } catch (err: any) {
-      setImportResult(`エラー: ${err.response?.data?.message ?? err.message}`)
+    } catch (err: unknown) {
+      setImportResult(`エラー: ${(err as ApiError).response?.data?.message ?? (err as ApiError).message}`)
     } finally {
       clearInterval(progressTimerRef.current!)
       setImporting(false)
@@ -751,8 +752,8 @@ export default function DeliveriesPage() {
       setShowNewModal(false)
       setNewForm({ email: '', name: '', occupation: '' })
       fetchAddresses()
-    } catch (err: any) {
-      setNewFormError(err.response?.data?.message ?? 'エラーが発生しました。')
+    } catch (err: unknown) {
+      setNewFormError((err as ApiError).response?.data?.message ?? 'エラーが発生しました。')
     } finally {
       setNewFormSaving(false)
     }
@@ -798,8 +799,8 @@ export default function DeliveriesPage() {
       })
       setEditingAddrId(null)
       fetchAddresses()
-    } catch (err: any) {
-      setEditFormError(err.response?.data?.message ?? 'エラーが発生しました。')
+    } catch (err: unknown) {
+      setEditFormError((err as ApiError).response?.data?.message ?? 'エラーが発生しました。')
     } finally {
       setEditFormSaving(false)
     }
@@ -881,8 +882,8 @@ export default function DeliveriesPage() {
       const { id, total_count } = res.data
       setSending(false)
       startProgressPolling(id, total_count)
-    } catch (err: any) {
-      setSendResult({ success: false, message: `エラー: ${err.response?.data?.message ?? err.message}` })
+    } catch (err: unknown) {
+      setSendResult({ success: false, message: `エラー: ${(err as ApiError).response?.data?.message ?? (err as ApiError).message}` })
       setSending(false)
     }
   }

@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { ApiError } from '@/lib/error-helpers';
 
 interface BusinessCard {
   id: number;
@@ -38,9 +39,9 @@ export default function BusinessCardDetailPage() {
       setError(null);
       const res = await apiClient.get(`/api/v1/cards/${id}`);
       setCard(res.data.data ?? res.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
-      else if (err.response?.status === 404) router.push('/business-cards');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
+      else if ((err as ApiError).response?.status === 404) router.push('/business-cards');
       else setError('名刺情報の取得に失敗しました');
     } finally { setLoading(false); }
   }, [id, router]);

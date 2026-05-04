@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/authStore';
 import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
 import SortableHeader from '@/components/SortableHeader';
+import type { ApiError } from '@/lib/error-helpers';
 
 interface Task {
   id: number; title: string; priority: string; status: string;
@@ -98,8 +99,8 @@ function TasksPage() {
       setTasks(res.data.data);
       setMeta(res.data.meta);
       if (userFilter === 'all') setGrandTotal(res.data.meta.total);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
       else setError('タスクの取得に失敗しました');
     } finally { setLoading(false); }
   }, [search, statusFilter, priorityFilter, dueFilter, page, userFilter, sortField, sortOrder, router]);

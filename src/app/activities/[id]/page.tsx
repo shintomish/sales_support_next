@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { ApiError } from '@/lib/error-helpers';
 
 interface Activity {
   id: number; type: string; subject: string; content: string | null;
@@ -36,9 +37,9 @@ export default function ActivityDetailPage() {
       setError(null);
       const res = await apiClient.get(`/api/v1/activities/${id}`);
       setActivity(res.data.data ?? res.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
-      else if (err.response?.status === 404) router.push('/activities');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
+      else if ((err as ApiError).response?.status === 404) router.push('/activities');
       else setError('活動履歴の取得に失敗しました');
     } finally { setLoading(false); }
   }, [id, router]);

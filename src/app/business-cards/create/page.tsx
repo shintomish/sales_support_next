@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { ApiError } from '@/lib/error-helpers';
 
 const ACCEPT_TYPES = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
 const MAX_SIZE_MB  = 20;
@@ -107,8 +108,8 @@ export default function BusinessCardCreatePage() {
               name: p.name, status: 'queued',
             });
           }
-        } catch (e: any) {
-          setError(`${file.name}: PDF展開失敗 (${e?.message ?? 'unknown'})`);
+        } catch (e: unknown) {
+          setError(`${file.name}: PDF展開失敗 (${(e as ApiError)?.message ?? 'unknown'})`);
         }
       } else {
         added.push({
@@ -189,8 +190,8 @@ export default function BusinessCardCreatePage() {
       } else {
         updateItem(item.id, { status: 'failed', error: r?.error ?? '登録に失敗しました' });
       }
-    } catch (err: any) {
-      const msg = err?.response?.data?.message ?? err?.message ?? 'アップロードに失敗しました';
+    } catch (err: unknown) {
+      const msg = (err as ApiError)?.response?.data?.message ?? (err as ApiError)?.message ?? 'アップロードに失敗しました';
       updateItem(item.id, { status: 'failed', error: msg });
     }
   };
@@ -216,8 +217,8 @@ export default function BusinessCardCreatePage() {
                 return [...filtered, ...replacements];
               });
             }
-          } catch (e: any) {
-            updateItem(it.id, { status: 'failed', error: '名刺検出に失敗: ' + (e?.message ?? '') });
+          } catch (e: unknown) {
+            updateItem(it.id, { status: 'failed', error: '名刺検出に失敗: ' + ((e as ApiError)?.message ?? '') });
           }
         }
       }

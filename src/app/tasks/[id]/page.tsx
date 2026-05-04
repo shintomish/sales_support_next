@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { ApiError } from '@/lib/error-helpers';
 
 interface Task {
   id: number; title: string; priority: string; status: string;
@@ -42,9 +43,9 @@ export default function TaskDetailPage() {
       setError(null);
       const res = await apiClient.get(`/api/v1/tasks/${id}`);
       setTask(res.data.data ?? res.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
-      else if (err.response?.status === 404) router.push('/tasks');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
+      else if ((err as ApiError).response?.status === 404) router.push('/tasks');
       else setError('タスク情報の取得に失敗しました');
     } finally { setLoading(false); }
   }, [id, router]);

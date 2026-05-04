@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { ApiError } from '@/lib/error-helpers';
 
 const Em = () => <span className="text-gray-300 text-xs">—</span>;
 const fmtDate = (v: string | null) => v ? new Date(v).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }) : null;
@@ -46,8 +47,6 @@ interface RecommendedEngineer {
   location_match_score: number; availability_match_score: number;
   skills: { name: string; experience_years: number }[];
 }
-interface EngineerOption { id: number; name: string; affiliation: string | null; }
-
 function ScoreBar({ label, score }: { label: string; score: number }) {
   const color = score >= 80 ? 'bg-green-500' : score >= 60 ? 'bg-yellow-400' : 'bg-red-400';
   return (
@@ -113,9 +112,9 @@ export default function PublicProjectDetailPage() {
       ]);
       setProject(projRes.data.data);
       setRecommended(recRes.data.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
-      else if (err.response?.status === 404) router.push('/public-projects');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
+      else if ((err as ApiError).response?.status === 404) router.push('/public-projects');
     } finally { setLoading(false); }
   }, [id, router]);
 

@@ -6,6 +6,7 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import type { ApiError } from '@/lib/error-helpers';
 
 const SES_STATUSES = ['稼働中', '更新交渉中', '新規', '提案', '交渉', '成約', '失注', '期限切れ'];
 const inputCls = 'border border-gray-200 rounded-md px-3 py-2 text-sm bg-white w-full focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -139,9 +140,9 @@ export default function SesContractEditPage() {
         invoice_received_date:       toDateStr(d.invoice_received_date),
         notes:                       toStr(d.notes),
       });
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
-      else if (err.response?.status === 404) router.push('/ses-contracts');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
+      else if ((err as ApiError).response?.status === 404) router.push('/ses-contracts');
       else alert('データの取得に失敗しました');
     } finally { setLoading(false); }
   }, [id, router]);
@@ -178,8 +179,8 @@ export default function SesContractEditPage() {
       });
       await apiClient.put(`/api/v1/ses-contracts/${id}`, payload);
       router.push('/ses-contracts');
-    } catch (err: any) {
-      if (err.response?.data?.errors) setErrors(err.response.data.errors);
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.data?.errors) setErrors(((err as ApiError).response?.data?.errors ?? {}) as unknown as Record<string, string>);
       else alert('保存に失敗しました');
     } finally { setSaving(false); }
   };

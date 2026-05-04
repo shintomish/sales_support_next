@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useRealtimeNotifications, RealtimeNotification } from '@/hooks/useRealtimeNotifications';
 
 const TYPE_ICON: Record<string, string> = {

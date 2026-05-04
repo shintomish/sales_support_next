@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import SortableHeader from '@/components/SortableHeader';
+import type { ApiError } from '@/lib/error-helpers';
 
 interface Contact {
   id: number; name: string; department: string | null; position: string | null;
@@ -72,8 +73,8 @@ function ContactsPage() {
       setContacts(cRes.data.data);
       setMeta(cRes.data.meta);
       setCustomers(cusRes.data.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
       else setError('担当者データの取得に失敗しました');
     } finally { setLoading(false); }
   }, [search, customerFilter, page, sortField, sortOrder, router]);

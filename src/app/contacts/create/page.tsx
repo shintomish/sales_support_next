@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { ApiError } from '@/lib/error-helpers';
 
 interface Customer { id: number; company_name: string; }
 
@@ -63,10 +64,10 @@ export default function ContactCreatePage() {
     try {
       await apiClient.post('/api/v1/contacts', { ...form, notes });
       router.push('/contacts');
-    } catch (err: any) {
-      if (err.response?.status === 422) {
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 422) {
         const serverErrors: FieldErrors = {};
-        Object.entries(err.response.data.errors ?? {}).forEach(([k, v]) => {
+        Object.entries((err as ApiError).response?.data?.errors ?? {}).forEach(([k, v]) => {
           serverErrors[k] = (v as string[])[0];
         });
         setErrors(serverErrors);

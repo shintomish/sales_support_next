@@ -10,6 +10,7 @@ import {
   Table, TableBody, TableCell,
   TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import type { ApiError } from '@/lib/error-helpers';
 
 interface Contact {
   id: number;
@@ -73,9 +74,9 @@ export default function CustomerDetailPage() {
       setError(null);
       const res = await apiClient.get(`/api/v1/customers/${id}`);
       setCustomer(res.data.data ?? res.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
-      else if (err.response?.status === 404) router.push('/customers');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
+      else if ((err as ApiError).response?.status === 404) router.push('/customers');
       else setError('顧客情報の取得に失敗しました');
     } finally {
       setLoading(false);

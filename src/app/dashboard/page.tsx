@@ -9,6 +9,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
+import type { ApiError } from '@/lib/error-helpers';
 
 // ───────── 型定義 ─────────
 interface Kpi {
@@ -81,8 +82,8 @@ export default function DashboardPage() {
       setError(null);
       const res = await apiClient.get('/api/v1/dashboard');
       setData(res.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
       else setError('データの取得に失敗しました');
     } finally { setLoading(false); }
   }, [router]);

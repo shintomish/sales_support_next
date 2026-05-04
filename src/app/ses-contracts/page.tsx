@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/authStore';
 import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
 import SortableHeader from '@/components/SortableHeader';
+import type { ApiError } from '@/lib/error-helpers';
 
 // ── 型定義 ────────────────────────────────────────────────────
 interface SesContract {
@@ -164,8 +165,8 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
       });
       setResult(res.data);
       if (res.data.log.status === 'completed') onSuccess();
-    } catch (err: any) {
-      setResult({ message: 'インポートに失敗しました', log: err.response?.data?.log });
+    } catch (err: unknown) {
+      setResult({ message: 'インポートに失敗しました', log: (err as ApiError).response?.data?.log as unknown as ImportLog });
     } finally { setUploading(false); }
   };
 
@@ -326,8 +327,8 @@ function SesContractsPage() {
       setAllContracts(allRes.data.data);
       setSummary(sumRes.data);
       if (userFilter === 'all') setGrandTotal(res.data.meta.total);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
       else setError('SES台帳の取得に失敗しました');
     } finally { setLoading(false); }
   }, [search, statusFilter, page, userFilter, sortField, sortOrder, router]);

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/authStore';
 import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
 import SortableHeader from '@/components/SortableHeader';
+import type { ApiError } from '@/lib/error-helpers';
 
 interface Activity {
   id: number; type: string; subject: string; activity_date: string;
@@ -86,8 +87,8 @@ function ActivitiesPage() {
       setMeta(actRes.data.meta);
       setCustomers(cusRes.data.data);
       if (userFilter === 'all') setGrandTotal(actRes.data.meta.total);
-    } catch (err: any) {
-      if (err.response?.status === 401) router.push('/login');
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 401) router.push('/login');
       else setError('活動履歴の取得に失敗しました');
     } finally { setLoading(false); }
   }, [search, typeFilter, customerFilter, dateFrom, dateTo, page, userFilter, sortField, sortOrder, router]);
