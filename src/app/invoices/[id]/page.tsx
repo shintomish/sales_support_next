@@ -152,7 +152,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   };
 
   const remove = async () => {
-    if (!confirm('この請求書（下書き）を削除します。よろしいですか？')) return;
+    const label = invoice?.status === 'issued' ? '発行済' : '下書き';
+    if (!confirm(`この請求書（${label}）を削除します。\n誤発行のリカバリ用です。よろしいですか？`)) return;
     setBusy(true);
     try {
       await apiClient.delete(`/api/v1/invoices/${id}`);
@@ -290,12 +291,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <Button onClick={generatePdf} disabled={busy} className="bg-blue-600 hover:bg-blue-700 text-white">
             📄 PDF 生成
           </Button>
-          {invoice.status === 'draft' && (
-            <Button variant="outline" onClick={remove} disabled={busy}
-              className="text-red-600 border-red-200 hover:bg-red-50 ml-auto">
-              削除
-            </Button>
-          )}
+          <Button variant="outline" onClick={remove} disabled={busy}
+            className="text-red-600 border-red-200 hover:bg-red-50 ml-auto">
+            削除
+          </Button>
         </div>
       </div>
     </div>
