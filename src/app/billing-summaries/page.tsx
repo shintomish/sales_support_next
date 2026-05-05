@@ -77,6 +77,7 @@ export default function BillingSummariesPage() {
   const [loading,   setLoading]   = useState(false);
   const [issuingId,  setIssuingId]  = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingWrId, setDeletingWrId] = useState<number | null>(null);
   const [sortBy,    setSortBy]    = useState<string>('customer');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -143,6 +144,20 @@ export default function BillingSummariesPage() {
       const msg = data?.errors?.deal_id?.[0] ?? data?.message ?? '請求書の発行に失敗しました';
       alert(msg);
       setIssuingId(null);
+    }
+  };
+
+  const deleteWorkRecord = async (dealId: number, dealTitle: string) => {
+    if (!confirm(`${dealTitle} / ${yearMonth} の勤務表を削除します。\n削除すると請求集計の表示から消えます。よろしいですか？`)) return;
+    setDeletingWrId(dealId);
+    try {
+      await apiClient.delete(`/api/v1/deals/${dealId}/work-records/${yearMonth}`);
+      await fetchData();
+    } catch (err: unknown) {
+      const data = (err as { response?: { data?: { message?: string } } })?.response?.data;
+      alert(data?.message ?? '勤務表の削除に失敗しました');
+    } finally {
+      setDeletingWrId(null);
     }
   };
 
@@ -338,14 +353,24 @@ export default function BillingSummariesPage() {
                             </button>
                           </>
                         ) : (
-                          <button
-                            onClick={() => issueInvoice(r.deal_id, r.customer_name)}
-                            disabled={issuingId === r.deal_id || !r.invoice_code}
-                            title={!r.invoice_code ? '取引先に請求書コードが未設定です' : '請求書の下書きを作成'}
-                            className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-block w-[72px] text-center"
-                          >
-                            {issuingId === r.deal_id ? '...' : '📝 下書き'}
-                          </button>
+                          <>
+                            <button
+                              onClick={() => issueInvoice(r.deal_id, r.customer_name)}
+                              disabled={issuingId === r.deal_id || !r.invoice_code}
+                              title={!r.invoice_code ? '取引先に請求書コードが未設定です' : '請求書の下書きを作成'}
+                              className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-block w-[72px] text-center"
+                            >
+                              {issuingId === r.deal_id ? '...' : '📝 下書き'}
+                            </button>
+                            <button
+                              onClick={() => deleteWorkRecord(r.deal_id, r.deal_title)}
+                              disabled={deletingWrId === r.deal_id}
+                              title="勤務表を削除（請求集計から外す）"
+                              className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 inline-block w-[72px] text-center"
+                            >
+                              {deletingWrId === r.deal_id ? '...' : '🗑️ 削除'}
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
