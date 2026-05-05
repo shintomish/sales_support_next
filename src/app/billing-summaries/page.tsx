@@ -260,8 +260,8 @@ export default function BillingSummariesPage() {
 
       {/* テーブル */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
-          <table className="table-fixed text-sm" style={{ minWidth: group === 'deal' ? '1290px' : '1110px', width: '100%' }}>
+        <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+          <table className="table-fixed w-full text-sm">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
                 {group === 'deal' ? (
@@ -286,7 +286,7 @@ export default function BillingSummariesPage() {
                 <th className="text-right px-2 py-3 font-semibold w-[80px]">小計</th>
                 <th className="text-right px-2 py-3 font-semibold w-[70px]">消費税</th>
                 <SortableHeader label="請求合計" field="total" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[100px]" />
-                {group === 'deal' && <th className="text-center px-2 py-3 font-semibold w-[300px]">操作</th>}
+                {group === 'deal' && <th className="text-center px-2 py-3 font-semibold w-[230px]">操作</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -321,6 +321,26 @@ export default function BillingSummariesPage() {
                           title="案件・契約を編集"
                           className="text-xs px-2 py-1 rounded text-gray-700 hover:bg-gray-100"
                         >⚙️</Link>
+                        {/* 削除ボタン（請求書 or 勤務表）— 歯車の右に配置 */}
+                        {r.invoice_id ? (
+                          <button
+                            onClick={() => deleteInvoice(r.invoice_id!, r.invoice_status!, r.customer_name)}
+                            disabled={deletingId === r.invoice_id}
+                            title="請求書を削除（誤発行のリカバリ用）"
+                            className="text-xs px-2 py-1 rounded text-red-600 hover:bg-red-50 disabled:opacity-50 inline-block w-[32px] text-center"
+                          >
+                            {deletingId === r.invoice_id ? '...' : '🗑️'}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => deleteWorkRecord(r.deal_id, r.deal_title)}
+                            disabled={deletingWrId === r.deal_id}
+                            title="勤務表を削除（請求集計から外す）"
+                            className="text-xs px-2 py-1 rounded text-red-600 hover:bg-red-50 disabled:opacity-50 inline-block w-[32px] text-center"
+                          >
+                            {deletingWrId === r.deal_id ? '...' : '🗑️'}
+                          </button>
+                        )}
                         {r.invoice_status === 'issued' && r.invoice_pdf_path ? (
                           <a
                             href={r.invoice_pdf_path}
@@ -333,44 +353,24 @@ export default function BillingSummariesPage() {
                           <span className="inline-block w-[32px]" aria-hidden="true" />
                         )}
                         {r.invoice_id ? (
-                          <>
-                            <Link
-                              href={`/invoices/${r.invoice_id}`}
-                              title={r.invoice_status === 'issued' ? '発行済の請求書を表示' : '下書きの請求書を編集'}
-                              className={`text-xs px-2 py-1 rounded text-white inline-block w-[72px] text-center ${
-                                r.invoice_status === 'issued' ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'
-                              }`}
-                            >
-                              {r.invoice_status === 'issued' ? '📋 発行済' : '📋 下書き'}
-                            </Link>
-                            <button
-                              onClick={() => deleteInvoice(r.invoice_id!, r.invoice_status!, r.customer_name)}
-                              disabled={deletingId === r.invoice_id}
-                              title="請求書を削除（誤発行のリカバリ用）"
-                              className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 inline-block w-[72px] text-center"
-                            >
-                              {deletingId === r.invoice_id ? '...' : '🗑️ 削除'}
-                            </button>
-                          </>
+                          <Link
+                            href={`/invoices/${r.invoice_id}`}
+                            title={r.invoice_status === 'issued' ? '発行済の請求書を表示' : '下書きの請求書を編集'}
+                            className={`text-xs px-2 py-1 rounded text-white inline-block w-[72px] text-center ${
+                              r.invoice_status === 'issued' ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'
+                            }`}
+                          >
+                            {r.invoice_status === 'issued' ? '📋 発行済' : '📋 下書き'}
+                          </Link>
                         ) : (
-                          <>
-                            <button
-                              onClick={() => issueInvoice(r.deal_id, r.customer_name)}
-                              disabled={issuingId === r.deal_id || !r.invoice_code}
-                              title={!r.invoice_code ? '取引先に請求書コードが未設定です' : '請求書の下書きを作成'}
-                              className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-block w-[72px] text-center"
-                            >
-                              {issuingId === r.deal_id ? '...' : '📝 下書き'}
-                            </button>
-                            <button
-                              onClick={() => deleteWorkRecord(r.deal_id, r.deal_title)}
-                              disabled={deletingWrId === r.deal_id}
-                              title="勤務表を削除（請求集計から外す）"
-                              className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 inline-block w-[72px] text-center"
-                            >
-                              {deletingWrId === r.deal_id ? '...' : '🗑️ 削除'}
-                            </button>
-                          </>
+                          <button
+                            onClick={() => issueInvoice(r.deal_id, r.customer_name)}
+                            disabled={issuingId === r.deal_id || !r.invoice_code}
+                            title={!r.invoice_code ? '取引先に請求書コードが未設定です' : '請求書の下書きを作成'}
+                            className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-block w-[72px] text-center"
+                          >
+                            {issuingId === r.deal_id ? '...' : '📝 下書き'}
+                          </button>
                         )}
                       </div>
                     </td>
