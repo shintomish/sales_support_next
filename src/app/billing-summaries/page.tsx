@@ -286,7 +286,7 @@ export default function BillingSummariesPage() {
                 <th className="text-right px-2 py-3 font-semibold w-[80px]">小計</th>
                 <th className="text-right px-2 py-3 font-semibold w-[70px]">消費税</th>
                 <SortableHeader label="請求合計" field="total" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[100px]" />
-                {group === 'deal' && <th className="text-center px-2 py-3 font-semibold w-[260px]">操作</th>}
+                {group === 'deal' && <th className="text-center px-2 py-3 font-semibold w-[300px]">操作</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
