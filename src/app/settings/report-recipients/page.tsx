@@ -98,7 +98,10 @@ export default function ReportRecipientsPage() {
     <div className="p-6 max-w-3xl mx-auto w-full">
       <Toast message={toast} onClose={() => setToast(null)} />
       <h1 className="text-2xl font-bold text-gray-800 mb-2">日次レポート配信先</h1>
-      <p className="text-xs text-gray-400 mb-6">毎朝08:30に「昨日の動き＋今日の要対応リスト」を AWS SES 経由で送信します。一時停止したい配信先は、下の一覧で該当行の【停止】ボタンを押してください（再開は【再開】ボタン）。</p>
+      <p className="text-xs text-gray-400 mb-6">
+        毎朝08:30に「昨日の動き＋今日の要対応リスト」を AWS SES 経由で送信します。<br />
+        一時停止したい配信先は、下の一覧で該当行の【停止】ボタンを押してください（再開は【再開】ボタン）。
+      </p>
 
       {/* 追加フォーム */}
       <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
