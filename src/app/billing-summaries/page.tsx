@@ -260,8 +260,8 @@ export default function BillingSummariesPage() {
 
       {/* テーブル */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 320px)' }}>
-          <table className="table-fixed w-full text-sm">
+        <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+          <table className="table-fixed text-sm" style={{ minWidth: group === 'deal' ? '1290px' : '1110px', width: '100%' }}>
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
                 {group === 'deal' ? (
