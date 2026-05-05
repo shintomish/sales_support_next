@@ -137,31 +137,35 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   // (O) 支払条件 = (G) 支払期限文言から「現金」を除いたもの
   const paymentCondition = paymentTermsText.replace('現金', '');
 
+  const buildPayload = (newStatus?: 'draft' | 'issued'): Record<string, unknown> => {
+    const payload: Record<string, unknown> = {
+      issued_date:         issuedDate || null,
+      due_date:            dueDate || null,
+      notes:               notes || null,
+      order_number:        orderNumber || null,
+      quote_number:        quoteNumber || null,
+      subject_name:        subjectName || null,
+      work_period_text:    workPeriodText || null,
+      work_location:       workLocation || null,
+      delivery_date_text:  deliveryDateText || null,
+      delivery_place_text: deliveryPlaceText || null,
+      payment_terms_text:  paymentTermsText || null,
+      lines: lines.map((l) => ({
+        description: l.description,
+        quantity:    Number(l.quantity) || 0,
+        unit:        l.unit || null,
+        unit_price:  Number(l.unit_price) || 0,
+        tax_rate:    Number(l.tax_rate),
+      })),
+    };
+    if (newStatus) payload.status = newStatus;
+    return payload;
+  };
+
   const save = async (newStatus?: 'draft' | 'issued') => {
     setBusy(true);
     try {
-      const payload: Record<string, unknown> = {
-        issued_date:         issuedDate || null,
-        due_date:            dueDate || null,
-        notes:               notes || null,
-        order_number:        orderNumber || null,
-        quote_number:        quoteNumber || null,
-        subject_name:        subjectName || null,
-        work_period_text:    workPeriodText || null,
-        work_location:       workLocation || null,
-        delivery_date_text:  deliveryDateText || null,
-        delivery_place_text: deliveryPlaceText || null,
-        payment_terms_text:  paymentTermsText || null,
-        lines: lines.map((l) => ({
-          description: l.description,
-          quantity:    Number(l.quantity) || 0,
-          unit:        l.unit || null,
-          unit_price:  Number(l.unit_price) || 0,
-          tax_rate:    Number(l.tax_rate),
-        })),
-      };
-      if (newStatus) payload.status = newStatus;
-      const res = await apiClient.put<Invoice>(`/api/v1/invoices/${id}`, payload);
+      const res = await apiClient.put<Invoice>(`/api/v1/invoices/${id}`, buildPayload(newStatus));
       setInvoice(res.data);
       setToast(`${res.data.invoice_number}を保存しました`);
     } catch (err: unknown) {
@@ -173,9 +177,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   };
 
   const generatePdf = async () => {
-    if (!confirm('PDFを生成し、ステータスを「発行済」に変更します。よろしいですか？')) return;
+    if (!confirm('編集中の内容を保存してPDFを生成し、ステータスを「発行済」に変更します。よろしいですか？')) return;
     setBusy(true);
     try {
+      // 編集中の内容を先にDBへ保存（トースト抑止のため save() ではなく直接呼ぶ）
+      await apiClient.put<Invoice>(`/api/v1/invoices/${id}`, buildPayload());
       const res = await apiClient.post<{ pdf_url: string; invoice: Invoice }>(`/api/v1/invoices/${id}/pdf`);
       setInvoice(res.data.invoice);
       window.open(res.data.pdf_url, '_blank');
