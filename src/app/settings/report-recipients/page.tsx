@@ -27,6 +27,11 @@ export default function ReportRecipientsPage() {
   const [newEmail, setNewEmail] = useState('');
   const [newName, setNewName]   = useState('');
 
+  // 編集状態（行ID + 編集中の値）
+  const [editingId, setEditingId]       = useState<number | null>(null);
+  const [editEmail, setEditEmail]       = useState('');
+  const [editName,  setEditName]        = useState('');
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -53,6 +58,36 @@ export default function ReportRecipientsPage() {
       await fetchData();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '追加に失敗しました';
+      alert(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startEdit = (r: Recipient) => {
+    setEditingId(r.id);
+    setEditEmail(r.email);
+    setEditName(r.name ?? '');
+  };
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditEmail(''); setEditName('');
+  };
+
+  const saveEdit = async (r: Recipient) => {
+    if (!editEmail) { alert('メールアドレスは必須です'); return; }
+    setBusy(true);
+    try {
+      const res = await apiClient.put<Recipient>(`/api/v1/settings/report-recipients/${r.id}`, {
+        email:     editEmail,
+        name:      editName || null,
+        is_active: r.is_active,
+      });
+      setItems((prev) => prev.map((x) => x.id === r.id ? res.data : x));
+      setToast('更新しました');
+      cancelEdit();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '更新に失敗しました';
       alert(msg);
     } finally {
       setBusy(false);
@@ -129,41 +164,72 @@ export default function ReportRecipientsPage() {
           <thead className="bg-gray-50 text-gray-600">
             <tr>
               <th className="text-left px-3 py-2 font-semibold">メールアドレス</th>
-              <th className="text-left px-3 py-2 font-semibold w-[160px]">表示名</th>
-              <th className="text-center px-3 py-2 font-semibold w-[110px]">状態</th>
-              <th className="text-center px-3 py-2 font-semibold w-[160px]">操作</th>
+              <th className="text-left px-3 py-2 font-semibold w-[180px]">表示名</th>
+              <th className="text-center px-3 py-2 font-semibold w-[90px]">状態</th>
+              <th className="text-center px-3 py-2 font-semibold w-[200px]">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {items.length === 0 ? (
               <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">配信先が登録されていません</td></tr>
-            ) : items.map((r) => (
-              <tr key={r.id}>
-                <td className="px-3 py-2">{r.email}</td>
-                <td className="px-3 py-2 text-gray-600">{r.name ?? '-'}</td>
-                <td className="px-3 py-2 text-center">
-                  <span className={`px-2 py-1 rounded text-xs ${r.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                    {r.is_active ? '配信中' : '停止中'}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-center space-x-1">
-                  <button
-                    onClick={() => toggleActive(r)}
-                    disabled={busy}
-                    className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-50"
-                  >
-                    {r.is_active ? '停止' : '再開'}
-                  </button>
-                  <button
-                    onClick={() => remove(r)}
-                    disabled={busy}
-                    className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50"
-                  >
-                    削除
-                  </button>
-                </td>
-              </tr>
-            ))}
+            ) : items.map((r) => {
+              const isEditing = editingId === r.id;
+              return (
+                <tr key={r.id}>
+                  <td className="px-3 py-2">
+                    {isEditing
+                      ? <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="text-sm" />
+                      : r.email}
+                  </td>
+                  <td className="px-3 py-2 text-gray-600">
+                    {isEditing
+                      ? <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="text-sm" placeholder="表示名（任意）" />
+                      : (r.name ?? '-')}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <span className={`px-2 py-1 rounded text-xs ${r.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {r.is_active ? '配信中' : '停止中'}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-center space-x-1">
+                    {isEditing ? (
+                      <>
+                        <button
+                          onClick={() => saveEdit(r)}
+                          disabled={busy}
+                          className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                        >保存</button>
+                        <button
+                          onClick={cancelEdit}
+                          disabled={busy}
+                          className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-50"
+                        >取消</button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => startEdit(r)}
+                          disabled={busy}
+                          className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-50"
+                        >編集</button>
+                        <button
+                          onClick={() => toggleActive(r)}
+                          disabled={busy}
+                          className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-50"
+                        >
+                          {r.is_active ? '停止' : '再開'}
+                        </button>
+                        <button
+                          onClick={() => remove(r)}
+                          disabled={busy}
+                          className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50"
+                        >削除</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
