@@ -332,9 +332,9 @@ export default function BillingSummariesPage() {
                               onClick={() => deleteInvoice(r.invoice_id!, r.invoice_status!, r.customer_name)}
                               disabled={deletingId === r.invoice_id}
                               title="請求書を削除（誤発行のリカバリ用）"
-                              className="text-xs px-2 py-1 rounded text-red-600 hover:bg-red-100 disabled:opacity-50"
+                              className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 inline-block w-[72px] text-center"
                             >
-                              {deletingId === r.invoice_id ? '...' : '🗑️'}
+                              {deletingId === r.invoice_id ? '...' : '🗑️ 削除'}
                             </button>
                           </>
                         ) : (
