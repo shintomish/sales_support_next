@@ -84,6 +84,7 @@ export default function Sidebar() {
       items: [
         { label: 'メール署名設定',   path: '/settings/email-template', icon: '✍️' },
         { label: '請求書発行元設定', path: '/settings/invoice-issuer', icon: '🏢', sesOnly: true },
+        { label: '日次レポート配信先', path: '/settings/report-recipients', icon: '📊', sesOnly: true },
       ],
     },
   ];
