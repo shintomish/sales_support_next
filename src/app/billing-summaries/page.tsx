@@ -130,7 +130,7 @@ export default function BillingSummariesPage() {
   }, [items, sortBy, sortOrder]);
 
   const issueInvoice = async (dealId: number, customerName: string | null) => {
-    if (!confirm(`${customerName ?? ''}+${yearMonth} の請求書（下書き）を発行します。よろしいですか？`)) return;
+    if (!confirm(`${customerName ?? ''} / ${yearMonth} の請求書 下書きを作成します。よろしいですか？`)) return;
     setIssuingId(dealId);
     try {
       const res = await apiClient.post<{ id: number }>('/api/v1/invoices', {
@@ -341,10 +341,10 @@ export default function BillingSummariesPage() {
                           <button
                             onClick={() => issueInvoice(r.deal_id, r.customer_name)}
                             disabled={issuingId === r.deal_id || !r.invoice_code}
-                            title={!r.invoice_code ? '取引先に請求書コードが未設定です' : '請求書を発行'}
+                            title={!r.invoice_code ? '取引先に請求書コードが未設定です' : '請求書の下書きを作成'}
                             className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-block w-[72px] text-center"
                           >
-                            {issuingId === r.deal_id ? '...' : '📄 発行'}
+                            {issuingId === r.deal_id ? '...' : '📝 下書き'}
                           </button>
                         )}
                       </div>
