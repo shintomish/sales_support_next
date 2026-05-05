@@ -21,6 +21,14 @@ interface InvoiceLine {
 interface Invoice {
   id: number;
   invoice_number: string;
+  order_number: string | null;
+  quote_number: string | null;
+  subject_name: string | null;
+  work_period_text: string | null;
+  work_location: string | null;
+  delivery_date_text: string | null;
+  delivery_place_text: string | null;
+  payment_terms_text: string | null;
   year_month: string;
   issued_date: string;
   due_date: string | null;
@@ -54,9 +62,18 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [busy,    setBusy]    = useState(false);
   const [toast,   setToast]   = useState<string | null>(null);
+
   const [issuedDate, setIssuedDate] = useState('');
   const [dueDate,    setDueDate]    = useState('');
   const [notes,      setNotes]      = useState('');
+  const [orderNumber,       setOrderNumber]       = useState('');
+  const [quoteNumber,       setQuoteNumber]       = useState('');
+  const [subjectName,       setSubjectName]       = useState('');
+  const [workPeriodText,    setWorkPeriodText]    = useState('');
+  const [workLocation,      setWorkLocation]      = useState('');
+  const [deliveryDateText,  setDeliveryDateText]  = useState('');
+  const [deliveryPlaceText, setDeliveryPlaceText] = useState('');
+  const [paymentTermsText,  setPaymentTermsText]  = useState('');
   const [lines,      setLines]      = useState<InvoiceLine[]>([]);
 
   const fetchData = useCallback(async () => {
@@ -67,6 +84,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       setIssuedDate(res.data.issued_date ?? '');
       setDueDate(res.data.due_date ?? '');
       setNotes(res.data.notes ?? '');
+      setOrderNumber(res.data.order_number ?? '');
+      setQuoteNumber(res.data.quote_number ?? '');
+      setSubjectName(res.data.subject_name ?? '');
+      setWorkPeriodText(res.data.work_period_text ?? '');
+      setWorkLocation(res.data.work_location ?? '');
+      setDeliveryDateText(res.data.delivery_date_text ?? '');
+      setDeliveryPlaceText(res.data.delivery_place_text ?? '');
+      setPaymentTermsText(res.data.payment_terms_text ?? '');
       setLines(res.data.lines.map((l) => ({
         description: l.description,
         quantity:    String(l.quantity),
@@ -109,13 +134,24 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   };
   const preview = calcPreview();
 
+  // (O) 支払条件 = (G) 支払期限文言から「現金」を除いたもの
+  const paymentCondition = paymentTermsText.replace('現金', '');
+
   const save = async (newStatus?: 'draft' | 'issued') => {
     setBusy(true);
     try {
       const payload: Record<string, unknown> = {
-        issued_date: issuedDate || null,
-        due_date:    dueDate || null,
-        notes:       notes || null,
+        issued_date:         issuedDate || null,
+        due_date:            dueDate || null,
+        notes:               notes || null,
+        order_number:        orderNumber || null,
+        quote_number:        quoteNumber || null,
+        subject_name:        subjectName || null,
+        work_period_text:    workPeriodText || null,
+        work_location:       workLocation || null,
+        delivery_date_text:  deliveryDateText || null,
+        delivery_place_text: deliveryPlaceText || null,
+        payment_terms_text:  paymentTermsText || null,
         lines: lines.map((l) => ({
           description: l.description,
           quantity:    Number(l.quantity) || 0,
@@ -204,12 +240,54 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           </Field>
         </div>
 
+        {/* 番号類 */}
+        <div className="grid grid-cols-3 gap-4">
+          <Field label="注文No.">
+            <Input value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} placeholder="PO-..." />
+          </Field>
+          <Field label="見積No.">
+            <Input value={quoteNumber} onChange={(e) => setQuoteNumber(e.target.value)} />
+          </Field>
+        </div>
+
+        {/* 左側ヘッダー (E)(F)(G) */}
+        <div className="grid grid-cols-3 gap-4">
+          <Field label="納期">
+            <Input value={deliveryDateText} onChange={(e) => setDeliveryDateText(e.target.value)} placeholder="御社ご指定日" />
+          </Field>
+          <Field label="納入場所">
+            <Input value={deliveryPlaceText} onChange={(e) => setDeliveryPlaceText(e.target.value)} placeholder="御社ご指定場所" />
+          </Field>
+          <Field label="支払期限文言">
+            <Input value={paymentTermsText} onChange={(e) => setPaymentTermsText(e.target.value)}
+              placeholder="月末締め翌々月20日現金お支払" />
+          </Field>
+        </div>
+
+        {/* 明細部メタ (K)(L)(N)(O) */}
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="件名">
+            <Input value={subjectName} onChange={(e) => setSubjectName(e.target.value)} />
+          </Field>
+          <Field label="作業期間">
+            <Input value={workPeriodText} onChange={(e) => setWorkPeriodText(e.target.value)}
+              placeholder="2026年4月1日～2026年4月30日" />
+          </Field>
+          <Field label="作業場所">
+            <Input value={workLocation} onChange={(e) => setWorkLocation(e.target.value)} />
+          </Field>
+          <Field label="支払条件 (PDF表示用・自動派生)">
+            <Input value={paymentCondition} disabled className="bg-gray-50 text-gray-500" />
+          </Field>
+        </div>
+
         {/* 明細 */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-semibold text-gray-700">明細</h2>
+            <h2 className="text-sm font-semibold text-gray-700">明細（金額計上行）</h2>
             <Button variant="outline" onClick={addLine} disabled={busy}>+ 行追加</Button>
           </div>
+          <p className="text-xs text-gray-400 mb-2">基本月額の摘要は「{`{金額}`}円 【基本月額】」形式で生成されます。</p>
           <div className="overflow-auto">
             <table className="w-full text-sm border border-gray-200">
               <thead className="bg-gray-50 text-gray-600">
@@ -278,7 +356,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* 備考 */}
-        <Field label="備考">
+        <Field label="備考（PDF下段に追記表示）">
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
             className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white" />
         </Field>

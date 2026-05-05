@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ interface IssuerSettings {
   invoice_issuer_postal_code: string | null;
   invoice_issuer_address: string | null;
   invoice_issuer_tel: string | null;
+  invoice_issuer_fax: string | null;
+  invoice_issuer_logo_path: string | null;
   invoice_issuer_invoice_number: string | null;
   invoice_issuer_bank_name: string | null;
   invoice_issuer_bank_branch: string | null;
@@ -21,17 +23,28 @@ interface IssuerSettings {
 
 const EMPTY: IssuerSettings = {
   invoice_issuer_name: '', invoice_issuer_postal_code: '', invoice_issuer_address: '',
-  invoice_issuer_tel: '', invoice_issuer_invoice_number: '',
+  invoice_issuer_tel: '', invoice_issuer_fax: '', invoice_issuer_logo_path: '',
+  invoice_issuer_invoice_number: '',
   invoice_issuer_bank_name: '', invoice_issuer_bank_branch: '',
   invoice_issuer_bank_account_type: '', invoice_issuer_bank_account_number: '',
   invoice_issuer_bank_account_holder: '',
 };
+
+// テキスト系（保存対象）— ロゴパスは別エンドポイントで管理
+const TEXT_KEYS: (keyof IssuerSettings)[] = [
+  'invoice_issuer_name', 'invoice_issuer_postal_code', 'invoice_issuer_address',
+  'invoice_issuer_tel', 'invoice_issuer_fax', 'invoice_issuer_invoice_number',
+  'invoice_issuer_bank_name', 'invoice_issuer_bank_branch',
+  'invoice_issuer_bank_account_type', 'invoice_issuer_bank_account_number',
+  'invoice_issuer_bank_account_holder',
+];
 
 export default function InvoiceIssuerSettingsPage() {
   const [form, setForm]       = useState<IssuerSettings>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy]       = useState(false);
   const [toast, setToast]     = useState<string | null>(null);
+  const fileInputRef          = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     apiClient.get<IssuerSettings>('/api/v1/settings/invoice-issuer')
@@ -50,10 +63,48 @@ export default function InvoiceIssuerSettingsPage() {
   const submit = async () => {
     setBusy(true);
     try {
-      await apiClient.put('/api/v1/settings/invoice-issuer', form);
+      const payload: Partial<IssuerSettings> = {};
+      TEXT_KEYS.forEach((k) => { payload[k] = form[k]; });
+      await apiClient.put('/api/v1/settings/invoice-issuer', payload);
       setToast('保存しました');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '保存に失敗しました';
+      alert(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const uploadLogo = async (file: File) => {
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('logo', file);
+      const res = await apiClient.post<{ invoice_issuer_logo_path: string }>(
+        '/api/v1/settings/invoice-issuer/logo',
+        fd,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      );
+      setForm((p) => ({ ...p, invoice_issuer_logo_path: res.data.invoice_issuer_logo_path }));
+      setToast('ロゴをアップロードしました');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'アップロードに失敗しました';
+      alert(msg);
+    } finally {
+      setBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const removeLogo = async () => {
+    if (!confirm('ロゴを削除しますか？')) return;
+    setBusy(true);
+    try {
+      await apiClient.delete('/api/v1/settings/invoice-issuer/logo');
+      setForm((p) => ({ ...p, invoice_issuer_logo_path: '' }));
+      setToast('ロゴを削除しました');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '削除に失敗しました';
       alert(msg);
     } finally {
       setBusy(false);
@@ -72,21 +123,57 @@ export default function InvoiceIssuerSettingsPage() {
         <Field label="会社名">
           <Input value={form.invoice_issuer_name ?? ''} onChange={(e) => set('invoice_issuer_name')(e.target.value)} />
         </Field>
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="郵便番号">
-            <Input value={form.invoice_issuer_postal_code ?? ''} onChange={(e) => set('invoice_issuer_postal_code')(e.target.value)} />
-          </Field>
-          <Field label="電話番号" className="col-span-2">
-            <Input value={form.invoice_issuer_tel ?? ''} onChange={(e) => set('invoice_issuer_tel')(e.target.value)} />
-          </Field>
-        </div>
+        <Field label="郵便番号">
+          <Input value={form.invoice_issuer_postal_code ?? ''} onChange={(e) => set('invoice_issuer_postal_code')(e.target.value)} />
+        </Field>
         <Field label="住所">
           <Input value={form.invoice_issuer_address ?? ''} onChange={(e) => set('invoice_issuer_address')(e.target.value)} />
         </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="電話番号">
+            <Input value={form.invoice_issuer_tel ?? ''} onChange={(e) => set('invoice_issuer_tel')(e.target.value)} />
+          </Field>
+          <Field label="FAX番号">
+            <Input value={form.invoice_issuer_fax ?? ''} onChange={(e) => set('invoice_issuer_fax')(e.target.value)} />
+          </Field>
+        </div>
         <Field label="適格請求書発行事業者登録番号 (T+13桁)">
           <Input value={form.invoice_issuer_invoice_number ?? ''} onChange={(e) => set('invoice_issuer_invoice_number')(e.target.value)}
             placeholder="T1234567890123" />
         </Field>
+
+        {/* ロゴ */}
+        <div className="border-t border-gray-100 pt-4 mt-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">ロゴ画像</h2>
+          <p className="text-xs text-gray-400 mb-3">PNG / JPG / GIF / WebP（2MB まで）。請求書PDF右上に表示されます。</p>
+          <div className="flex items-center gap-4">
+            {form.invoice_issuer_logo_path
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={form.invoice_issuer_logo_path} alt="logo"
+                  className="h-16 w-auto max-w-[160px] border border-gray-200 rounded object-contain bg-white p-1" />
+              : <div className="h-16 w-40 border border-dashed border-gray-300 rounded flex items-center justify-center text-xs text-gray-400">未設定</div>
+            }
+            <div className="flex flex-col gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadLogo(f);
+                }}
+                className="text-xs"
+                disabled={busy}
+              />
+              {form.invoice_issuer_logo_path && (
+                <Button variant="outline" onClick={removeLogo} disabled={busy}
+                  className="text-red-600 border-red-200 hover:bg-red-50 text-xs">
+                  ロゴを削除
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
 
         <div className="border-t border-gray-100 pt-4 mt-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">振込先</h2>

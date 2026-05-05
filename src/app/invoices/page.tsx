@@ -10,6 +10,7 @@ import SortableHeader from '@/components/SortableHeader';
 interface InvoiceListItem {
   id: number;
   invoice_number: string;
+  order_number: string | null;
   year_month: string;
   issued_date: string;
   due_date: string | null;
@@ -137,11 +138,12 @@ export default function InvoicesPage() {
           <table className="table-fixed w-full text-sm">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
-                <th className="text-left px-2 py-3 font-semibold w-[180px]">請求書番号</th>
-                <th className="text-left px-2 py-3 font-semibold w-[80px]">対象月</th>
-                <SortableHeader label="取引先"   field="customer" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[160px]" />
-                <SortableHeader label="案件"     field="deal"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[180px]" />
-                <th className="text-left px-2 py-3 font-semibold w-[100px]">発行日</th>
+                <th className="text-left px-2 py-3 font-semibold w-[170px]">請求書番号</th>
+                <th className="text-left px-2 py-3 font-semibold w-[130px]">注文No.</th>
+                <th className="text-left px-2 py-3 font-semibold w-[70px]">対象月</th>
+                <SortableHeader label="取引先"   field="customer" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[150px]" />
+                <SortableHeader label="案件"     field="deal"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[170px]" />
+                <th className="text-left px-2 py-3 font-semibold w-[90px]">発行日</th>
                 <SortableHeader label="税込合計" field="total"    sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[110px]" />
                 <th className="text-center px-2 py-3 font-semibold w-[80px]">状態</th>
                 <th className="px-2 py-3 text-center font-semibold w-[70px]">PDF</th>
@@ -150,12 +152,13 @@ export default function InvoicesPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
               ) : sortedItems.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">請求書がありません</td></tr>
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">請求書がありません</td></tr>
               ) : sortedItems.map((r, idx) => (
                 <tr key={r.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
                   <td className="px-2 py-3 font-mono text-xs truncate">{r.invoice_number}</td>
+                  <td className="px-2 py-3 font-mono text-xs truncate text-gray-600" title={r.order_number ?? ''}>{r.order_number ?? '-'}</td>
                   <td className="px-2 py-3 truncate">{r.year_month}</td>
                   <td className="px-2 py-3 text-gray-800 truncate" title={r.customer_name_snapshot ?? r.customer?.company_name ?? ''}>{r.customer_name_snapshot ?? r.customer?.company_name ?? '-'}</td>
                   <td className="px-2 py-3 truncate" title={r.deal?.title ?? ''}>{r.deal?.title ?? '-'}</td>
