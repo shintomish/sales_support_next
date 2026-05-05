@@ -248,10 +248,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
         {/* 番号類 */}
         <div className="grid grid-cols-3 gap-4">
-          <Field label="注文No.">
+          <Field label="注文番号">
             <Input value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} placeholder="PO-..." />
           </Field>
-          <Field label="見積No.">
+          <Field label="見積番号">
             <Input value={quoteNumber} onChange={(e) => setQuoteNumber(e.target.value)} />
           </Field>
         </div>

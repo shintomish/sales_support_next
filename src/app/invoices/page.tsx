@@ -138,8 +138,8 @@ export default function InvoicesPage() {
           <table className="table-fixed w-full text-sm">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
-                <th className="text-left px-2 py-3 font-semibold w-[170px]">請求書番号</th>
-                <th className="text-left px-2 py-3 font-semibold w-[130px]">注文No.</th>
+                <th className="text-left px-2 py-3 font-semibold w-[170px]">請求番号</th>
+                <th className="text-left px-2 py-3 font-semibold w-[130px]">注文番号</th>
                 <th className="text-left px-2 py-3 font-semibold w-[70px]">対象月</th>
                 <SortableHeader label="取引先"   field="customer" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[150px]" />
                 <SortableHeader label="案件"     field="deal"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[170px]" />
