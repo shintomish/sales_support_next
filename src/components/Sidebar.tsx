@@ -15,6 +15,7 @@ type SubItem = {
   icon: string;
   badge?: number;
   sesOnly?: boolean;
+  superAdminOnly?: boolean;
 };
 
 type Entry =
@@ -85,6 +86,7 @@ export default function Sidebar() {
         { label: 'メール署名設定',   path: '/settings/email-template', icon: '✍️' },
         { label: '請求書発行元設定', path: '/settings/invoice-issuer', icon: '🏢', sesOnly: true },
         { label: '日次レポート配信先', path: '/settings/report-recipients', icon: '📊', sesOnly: true },
+        { label: '不具合・要望を送る', path: '/settings/feedback', icon: '💬' },
       ],
     },
   ];
@@ -103,12 +105,14 @@ export default function Sidebar() {
 
   // 管理メニュー
   const showAdmin = user?.role === 'super_admin' || user?.role === 'tenant_admin';
+  const isSuperAdmin = user?.role === 'super_admin';
   const adminGroup: Extract<Entry, { type: 'group' }> = {
     type: 'group', key: 'admin', label: '管理', icon: '🛡️',
     items: [
       { label: 'ユーザー管理', path: '/admin/users', icon: '🛡️' },
       { label: 'データ統計',   path: '/admin/stats', icon: '📊' },
-    ],
+      { label: 'ご意見一覧',   path: '/admin/feedback', icon: '💬', superAdminOnly: true },
+    ].filter((it) => !it.superAdminOnly || isSuperAdmin) as SubItem[],
   };
 
   // 現在パスを含むグループを返す

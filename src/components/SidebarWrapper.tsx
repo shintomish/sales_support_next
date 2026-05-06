@@ -31,6 +31,17 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
     mainRef.current?.scrollTo(0, 0);
   }, [pathname]);
 
+  // フィードバック時に「不具合が起きた画面 URL」をプリフィルするため、直前訪問ページを記録
+  // /settings/feedback 自身は記録対象外（自分自身が記録されないようにする）
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (pathname.startsWith('/settings/feedback')) return;
+    if (NO_SIDEBAR_PATHS.includes(pathname)) return;
+    try {
+      sessionStorage.setItem('lastVisitedUrl', `${window.location.origin}${pathname}`);
+    } catch {}
+  }, [pathname]);
+
   const showSidebar = !NO_SIDEBAR_PATHS.includes(pathname);
 
   if (loading) {
