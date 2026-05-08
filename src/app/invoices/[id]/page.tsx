@@ -384,7 +384,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setMailModalOpen(false);
-      alert('メールを送信しました');
+      setToast('送信しました');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'メール送信に失敗しました';
       alert(msg);
