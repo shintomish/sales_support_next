@@ -76,13 +76,18 @@ type SendHistory = {
   email: string
   name: string | null
   status: 'sent' | 'failed' | 'replied'
+  sent_at?: string | null
+  resent_at?: string | null
+  parent_history_id?: number | null
   replied_at: string | null
+  reply_email_id?: number | null
   reply_subject: string | null
   reply_received_at: string | null
   reply_body_snippet?: string | null
   reply_body_text?: string | null
   reply_from?: string | null
   reply_from_name?: string | null
+  reply_attachments?: ThreadAttachment[]
 }
 
 type CampaignDetail = Campaign & {
@@ -483,6 +488,22 @@ export default function DeliveriesPage() {
     try {
       await axios.post(`/api/v1/delivery-campaigns/${campaignId}/histories/${historyId}/resend`)
       reloadThreadDetail(t)
+    } catch (e) {
+      alert((e as ApiError).response?.data?.message ?? '再送信に失敗しました')
+    } finally {
+      setResendingHistoryId(null)
+    }
+  }
+
+  // 一斉配信履歴 アコーディオンからの再送信
+  const handleResendCampaignHistory = async (campaignId: number, historyId: number, to: string) => {
+    if (!confirm(`${to} に再送信しますか？`)) return
+    setResendingHistoryId(historyId)
+    try {
+      await axios.post(`/api/v1/delivery-campaigns/${campaignId}/histories/${historyId}/resend`)
+      // キャンペーン詳細を再取得（accordion キャッシュも更新）
+      const res = await axios.get<CampaignDetail>(`/api/v1/delivery-campaigns/${campaignId}`)
+      setCampDetailCache(prev => ({ ...prev, [campaignId]: res.data }))
     } catch (e) {
       alert((e as ApiError).response?.data?.message ?? '再送信に失敗しました')
     } finally {
@@ -1483,7 +1504,16 @@ export default function DeliveriesPage() {
                                 {/* 返信一覧 */}
                                 {detail.histories.filter(h => h.status === 'replied').length > 0 && (
                                   <div className="space-y-3">
-                                    {detail.histories.filter(h => h.status === 'replied').map(h => (
+                                    {detail.histories.filter(h => h.status === 'replied').map(h => {
+                                      const sourceType: 'project' | 'engineer' | null =
+                                        camp.project_mail_id ? 'project'
+                                        : camp.engineer_mail_source_id ? 'engineer'
+                                        : null
+                                      const sourceId =
+                                        camp.project_mail_id ?? camp.engineer_mail_source_id ?? null
+                                      const replyFrom = h.reply_from ?? h.email
+                                      const replyFromName = h.reply_from_name ?? h.name ?? null
+                                      return (
                                       <div key={h.id} className="rounded-lg border p-3 bg-white border-gray-200 mr-8">
                                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                           <span className="text-xs font-bold text-red-600">← 受信</span>
@@ -1491,15 +1521,72 @@ export default function DeliveriesPage() {
                                             {h.replied_at ? new Date(h.replied_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : ''}
                                           </span>
                                           <span className="text-xs text-gray-500">
-                                            From: {h.reply_from_name ?? h.reply_from ?? h.name ?? h.email}
+                                            From: {replyFromName ?? replyFrom}
                                           </span>
+                                          {h.resent_at && (
+                                            <span className="text-xs text-amber-600">
+                                              再送信: {new Date(h.resent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                                            </span>
+                                          )}
+                                          <div className="ml-auto flex items-center gap-2">
+                                            {sourceType && sourceId && replyFrom && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  setReplyCompose({
+                                                    sourceType, sourceId,
+                                                    to: replyFrom, toName: replyFromName,
+                                                    subject: (h.reply_subject ?? '').startsWith('Re:')
+                                                      ? (h.reply_subject ?? '')
+                                                      : `Re: ${h.reply_subject ?? camp.subject}`,
+                                                  })
+                                                }}
+                                                className="text-xs text-blue-600 hover:underline"
+                                              >
+                                                ↗ 送信
+                                              </button>
+                                            )}
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleResendCampaignHistory(camp.id, h.id, h.email)
+                                              }}
+                                              disabled={resendingHistoryId === h.id}
+                                              className="text-xs text-orange-600 hover:underline disabled:opacity-50 disabled:no-underline"
+                                            >
+                                              {resendingHistoryId === h.id ? '送信中…' : '↻ 再送信'}
+                                            </button>
+                                          </div>
                                         </div>
                                         <p className="text-sm font-semibold text-gray-800 mb-1">{h.reply_subject ?? '（件名なし）'}</p>
                                         <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans break-words">
                                           {h.reply_body_text ?? h.reply_body_snippet ?? ''}
                                         </pre>
+                                        {h.reply_email_id && h.reply_attachments && h.reply_attachments.length > 0 && (
+                                          <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-2">
+                                            {h.reply_attachments.map(att => (
+                                              <button
+                                                key={att.id}
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  handleDownloadAttachment(h.reply_email_id!, att)
+                                                }}
+                                                className="inline-flex items-center gap-1 text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 rounded px-2 py-1"
+                                                title={att.mime_type ?? ''}
+                                              >
+                                                📎 {att.filename}
+                                                {att.size != null && (
+                                                  <span className="text-gray-400 ml-1">
+                                                    ({Math.ceil(att.size / 1024)}KB)
+                                                  </span>
+                                                )}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        )}
                                       </div>
-                                    ))}
+                                      )
+                                    })}
                                   </div>
                                 )}
 
