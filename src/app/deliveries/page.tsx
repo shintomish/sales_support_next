@@ -64,6 +64,7 @@ type Campaign = {
   engineer_mail_title: string | null
   subject: string
   sent_at: string | null
+  latest_resent_at?: string | null
   sent_by: string | null
   total_count: number
   success_count: number
@@ -1393,15 +1394,19 @@ export default function DeliveriesPage() {
                       { col: 'project_title' as CampSortBy, label: '紐づき案件' },
                     ] as const
                   ).map(({ col, label }) => (
-                    <SortableHeader
-                      key={col}
-                      label={label}
-                      field={col}
-                      sortField={campSortBy}
-                      sortOrder={campSortDir}
-                      onSort={(f) => handleCampSort(f as CampSortBy)}
-                      className="px-4 py-3"
-                    />
+                    <Fragment key={col}>
+                      <SortableHeader
+                        label={label}
+                        field={col}
+                        sortField={campSortBy}
+                        sortOrder={campSortDir}
+                        onSort={(f) => handleCampSort(f as CampSortBy)}
+                        className="px-4 py-3"
+                      />
+                      {col === 'sent_at' && (
+                        <th className="px-4 py-3 text-left whitespace-nowrap">最終再送信日時</th>
+                      )}
+                    </Fragment>
                   ))}
                   <th className="px-4 py-3 text-center">分類</th>
                   <th className="px-4 py-3 text-center">送信数</th>
@@ -1426,6 +1431,9 @@ export default function DeliveriesPage() {
                         </td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                           {camp.sent_at ? new Date(camp.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-amber-600 whitespace-nowrap text-xs">
+                          {camp.latest_resent_at ? new Date(camp.latest_resent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}
                         </td>
                         <td className="px-4 py-3 text-gray-800 whitespace-nowrap">{camp.sent_by ?? '-'}</td>
                         <td className="px-4 py-3 w-44">
@@ -1477,7 +1485,7 @@ export default function DeliveriesPage() {
                       </tr>
                       {isExpanded && (
                         <tr className="bg-gray-50">
-                          <td colSpan={11} className="px-6 py-4 border-t border-gray-200">
+                          <td colSpan={12} className="px-6 py-4 border-t border-gray-200">
                             {isDetailLoading && (
                               <div className="text-xs text-gray-400">読み込み中...</div>
                             )}
@@ -1613,7 +1621,7 @@ export default function DeliveriesPage() {
                 })}
                 {campaigns?.data.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={12} className="px-4 py-8 text-center text-gray-400">
                       キャンペーン履歴がありません。
                     </td>
                   </tr>
