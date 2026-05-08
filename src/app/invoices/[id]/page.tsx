@@ -821,12 +821,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 )}
               </div>
 
-              {/* 送信履歴 */}
-              {sendHistories.length > 0 && (
+              {/* メール送信履歴のみ表示 */}
+              {sendHistories.filter(h => h.method === 'mail').length > 0 && (
                 <div className="border-t border-gray-100 pt-3">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">送信履歴</p>
+                  <p className="text-xs font-semibold text-gray-700 mb-2">メール送信履歴</p>
                   <div className="text-xs space-y-1 max-h-32 overflow-y-auto">
-                    {sendHistories.map((h) => (
+                    {sendHistories.filter(h => h.method === 'mail').map((h) => (
                       <div key={h.id} className="flex items-center gap-2">
                         <span className={`px-1.5 py-0.5 rounded ${h.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                           {h.status === 'sent' ? '送信済' : '失敗'}
