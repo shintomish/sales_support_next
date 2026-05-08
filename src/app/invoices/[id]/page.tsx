@@ -267,6 +267,35 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     } finally { setBusy(false); }
   };
 
+  // 郵送記録モーダル
+  const [postModalOpen, setPostModalOpen] = useState(false);
+  const [postSentAt, setPostSentAt]       = useState<string>(new Date().toISOString().slice(0, 10));
+  const [postNote, setPostNote]           = useState('');
+  const [postItems, setPostItems]         = useState({ invoice: true, cover: false, timesheet: false, transport: false });
+
+  const recordPost = async () => {
+    if (!confirm(`${postSentAt} に郵送したことを記録します。よろしいですか？`)) return;
+    setBusy(true);
+    try {
+      const items = [
+        postItems.invoice   ? '請求書'         : null,
+        postItems.cover     ? '送付状'         : null,
+        postItems.timesheet ? '勤務表'         : null,
+        postItems.transport ? '交通費明細書'   : null,
+      ].filter(Boolean);
+      await apiClient.post(`/api/v1/invoices/${id}/record-post`, {
+        sent_at: postSentAt,
+        note:    postNote || null,
+        items,
+      });
+      setPostModalOpen(false);
+      alert('郵送記録を保存しました');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '記録に失敗しました';
+      alert(msg);
+    } finally { setBusy(false); }
+  };
+
   // メール送信モーダル
   const [mailModalOpen, setMailModalOpen] = useState(false);
   const [mailTo, setMailTo]               = useState<string[]>([]);
@@ -591,12 +620,70 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             title={invoice.approved ? '請求書をメール送信' : '承認済みのみメール送信できます'}>
             📧 メール送信
           </Button>
+          <Button variant="outline" onClick={() => setPostModalOpen(true)}
+            disabled={busy || !invoice.approved}
+            title={invoice.approved ? '郵送記録を残す' : '承認済みのみ郵送記録できます'}>
+            📮 郵送記録
+          </Button>
           <Button variant="outline" onClick={remove} disabled={busy}
             className="text-red-600 border-red-200 hover:bg-red-50 ml-auto">
             削除
           </Button>
         </div>
       </div>
+
+      {/* 郵送記録モーダル */}
+      {postModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setPostModalOpen(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4">📮 郵送記録</h2>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">郵送日</label>
+                <Input type="date" value={postSentAt} onChange={(e) => setPostSentAt(e.target.value)} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-700 mb-2">同封物</p>
+                <div className="space-y-1 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={postItems.invoice}
+                      onChange={(e) => setPostItems(p => ({ ...p, invoice: e.target.checked }))} />
+                    請求書
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={postItems.cover}
+                      onChange={(e) => setPostItems(p => ({ ...p, cover: e.target.checked }))} />
+                    送付状
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={postItems.timesheet}
+                      onChange={(e) => setPostItems(p => ({ ...p, timesheet: e.target.checked }))} />
+                    勤務表
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={postItems.transport}
+                      onChange={(e) => setPostItems(p => ({ ...p, transport: e.target.checked }))} />
+                    交通費明細書
+                  </label>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">備考（任意）</label>
+                <textarea value={postNote} onChange={(e) => setPostNote(e.target.value)} rows={2}
+                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm" />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5">
+              <Button variant="outline" onClick={() => setPostModalOpen(false)} disabled={busy}>キャンセル</Button>
+              <Button onClick={recordPost} disabled={busy} className="bg-amber-600 hover:bg-amber-700 text-white">
+                {busy ? '保存中…' : '記録する'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* メール送信モーダル */}
       {mailModalOpen && (
