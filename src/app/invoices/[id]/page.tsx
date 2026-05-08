@@ -273,6 +273,39 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [postNote, setPostNote]           = useState('');
   const [postItems, setPostItems]         = useState({ invoice: false, cover: false, timesheet: false, transport: false });
 
+  const openPostModal = async () => {
+    setBusy(true);
+    try {
+      // 最新の郵送記録を取得して、あれば反映
+      const res = await apiClient.get<{
+        sent_at: string | null;
+        note: string | null;
+        attachments_meta: string[] | null;
+      } | null>(`/api/v1/invoices/${id}/latest-post`);
+      if (res.data) {
+        setPostSentAt(res.data.sent_at ?? new Date().toISOString().slice(0, 10));
+        setPostNote(res.data.note ?? '');
+        const items = res.data.attachments_meta ?? [];
+        setPostItems({
+          invoice:   items.includes('請求書'),
+          cover:     items.includes('送付状'),
+          timesheet: items.includes('勤務表'),
+          transport: items.includes('交通費明細書'),
+        });
+      } else {
+        setPostSentAt(new Date().toISOString().slice(0, 10));
+        setPostNote('');
+        setPostItems({ invoice: false, cover: false, timesheet: false, transport: false });
+      }
+      setPostModalOpen(true);
+    } catch {
+      setPostSentAt(new Date().toISOString().slice(0, 10));
+      setPostNote('');
+      setPostItems({ invoice: false, cover: false, timesheet: false, transport: false });
+      setPostModalOpen(true);
+    } finally { setBusy(false); }
+  };
+
   const recordPost = async () => {
     setBusy(true);
     try {
@@ -619,12 +652,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             title={invoice.approved ? '請求書をメール送信' : '承認済みのみメール送信できます'}>
             📧 メール送信
           </Button>
-          <Button variant="outline" onClick={() => {
-              setPostSentAt(new Date().toISOString().slice(0, 10));
-              setPostNote('');
-              setPostItems({ invoice: false, cover: false, timesheet: false, transport: false });
-              setPostModalOpen(true);
-            }}
+          <Button variant="outline" onClick={openPostModal}
             disabled={busy || !invoice.approved}
             title={invoice.approved ? '郵送記録を残す' : '承認済みのみ郵送記録できます'}>
             📮 郵送記録
