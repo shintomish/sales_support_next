@@ -1257,7 +1257,7 @@ export default function DeliveriesPage() {
                   <SortableHeader label="メールアドレス" field="email" sortField={addrSortBy} sortOrder={addrSortOrder} onSort={handleAddrSort} className="px-4 py-3" />
                   <SortableHeader label="職種" field="occupation" sortField={addrSortBy} sortOrder={addrSortOrder} onSort={handleAddrSort} className="px-4 py-3" />
                   <SortableHeader label="状態" field="is_active" sortField={addrSortBy} sortOrder={addrSortOrder} onSort={handleAddrSort} className="px-4 py-3 text-center" />
-                  <th className="px-4 py-3 text-center">停止理由</th>
+                  <SortableHeader label="停止理由" field="unsubscribe_reason" sortField={addrSortBy} sortOrder={addrSortOrder} onSort={handleAddrSort} className="px-4 py-3 text-center" />
                   <th className="px-4 py-3 text-center">操作</th>
                 </tr>
               </thead>
