@@ -1319,7 +1319,7 @@ export default function DeliveriesPage() {
                           {camp.replied_count != null && camp.success_count > 0 ? (
                             <div className="flex flex-col items-center gap-0.5">
                               <span className="text-blue-600 font-medium text-xs">
-                                {Math.round(camp.replied_count / camp.success_count * 100)}%
+                                {(camp.replied_count / camp.success_count * 100).toFixed(2)}%
                               </span>
                               <span className="text-gray-400 text-xs">{camp.replied_count}件</span>
                             </div>

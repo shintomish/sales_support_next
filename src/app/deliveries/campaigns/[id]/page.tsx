@@ -111,7 +111,7 @@ export default function CampaignDetailPage() {
 
   const repliedCount = campaign?.histories.filter(h => h.status === 'replied').length ?? 0
   const replyRate = campaign && campaign.success_count > 0
-    ? Math.round(repliedCount / campaign.success_count * 100)
+    ? Number((repliedCount / campaign.success_count * 100).toFixed(2))
     : 0
 
   if (!campaign) {
