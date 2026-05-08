@@ -39,6 +39,14 @@ const recentMonths = (): string[] => {
   return arr;
 };
 
+/** 当月-1 の YYYY-MM を返す（請求集計画面と同じ既定値） */
+const previousMonth = (): string => {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
 const yen = (n: string | number) => `¥${Number(n).toLocaleString()}`;
 
 type SortField = 'invoice_number' | 'year_month' | 'customer' | 'deal' | 'issued_date' | 'total' | 'status';
@@ -48,7 +56,7 @@ export default function InvoicesPage() {
   const canApprove = user?.role === 'tenant_admin' || user?.role === 'super_admin';
 
   const [items, setItems]         = useState<InvoiceListItem[]>([]);
-  const [yearMonth, setYearMonth] = useState('');
+  const [yearMonth, setYearMonth] = useState<string>(previousMonth());
   const [status, setStatus]       = useState<'' | 'draft' | 'issued'>('');
   const [q, setQ]                 = useState('');
   const [loading, setLoading]     = useState(false);
