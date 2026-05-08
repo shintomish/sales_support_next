@@ -39,13 +39,16 @@ const formatDateInput = (v: string | null): string => v?.slice(0, 10) ?? '';
 /**
  * 超過時間 = 実労働時間 - 精算上限 (上限超え分) または 実労働時間 - 精算下限 (下限未達分)
  * 範囲内なら 0。SES契約の客先精算条件を参照する。
+ *  - 戻り値 number: 計算可能（範囲内なら 0、超過/控除なら正/負の値）
+ *  - 戻り値 null: 計算不能（実労働未入力 / 契約未取得 / 上下限が共に未設定）
  */
 function computeExcessHours(actualHours: string | number | null, contract: ContractSettlement | null): number | null {
   if (actualHours === null || actualHours === '' || !contract) return null;
   const a = Number(actualHours);
-  const lo = contract.client_deduction_hours !== null ? Number(contract.client_deduction_hours) : null;
-  const hi = contract.client_overtime_hours  !== null ? Number(contract.client_overtime_hours)  : null;
   if (Number.isNaN(a)) return null;
+  const lo = contract.client_deduction_hours != null && Number(contract.client_deduction_hours) > 0 ? Number(contract.client_deduction_hours) : null;
+  const hi = contract.client_overtime_hours  != null && Number(contract.client_overtime_hours)  > 0 ? Number(contract.client_overtime_hours)  : null;
+  if (lo === null && hi === null) return null; // 上下限とも未設定 → 計算不能
   if (hi !== null && a > hi) return Math.round((a - hi) * 100) / 100;
   if (lo !== null && a < lo) return Math.round((a - lo) * 100) / 100; // 負の値
   return 0;
@@ -236,13 +239,20 @@ function EditDialog({ dealId, yearMonth, existing, contract, onClose, onSaved }:
           </Field>
           <Field label="超過時間(計算)">
             {(() => {
-              const e = computeExcessHours(form.actual_hours || null, contract);
-              if (e === null) {
-                return <div className="text-sm text-gray-400 px-3 py-2">SES契約の精算条件未設定</div>;
+              const lo = contract?.client_deduction_hours != null && Number(contract.client_deduction_hours) > 0 ? Number(contract.client_deduction_hours) : null;
+              const hi = contract?.client_overtime_hours  != null && Number(contract.client_overtime_hours)  > 0 ? Number(contract.client_overtime_hours)  : null;
+              if (lo === null && hi === null) {
+                return (
+                  <div className="text-sm text-amber-600 px-3 py-2">
+                    SES契約の客先精算条件（控除/超過時間）が未設定です
+                  </div>
+                );
               }
-              const lo = contract?.client_deduction_hours ? Number(contract.client_deduction_hours) : null;
-              const hi = contract?.client_overtime_hours  ? Number(contract.client_overtime_hours)  : null;
-              const range = (lo !== null && hi !== null) ? `${lo}h〜${hi}h` : '';
+              const e = computeExcessHours(form.actual_hours || null, contract);
+              const range = (lo !== null && hi !== null) ? `${lo}h〜${hi}h` : (hi !== null ? `〜${hi}h` : `${lo}h〜`);
+              if (e === null) {
+                return <div className="text-sm text-gray-400 px-3 py-2">実労働を入力してください<span className="text-xs ml-2">基本範囲 {range}</span></div>;
+              }
               const color = e > 0 ? 'text-blue-600' : (e < 0 ? 'text-red-600' : 'text-gray-500');
               return (
                 <div className={`text-sm px-3 py-2 ${color}`}>
