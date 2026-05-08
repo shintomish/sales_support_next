@@ -18,6 +18,7 @@ interface HistoryRow {
   status: 'sent' | 'failed';
   error_message: string | null;
   sent_at: string | null;
+  created_at: string | null;
   sent_by_name: string | null;
   invoice_id: number;
   invoice_number: string | null;
@@ -54,11 +55,10 @@ const previousMonth = (): string => {
 type SortField = 'invoice_number' | 'customer_name' | 'subject' | 'to' | 'sent_at' | 'sent_by';
 
 const yen = (n: string | number | null | undefined) => n == null ? '-' : `¥${Number(n).toLocaleString()}`;
-/** mail: yyyy-mm-dd hh:mm / post: yyyy-mm-dd */
-const fmtSent = (s: string | null, method: 'mail' | 'post' | null) => {
+/** yyyy-mm-dd hh:mm */
+const fmtDateTime = (s: string | null) => {
   if (!s) return '-';
-  const cleaned = s.replace('T', ' ');
-  return method === 'post' ? cleaned.slice(0, 10) : cleaned.slice(0, 16);
+  return s.replace('T', ' ').slice(0, 16);
 };
 
 export default function InvoiceSendHistoriesPage() {
@@ -221,7 +221,9 @@ export default function InvoiceSendHistoriesPage() {
                       ? `📎 ${r.attachments_meta.length}件`
                       : '-'}
                   </td>
-                  <td className="px-2 py-2 text-gray-600 text-xs truncate">{fmtSent(r.sent_at, r.method)}</td>
+                  <td className="px-2 py-2 text-gray-600 text-xs truncate">
+                    {fmtDateTime(r.method === 'post' ? r.created_at : r.sent_at)}
+                  </td>
                   <td className="px-2 py-2 text-gray-600 text-xs truncate">{r.sent_by_name ?? '-'}</td>
                 </tr>
               ))}
