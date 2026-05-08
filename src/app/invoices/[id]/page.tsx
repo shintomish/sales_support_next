@@ -280,6 +280,33 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [mailCoverItems, setMailCoverItems] = useState({ invoice: true, timesheet: false, transport: false });
   const [sendHistories, setSendHistories] = useState<SendHistoryRow[]>([]);
 
+  // 宛名行を TO の連絡先名で置換する
+  // 既存の冒頭ブロック（最初の空行まで）= 宛名 を、新しい宛名で差し替え
+  const buildSalutation = (custName: string, contactNames: string[]): string => {
+    if (contactNames.length === 0) return `${custName} 様`;
+    return `${custName}\n` + contactNames.map(n => `　${n} 様`).join('\n');
+  };
+
+  const replaceSalutation = (body: string, newSalutation: string): string => {
+    const idx = body.indexOf('\n\n');
+    if (idx < 0) return newSalutation + '\n\n' + body;
+    return newSalutation + body.substring(idx);
+  };
+
+  // mailTo が変わるたびに body の宛名を更新（user の手動編集を尊重するため、宛名以外は触らない）
+  useEffect(() => {
+    if (!mailModalOpen) return;
+    const custName = invoice?.customer_name_snapshot ?? invoice?.customer?.company_name ?? '';
+    if (!custName) return;
+    const namesByEmail = new Map(mailCandidates.map(c => [c.email, c.name]));
+    const contactNames = mailTo
+      .map(em => namesByEmail.get(em))
+      .filter((n): n is string => !!n);
+    const sal = buildSalutation(custName, contactNames);
+    setMailBody(prev => replaceSalutation(prev, sal));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mailTo, mailModalOpen, mailCandidates]);
+
   const openMailModal = async () => {
     setBusy(true);
     try {
