@@ -619,7 +619,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             title={invoice.approved ? '請求書をメール送信' : '承認済みのみメール送信できます'}>
             📧 メール送信
           </Button>
-          <Button variant="outline" onClick={() => setPostModalOpen(true)}
+          <Button variant="outline" onClick={() => {
+              setPostSentAt(new Date().toISOString().slice(0, 10));
+              setPostNote('');
+              setPostItems({ invoice: true, cover: false, timesheet: false, transport: false });
+              setPostModalOpen(true);
+            }}
             disabled={busy || !invoice.approved}
             title={invoice.approved ? '郵送記録を残す' : '承認済みのみ郵送記録できます'}>
             📮 郵送記録
@@ -645,23 +650,27 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               <div>
                 <p className="text-xs font-semibold text-gray-700 mb-2">同封物</p>
                 <div className="space-y-1 text-sm">
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={postItems.invoice}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 accent-blue-600"
+                      checked={postItems.invoice}
                       onChange={(e) => setPostItems(p => ({ ...p, invoice: e.target.checked }))} />
                     請求書
                   </label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={postItems.cover}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 accent-blue-600"
+                      checked={postItems.cover}
                       onChange={(e) => setPostItems(p => ({ ...p, cover: e.target.checked }))} />
                     送付状
                   </label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={postItems.timesheet}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 accent-blue-600"
+                      checked={postItems.timesheet}
                       onChange={(e) => setPostItems(p => ({ ...p, timesheet: e.target.checked }))} />
                     勤務表
                   </label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={postItems.transport}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 accent-blue-600"
+                      checked={postItems.transport}
                       onChange={(e) => setPostItems(p => ({ ...p, transport: e.target.checked }))} />
                     交通費明細書
                   </label>
