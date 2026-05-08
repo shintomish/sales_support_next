@@ -16,6 +16,7 @@ interface InvoiceLine {
   unit_price: string;
   tax_rate: string;
   amount?: string;
+  is_expense?: boolean;
 }
 
 interface Invoice {
@@ -26,6 +27,8 @@ interface Invoice {
   subject_name: string | null;
   work_period_text: string | null;
   work_location: string | null;
+  delivery_items_text: string | null;
+  transportation_note_text: string | null;
   delivery_date_text: string | null;
   delivery_place_text: string | null;
   payment_terms_text: string | null;
@@ -66,14 +69,16 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [issuedDate, setIssuedDate] = useState('');
   const [dueDate,    setDueDate]    = useState('');
   const [notes,      setNotes]      = useState('');
-  const [orderNumber,       setOrderNumber]       = useState('');
-  const [quoteNumber,       setQuoteNumber]       = useState('');
-  const [subjectName,       setSubjectName]       = useState('');
-  const [workPeriodText,    setWorkPeriodText]    = useState('');
-  const [workLocation,      setWorkLocation]      = useState('');
-  const [deliveryDateText,  setDeliveryDateText]  = useState('');
-  const [deliveryPlaceText, setDeliveryPlaceText] = useState('');
-  const [paymentTermsText,  setPaymentTermsText]  = useState('');
+  const [orderNumber,            setOrderNumber]            = useState('');
+  const [quoteNumber,            setQuoteNumber]            = useState('');
+  const [subjectName,            setSubjectName]            = useState('');
+  const [workPeriodText,         setWorkPeriodText]         = useState('');
+  const [workLocation,           setWorkLocation]           = useState('');
+  const [deliveryItemsText,      setDeliveryItemsText]      = useState('');
+  const [transportationNoteText, setTransportationNoteText] = useState('');
+  const [deliveryDateText,       setDeliveryDateText]       = useState('');
+  const [deliveryPlaceText,      setDeliveryPlaceText]      = useState('');
+  const [paymentTermsText,       setPaymentTermsText]       = useState('');
   const [lines,      setLines]      = useState<InvoiceLine[]>([]);
 
   const fetchData = useCallback(async () => {
@@ -89,6 +94,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       setSubjectName(res.data.subject_name ?? '');
       setWorkPeriodText(res.data.work_period_text ?? '');
       setWorkLocation(res.data.work_location ?? '');
+      setDeliveryItemsText(res.data.delivery_items_text ?? '');
+      setTransportationNoteText(res.data.transportation_note_text ?? '');
       setDeliveryDateText(res.data.delivery_date_text ?? '');
       setDeliveryPlaceText(res.data.delivery_place_text ?? '');
       setPaymentTermsText(res.data.payment_terms_text ?? '');
@@ -98,6 +105,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         unit:        l.unit,
         unit_price:  String(l.unit_price),
         tax_rate:    String(Number(l.tax_rate)),
+        is_expense:  !!l.is_expense,
       })));
     } finally {
       setLoading(false);
@@ -106,23 +114,25 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const updateLine = (i: number, field: keyof InvoiceLine, value: string) => {
+  const updateLine = (i: number, field: keyof InvoiceLine, value: string | boolean) => {
     setLines((prev) => {
       const next = [...prev];
-      next[i] = { ...next[i], [field]: value };
+      next[i] = { ...next[i], [field]: value } as InvoiceLine;
       return next;
     });
   };
   const addLine = () => setLines((prev) => [...prev, {
-    description: '', quantity: '1', unit: '式', unit_price: '0', tax_rate: '0.10',
+    description: '', quantity: '1', unit: '式', unit_price: '0', tax_rate: '0.10', is_expense: false,
   }]);
   const removeLine = (i: number) => setLines((prev) => prev.filter((_, idx) => idx !== i));
 
   const calcPreview = () => {
     const byRate: Record<string, number> = {};
+    let expense = 0;
     lines.forEach((l) => {
+      const sub = (Number(l.quantity) || 0) * (Number(l.unit_price) || 0);
+      if (l.is_expense) { expense += sub; return; }
       const rate = String(Number(l.tax_rate));
-      const sub  = (Number(l.quantity) || 0) * (Number(l.unit_price) || 0);
       byRate[rate] = (byRate[rate] ?? 0) + sub;
     });
     let subtotal = 0, tax = 0;
@@ -130,7 +140,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       subtotal += sub;
       tax      += Math.round(sub * Number(rate));
     });
-    return { subtotal, tax, total: subtotal + tax };
+    return { subtotal, tax, expense, total: subtotal + tax + expense };
   };
   const preview = calcPreview();
 
@@ -139,23 +149,26 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
   const buildPayload = (newStatus?: 'draft' | 'issued'): Record<string, unknown> => {
     const payload: Record<string, unknown> = {
-      issued_date:         issuedDate || null,
-      due_date:            dueDate || null,
-      notes:               notes || null,
-      order_number:        orderNumber || null,
-      quote_number:        quoteNumber || null,
-      subject_name:        subjectName || null,
-      work_period_text:    workPeriodText || null,
-      work_location:       workLocation || null,
-      delivery_date_text:  deliveryDateText || null,
-      delivery_place_text: deliveryPlaceText || null,
-      payment_terms_text:  paymentTermsText || null,
+      issued_date:              issuedDate || null,
+      due_date:                 dueDate || null,
+      notes:                    notes || null,
+      order_number:             orderNumber || null,
+      quote_number:             quoteNumber || null,
+      subject_name:             subjectName || null,
+      work_period_text:         workPeriodText || null,
+      work_location:            workLocation || null,
+      delivery_items_text:      deliveryItemsText || null,
+      transportation_note_text: transportationNoteText || null,
+      delivery_date_text:       deliveryDateText || null,
+      delivery_place_text:      deliveryPlaceText || null,
+      payment_terms_text:       paymentTermsText || null,
       lines: lines.map((l) => ({
         description: l.description,
         quantity:    Number(l.quantity) || 0,
         unit:        l.unit || null,
         unit_price:  Number(l.unit_price) || 0,
         tax_rate:    Number(l.tax_rate),
+        is_expense:  !!l.is_expense,
       })),
     };
     if (newStatus) payload.status = newStatus;
@@ -238,7 +251,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       <div className="flex-1 min-h-0 overflow-auto bg-white rounded-lg border border-gray-200 p-6 space-y-6">
         {/* メタ情報 */}
         <div className="grid grid-cols-3 gap-4">
-          <Field label="発行日">
+          <Field label="請求日">
             <Input type="date" value={issuedDate} onChange={(e) => setIssuedDate(e.target.value)} />
           </Field>
           <Field label="支払期限">
@@ -282,6 +295,16 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <Field label="作業場所">
             <Input value={workLocation} onChange={(e) => setWorkLocation(e.target.value)} />
           </Field>
+          <Field label="納品物">
+            <Input value={deliveryItemsText} onChange={(e) => setDeliveryItemsText(e.target.value)}
+              placeholder="作業報告書" />
+          </Field>
+          <Field label="業務交通費 説明">
+            <textarea value={transportationNoteText} onChange={(e) => setTransportationNoteText(e.target.value)}
+              rows={2}
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
+              placeholder="お客様指示の基、移動が発生した場合は別途実費にてご請求" />
+          </Field>
           <Field label="支払条件 (PDF表示用・自動派生)">
             <Input value={paymentCondition} disabled className="bg-gray-50 text-gray-500" />
           </Field>
@@ -303,6 +326,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   <th className="text-left px-2 py-2 font-semibold w-16">単位</th>
                   <th className="text-right px-2 py-2 font-semibold w-32">単価</th>
                   <th className="text-center px-2 py-2 font-semibold w-24">税率</th>
+                  <th className="text-center px-2 py-2 font-semibold w-16" title="経費(非課税)。オン=「経費」行で合算">経費</th>
                   <th className="text-right px-2 py-2 font-semibold w-32">金額</th>
                   <th className="w-12"></th>
                 </tr>
@@ -328,9 +352,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                       </td>
                       <td className="px-2 py-1">
                         <select value={l.tax_rate} onChange={(e) => updateLine(i, 'tax_rate', e.target.value)}
-                          className="w-full border border-gray-200 rounded-md px-2 py-2 text-sm bg-white">
+                          disabled={!!l.is_expense}
+                          className="w-full border border-gray-200 rounded-md px-2 py-2 text-sm bg-white disabled:bg-gray-50 disabled:text-gray-400">
                           {TAX_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        <input type="checkbox" checked={!!l.is_expense}
+                          onChange={(e) => updateLine(i, 'is_expense', e.target.checked)} />
                       </td>
                       <td className="px-2 py-2 text-right tabular-nums">{yen(amount)}</td>
                       <td className="px-2 py-2 text-center">
@@ -342,17 +371,24 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               </tbody>
               <tfoot className="bg-gray-50">
                 <tr>
-                  <td colSpan={5} className="px-2 py-2 text-right text-gray-600">小計</td>
+                  <td colSpan={6} className="px-2 py-2 text-right text-gray-600">小計</td>
                   <td className="px-2 py-2 text-right tabular-nums">{yen(preview.subtotal)}</td>
                   <td></td>
                 </tr>
                 <tr>
-                  <td colSpan={5} className="px-2 py-2 text-right text-gray-600">消費税</td>
+                  <td colSpan={6} className="px-2 py-2 text-right text-gray-600">消費税</td>
                   <td className="px-2 py-2 text-right tabular-nums">{yen(preview.tax)}</td>
                   <td></td>
                 </tr>
+                {preview.expense > 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-2 py-2 text-right text-gray-600">経費</td>
+                    <td className="px-2 py-2 text-right tabular-nums">{yen(preview.expense)}</td>
+                    <td></td>
+                  </tr>
+                )}
                 <tr className="font-semibold">
-                  <td colSpan={5} className="px-2 py-2 text-right">合計</td>
+                  <td colSpan={6} className="px-2 py-2 text-right">合計</td>
                   <td className="px-2 py-2 text-right tabular-nums text-blue-700">{yen(preview.total)}</td>
                   <td></td>
                 </tr>

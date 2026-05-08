@@ -26,7 +26,30 @@ interface Deal {
   customer?: { id: number; company_name: string };
 }
 
+interface ContractSettlement {
+  client_deduction_hours: string | number | null;
+  client_overtime_hours: string | number | null;
+  client_deduction_unit_price: string | number | null;
+  client_overtime_unit_price: string | number | null;
+  settlement_unit_minutes: number | null;
+}
+
 const formatDateInput = (v: string | null): string => v?.slice(0, 10) ?? '';
+
+/**
+ * 超過時間 = 実労働時間 - 精算上限 (上限超え分) または 実労働時間 - 精算下限 (下限未達分)
+ * 範囲内なら 0。SES契約の客先精算条件を参照する。
+ */
+function computeExcessHours(actualHours: string | number | null, contract: ContractSettlement | null): number | null {
+  if (actualHours === null || actualHours === '' || !contract) return null;
+  const a = Number(actualHours);
+  const lo = contract.client_deduction_hours !== null ? Number(contract.client_deduction_hours) : null;
+  const hi = contract.client_overtime_hours  !== null ? Number(contract.client_overtime_hours)  : null;
+  if (Number.isNaN(a)) return null;
+  if (hi !== null && a > hi) return Math.round((a - hi) * 100) / 100;
+  if (lo !== null && a < lo) return Math.round((a - lo) * 100) / 100; // 負の値
+  return 0;
+}
 
 /** 直近12ヶ月の YYYY-MM 配列を新しい順で返す */
 const recentMonths = (): string[] => {
@@ -46,6 +69,7 @@ export default function TimesheetsPage({ params }: { params: Promise<{ id: strin
 
   const [deal,    setDeal]    = useState<Deal | null>(null);
   const [records, setRecords] = useState<Record<string, WorkRecord>>({});
+  const [contract, setContract] = useState<ContractSettlement | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -60,6 +84,7 @@ export default function TimesheetsPage({ params }: { params: Promise<{ id: strin
       const map: Record<string, WorkRecord> = {};
       (recRes.data.records ?? []).forEach((r: WorkRecord) => { map[r.year_month] = r; });
       setRecords(map);
+      setContract(recRes.data.contract ?? null);
     } finally {
       setLoading(false);
     }
@@ -93,6 +118,7 @@ export default function TimesheetsPage({ params }: { params: Promise<{ id: strin
                 <th className="text-left px-4 py-3 font-semibold">年月</th>
                 <th className="text-left px-4 py-3 font-semibold">勤務表受領</th>
                 <th className="text-right px-4 py-3 font-semibold">実労働(h)</th>
+                <th className="text-right px-4 py-3 font-semibold" title="客先精算条件の上下限を超える時間">超過時間(h)</th>
                 <th className="text-right px-4 py-3 font-semibold">欠勤(日)</th>
                 <th className="text-right px-4 py-3 font-semibold">有給(日)</th>
                 <th className="text-right px-4 py-3 font-semibold">交通費</th>
@@ -103,14 +129,18 @@ export default function TimesheetsPage({ params }: { params: Promise<{ id: strin
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
               ) : months.map((ym) => {
                 const r = records[ym];
+                const excess = computeExcessHours(r?.actual_hours ?? null, contract);
                 return (
                   <tr key={ym} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-semibold">{ym}</td>
                     <td className="px-4 py-3 text-gray-600">{formatDateInput(r?.timesheet_received_date ?? null) || '-'}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{r?.actual_hours ?? '-'}</td>
+                    <td className={`px-4 py-3 text-right tabular-nums ${excess !== null && excess !== 0 ? (excess > 0 ? 'text-blue-600' : 'text-red-600') : 'text-gray-400'}`}>
+                      {excess === null ? '-' : (excess > 0 ? `+${excess}` : String(excess))}
+                    </td>
                     <td className="px-4 py-3 text-right tabular-nums">{r?.absence_days ?? '-'}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{r?.paid_leave_days ?? '-'}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{r?.transportation_fee ? `¥${Number(r.transportation_fee).toLocaleString()}` : '-'}</td>
@@ -135,6 +165,7 @@ export default function TimesheetsPage({ params }: { params: Promise<{ id: strin
           dealId={dealId}
           yearMonth={editing}
           existing={records[editing]}
+          contract={contract}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); fetchData(); }}
         />
@@ -144,8 +175,9 @@ export default function TimesheetsPage({ params }: { params: Promise<{ id: strin
 }
 
 // ─── 編集ダイアログ ───
-function EditDialog({ dealId, yearMonth, existing, onClose, onSaved }: {
+function EditDialog({ dealId, yearMonth, existing, contract, onClose, onSaved }: {
   dealId: number; yearMonth: string; existing: WorkRecord | undefined;
+  contract: ContractSettlement | null;
   onClose: () => void; onSaved: () => void;
 }) {
   const [form, setForm] = useState({
@@ -201,6 +233,23 @@ function EditDialog({ dealId, yearMonth, existing, onClose, onSaved }: {
           <Field label="実労働(時間)">
             <Input type="number" step="0.25" min="0" value={String(form.actual_hours)}
               onChange={(e) => setForm({...form, actual_hours: e.target.value})} />
+          </Field>
+          <Field label="超過時間(計算)">
+            {(() => {
+              const e = computeExcessHours(form.actual_hours || null, contract);
+              if (e === null) {
+                return <div className="text-sm text-gray-400 px-3 py-2">SES契約の精算条件未設定</div>;
+              }
+              const lo = contract?.client_deduction_hours ? Number(contract.client_deduction_hours) : null;
+              const hi = contract?.client_overtime_hours  ? Number(contract.client_overtime_hours)  : null;
+              const range = (lo !== null && hi !== null) ? `${lo}h〜${hi}h` : '';
+              const color = e > 0 ? 'text-blue-600' : (e < 0 ? 'text-red-600' : 'text-gray-500');
+              return (
+                <div className={`text-sm px-3 py-2 ${color}`}>
+                  {e > 0 ? `+${e}h` : `${e}h`} <span className="text-gray-400 text-xs ml-2">基本範囲 {range}</span>
+                </div>
+              );
+            })()}
           </Field>
           <Field label="欠勤日数">
             <Input type="number" step="0.5" min="0" value={String(form.absence_days)}

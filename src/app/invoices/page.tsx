@@ -143,7 +143,7 @@ export default function InvoicesPage() {
                 <th className="text-left px-2 py-3 font-semibold w-[70px]">対象月</th>
                 <SortableHeader label="取引先"   field="customer" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[150px]" />
                 <SortableHeader label="案件"     field="deal"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[170px]" />
-                <th className="text-left px-2 py-3 font-semibold w-[90px]">発行日</th>
+                <th className="text-left px-2 py-3 font-semibold w-[90px]">請求日</th>
                 <SortableHeader label="税込合計" field="total"    sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[110px]" />
                 <th className="text-center px-2 py-3 font-semibold w-[80px]">状態</th>
                 <th className="px-2 py-3 text-center font-semibold w-[70px]">PDF</th>
