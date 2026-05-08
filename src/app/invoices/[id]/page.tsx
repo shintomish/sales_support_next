@@ -56,6 +56,7 @@ interface Invoice {
   issued_date: string;
   due_date: string | null;
   status: 'draft' | 'issued';
+  approved: boolean;
   notes: string | null;
   subtotal: string;
   tax: string;
@@ -533,7 +534,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <Button variant="outline" onClick={() => setEnvelopeModalOpen(true)} disabled={busy}>
             ✉️ 長3封筒 PDF
           </Button>
-          <Button variant="outline" onClick={openMailModal} disabled={busy}>
+          <Button variant="outline" onClick={openMailModal}
+            disabled={busy || !invoice.approved}
+            title={invoice.approved ? '請求書をメール送信' : '承認済みのみメール送信できます'}>
             📧 メール送信
           </Button>
           <Button variant="outline" onClick={remove} disabled={busy}
