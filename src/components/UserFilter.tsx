@@ -25,9 +25,9 @@ export default function UserFilter({ value, onChange, className = '' }: Props) {
 
   return (
     <select value={value} onChange={e => onChange(e.target.value)} className={cls}>
-      <option value="all">👥 ALL</option>
+      <option value="all">担当者：ALL</option>
       {users.map(u => (
-        <option key={u.id} value={String(u.id)}>{u.name}</option>
+        <option key={u.id} value={String(u.id)}>担当者：{u.name}</option>
       ))}
     </select>
   );
