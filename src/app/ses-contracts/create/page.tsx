@@ -41,6 +41,7 @@ interface FormData {
   client_overtime_hours: string;
   settlement_unit_minutes: string;
   payment_site: string;
+  order_number: string;
   vendor_deduction_unit_price: string;
   vendor_deduction_hours: string;
   vendor_overtime_unit_price: string;
@@ -62,7 +63,7 @@ const initialForm: FormData = {
   profit: '', profit_rate_29: '',
   client_deduction_unit_price: '', client_deduction_hours: '',
   client_overtime_unit_price: '', client_overtime_hours: '',
-  settlement_unit_minutes: '', payment_site: '',
+  settlement_unit_minutes: '', payment_site: '', order_number: '',
   vendor_deduction_unit_price: '', vendor_deduction_hours: '',
   vendor_overtime_unit_price: '', vendor_overtime_hours: '', vendor_payment_site: '',
   contract_start: '', contract_period_start: '', contract_period_end: '',
@@ -233,6 +234,7 @@ export default function SesContractCreatePage() {
               <div><label className={labelCls}>超過時間</label><Input type="number" value={form.client_overtime_hours} onChange={set('client_overtime_hours')} placeholder="180" /></div>
               <div><label className={labelCls}>精算単位（分）</label><Input type="number" value={form.settlement_unit_minutes} onChange={set('settlement_unit_minutes')} placeholder="30" /></div>
               <div><label className={labelCls}>入金サイト（日）</label><Input type="number" value={form.payment_site} onChange={set('payment_site')} placeholder="50" /></div>
+              <div><label className={labelCls}>注文No.</label><Input value={form.order_number} onChange={set('order_number')} placeholder="顧客からのPO番号など" /></div>
             </CardContent>
           </Card>
           <Card className="shadow-sm">

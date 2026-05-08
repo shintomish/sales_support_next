@@ -13,6 +13,7 @@ interface IssuerSettings {
   invoice_issuer_tel: string | null;
   invoice_issuer_fax: string | null;
   invoice_issuer_logo_path: string | null;
+  invoice_issuer_seal_path: string | null;
   invoice_issuer_invoice_number: string | null;
   invoice_issuer_bank_name: string | null;
   invoice_issuer_bank_branch: string | null;
@@ -24,6 +25,7 @@ interface IssuerSettings {
 const EMPTY: IssuerSettings = {
   invoice_issuer_name: '', invoice_issuer_postal_code: '', invoice_issuer_address: '',
   invoice_issuer_tel: '', invoice_issuer_fax: '', invoice_issuer_logo_path: '',
+  invoice_issuer_seal_path: '',
   invoice_issuer_invoice_number: '',
   invoice_issuer_bank_name: '', invoice_issuer_bank_branch: '',
   invoice_issuer_bank_account_type: '', invoice_issuer_bank_account_number: '',
@@ -45,6 +47,7 @@ export default function InvoiceIssuerSettingsPage() {
   const [busy, setBusy]       = useState(false);
   const [toast, setToast]     = useState<string | null>(null);
   const fileInputRef          = useRef<HTMLInputElement>(null);
+  const sealInputRef          = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     apiClient.get<IssuerSettings>('/api/v1/settings/invoice-issuer')
@@ -111,6 +114,42 @@ export default function InvoiceIssuerSettingsPage() {
     }
   };
 
+  const uploadSeal = async (file: File) => {
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('seal', file);
+      const res = await apiClient.post<{ invoice_issuer_seal_path: string }>(
+        '/api/v1/settings/invoice-issuer/seal',
+        fd,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      );
+      setForm((p) => ({ ...p, invoice_issuer_seal_path: res.data.invoice_issuer_seal_path }));
+      setToast('電子印をアップロードしました');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'アップロードに失敗しました';
+      alert(msg);
+    } finally {
+      setBusy(false);
+      if (sealInputRef.current) sealInputRef.current.value = '';
+    }
+  };
+
+  const removeSeal = async () => {
+    if (!confirm('電子印を削除しますか？')) return;
+    setBusy(true);
+    try {
+      await apiClient.delete('/api/v1/settings/invoice-issuer/seal');
+      setForm((p) => ({ ...p, invoice_issuer_seal_path: '' }));
+      setToast('電子印を削除しました');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '削除に失敗しました';
+      alert(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) return <div className="p-6 text-gray-400">読み込み中...</div>;
 
   return (
@@ -169,6 +208,36 @@ export default function InvoiceIssuerSettingsPage() {
                 <Button variant="outline" onClick={removeLogo} disabled={busy}
                   className="text-red-600 border-red-200 hover:bg-red-50 text-xs">
                   ロゴを削除
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 電子印 */}
+        <div className="border-t border-gray-100 pt-4 mt-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">電子印</h2>
+          <p className="text-xs text-gray-400 mb-3">PNG / JPG / GIF / WebP（2MB まで）。請求書PDFの発行者名右側に押印されます。</p>
+          <div className="flex items-center gap-4">
+            {form.invoice_issuer_seal_path
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={form.invoice_issuer_seal_path} alt="seal"
+                  className="h-20 w-20 border border-gray-200 rounded object-contain bg-white p-1" />
+              : <div className="h-20 w-20 border border-dashed border-gray-300 rounded flex items-center justify-center text-xs text-gray-400">未設定</div>
+            }
+            <div className="flex flex-col gap-2">
+              <input
+                ref={sealInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadSeal(f); }}
+                className="text-xs"
+                disabled={busy}
+              />
+              {form.invoice_issuer_seal_path && (
+                <Button variant="outline" onClick={removeSeal} disabled={busy}
+                  className="text-red-600 border-red-200 hover:bg-red-50 text-xs">
+                  電子印を削除
                 </Button>
               )}
             </div>
