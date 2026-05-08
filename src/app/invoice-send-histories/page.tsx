@@ -166,7 +166,7 @@ export default function InvoiceSendHistoriesPage() {
                 <th className="text-right  px-2 py-3 font-semibold w-[100px]">金額</th>
                 <th className="text-center px-2 py-3 font-semibold w-[80px]">手段</th>
                 <th className="text-center px-2 py-3 font-semibold w-[70px]">状態</th>
-                <th className="text-left   px-2 py-3 font-semibold w-[70px]">添付</th>
+                <th className="text-left   px-2 py-3 font-semibold w-[180px]">添付/同封物</th>
                 <SortableHeader label="送信日時" field="sent_at" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[120px]" />
                 <SortableHeader label="送信者"   field="sent_by" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
               </tr>
@@ -189,7 +189,9 @@ export default function InvoiceSendHistoriesPage() {
                   <td className="px-2 py-2 text-gray-800 truncate" title={r.customer_name ?? ''}>
                     {r.customer_name ?? '-'}
                   </td>
-                  <td className="px-2 py-2 truncate" title={r.subject ?? ''}>{r.subject ?? '-'}</td>
+                  <td className="px-2 py-2 truncate" title={r.subject ?? ''}>
+                    {r.subject ?? (r.method === 'post' ? <span className="text-gray-400">（郵送）</span> : '-')}
+                  </td>
                   <td className="px-2 py-2 text-gray-600 text-xs truncate" title={r.to_emails?.join(', ')}>
                     {r.to_names && r.to_names.length > 0 ? r.to_names.join(', ') : (r.to_emails?.join(', ') ?? '-')}
                   </td>
@@ -211,7 +213,9 @@ export default function InvoiceSendHistoriesPage() {
                   </td>
                   <td className="px-2 py-2 text-xs text-gray-500 truncate" title={r.attachments_meta?.join(' / ')}>
                     {r.attachments_meta && r.attachments_meta.length > 0
-                      ? `📎 ${r.attachments_meta.length}件`
+                      ? (r.method === 'post'
+                          ? r.attachments_meta.join(' / ')
+                          : `📎 ${r.attachments_meta.length}件`)
                       : '-'}
                   </td>
                   <td className="px-2 py-2 text-gray-600 text-xs truncate">{fmt(r.sent_at)}</td>
