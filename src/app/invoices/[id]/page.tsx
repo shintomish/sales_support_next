@@ -276,8 +276,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [mailCandidates, setMailCandidates] = useState<MailCandidate[]>([]);
   const [mailDeliveryMethod, setMailDeliveryMethod] = useState<'mail' | 'post' | 'both' | null>(null);
   const [attachInvoice, setAttachInvoice] = useState(true);
-  const [attachCover, setAttachCover]     = useState(false);
-  const [mailCoverItems, setMailCoverItems] = useState({ invoice: true, timesheet: false, transport: false });
+  const [attachFiles, setAttachFiles]     = useState<File[]>([]);
+  const [dragOver, setDragOver]           = useState(false);
   const [sendHistories, setSendHistories] = useState<SendHistoryRow[]>([]);
 
   // 宛名行を TO の連絡先名で置換する
@@ -320,7 +320,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       setMailDeliveryMethod(tplRes.data.delivery_method);
       setSendHistories(histRes.data.data ?? []);
       setMailTo([]); setMailCc([]);
-      setAttachInvoice(true); setAttachCover(false);
+      setAttachInvoice(true); setAttachFiles([]);
       setMailModalOpen(true);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'テンプレート取得に失敗しました';
@@ -333,14 +333,15 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     if (!mailSubject || !mailBody) { alert('件名・本文を入力してください'); return; }
     setBusy(true);
     try {
-      await apiClient.post(`/api/v1/invoices/${id}/send-mail`, {
-        to_emails: mailTo,
-        cc_emails: mailCc,
-        subject:   mailSubject,
-        body:      mailBody,
-        attach_invoice:      attachInvoice,
-        attach_cover_letter: attachCover,
-        cover_items:         mailCoverItems,
+      const fd = new FormData();
+      mailTo.forEach((e) => fd.append('to_emails[]', e));
+      mailCc.forEach((e) => fd.append('cc_emails[]', e));
+      fd.append('subject', mailSubject);
+      fd.append('body', mailBody);
+      fd.append('attach_invoice', attachInvoice ? '1' : '0');
+      attachFiles.forEach((f) => fd.append('attachments[]', f));
+      await apiClient.post(`/api/v1/invoices/${id}/send-mail`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       setMailModalOpen(false);
       alert('メールを送信しました');
@@ -349,6 +350,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       alert(msg);
     } finally { setBusy(false); }
   };
+
+  const onDropFiles = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    const dropped = Array.from(e.dataTransfer.files ?? []);
+    if (dropped.length > 0) setAttachFiles((prev) => [...prev, ...dropped]);
+  };
+  const removeAttachFile = (idx: number) => setAttachFiles((prev) => prev.filter((_, i) => i !== idx));
 
   const remove = async () => {
     const label = invoice?.status === 'issued' ? '発行済' : '下書き';
@@ -635,28 +644,40 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   <input type="checkbox" checked={attachInvoice} onChange={(e) => setAttachInvoice(e.target.checked)} />
                   請求書 PDF（{invoice.invoice_number}.pdf）
                 </label>
-                <label className="flex items-center gap-2 text-sm mt-1">
-                  <input type="checkbox" checked={attachCover} onChange={(e) => setAttachCover(e.target.checked)} />
-                  送付状 PDF
-                </label>
-                {attachCover && (
-                  <div className="ml-6 mt-1 space-y-1 text-xs">
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={mailCoverItems.invoice}
-                        onChange={(e) => setMailCoverItems(p => ({ ...p, invoice: e.target.checked }))} />
-                      御請求書
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={mailCoverItems.timesheet}
-                        onChange={(e) => setMailCoverItems(p => ({ ...p, timesheet: e.target.checked }))} />
-                      勤務表
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={mailCoverItems.transport}
-                        onChange={(e) => setMailCoverItems(p => ({ ...p, transport: e.target.checked }))} />
-                      交通費明細書
-                    </label>
-                  </div>
+
+                {/* 追加ファイル D&D */}
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={onDropFiles}
+                  className={`mt-3 border-2 border-dashed rounded-md px-4 py-6 text-center text-sm cursor-pointer transition-colors ${
+                    dragOver ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-gray-300 text-gray-500 hover:bg-gray-50'
+                  }`}
+                  onClick={() => document.getElementById('mail-attach-input')?.click()}
+                >
+                  📎 ファイルをドラッグ&ドロップ または クリックして選択（勤務表・交通費明細書 など、10MB まで）
+                  <input
+                    id="mail-attach-input"
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files ?? []);
+                      if (files.length > 0) setAttachFiles((prev) => [...prev, ...files]);
+                      e.target.value = '';
+                    }}
+                  />
+                </div>
+                {attachFiles.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {attachFiles.map((f, i) => (
+                      <li key={i} className="flex items-center gap-2 text-xs">
+                        <span className="bg-gray-100 px-2 py-0.5 rounded truncate max-w-md">📄 {f.name}</span>
+                        <span className="text-gray-400">{Math.ceil(f.size / 1024)}KB</span>
+                        <button onClick={() => removeAttachFile(i)} className="text-red-500 hover:underline">削除</button>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
 
