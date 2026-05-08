@@ -86,6 +86,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [busy,    setBusy]    = useState(false);
   const [toast,   setToast]   = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToastType(type);
+    setToast(message);
+  };
 
   const [issuedDate, setIssuedDate] = useState('');
   const [dueDate,    setDueDate]    = useState('');
@@ -201,7 +206,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     try {
       const res = await apiClient.put<Invoice>(`/api/v1/invoices/${id}`, buildPayload(newStatus));
       setInvoice(res.data);
-      setToast(`${res.data.invoice_number}を保存しました`);
+      showToast(`${res.data.invoice_number}を保存しました`, 'success');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '保存に失敗しました';
       alert(msg);
@@ -321,7 +326,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         items,
       });
       setPostModalOpen(false);
-      setToast('記録しました');
+      showToast('記録しました', 'success');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '記録に失敗しました';
       alert(msg);
@@ -417,10 +422,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setMailModalOpen(false);
-      setToast('送信しました');
+      showToast('送信しました', 'success');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'メール送信に失敗しました';
-      alert(msg);
+      // 失敗してもモーダルは閉じる（失敗履歴に残るため）
+      setMailModalOpen(false);
+      showToast(msg, 'error');
     } finally { setBusy(false); }
   };
 
@@ -453,7 +460,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="h-full flex flex-col p-6 max-w-6xl mx-auto w-full">
-      <Toast message={toast} onClose={() => setToast(null)} />
+      <Toast message={toast} type={toastType} onClose={() => setToast(null)} />
       <div className="flex-shrink-0 mb-4">
         <Link href="/invoices" className="text-sm text-blue-600 hover:underline">← 請求書一覧に戻る</Link>
         <div className="flex items-center justify-between mt-2">
