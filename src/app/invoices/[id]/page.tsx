@@ -331,18 +331,28 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const sendMail = async () => {
     if (mailTo.length === 0) { alert('TO を1件以上指定してください'); return; }
     if (!mailSubject || !mailBody) { alert('件名・本文を入力してください'); return; }
+
+    // 送信直前に宛名を再計算（useEffect の遅延や手動編集と競合した時の保険）
+    const custName = invoice?.customer_name_snapshot ?? invoice?.customer?.company_name ?? '';
+    let bodyToSend = mailBody;
+    if (custName) {
+      const namesByEmail = new Map(mailCandidates.map(c => [c.email, c.name]));
+      const contactNames = mailTo.map(em => namesByEmail.get(em)).filter((n): n is string => !!n);
+      const sal = buildSalutation(custName, contactNames);
+      bodyToSend = replaceSalutation(mailBody, sal);
+      setMailBody(bodyToSend);
+    }
+
     setBusy(true);
     try {
       const fd = new FormData();
       mailTo.forEach((e) => fd.append('to_emails[]', e));
       mailCc.forEach((e) => fd.append('cc_emails[]', e));
       fd.append('subject', mailSubject);
-      fd.append('body', mailBody);
+      fd.append('body', bodyToSend);
       fd.append('attach_invoice', attachInvoice ? '1' : '0');
       attachFiles.forEach((f) => fd.append('attachments[]', f));
-      await apiClient.post(`/api/v1/invoices/${id}/send-mail`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      await apiClient.post(`/api/v1/invoices/${id}/send-mail`, fd);
       setMailModalOpen(false);
       alert('メールを送信しました');
     } catch (err: unknown) {
