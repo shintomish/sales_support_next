@@ -14,6 +14,7 @@ interface IssuerSettings {
   invoice_issuer_fax: string | null;
   invoice_issuer_logo_path: string | null;
   invoice_issuer_seal_path: string | null;
+  invoice_issuer_url: string | null;
   invoice_issuer_invoice_number: string | null;
   invoice_issuer_bank_name: string | null;
   invoice_issuer_bank_branch: string | null;
@@ -26,6 +27,7 @@ const EMPTY: IssuerSettings = {
   invoice_issuer_name: '', invoice_issuer_postal_code: '', invoice_issuer_address: '',
   invoice_issuer_tel: '', invoice_issuer_fax: '', invoice_issuer_logo_path: '',
   invoice_issuer_seal_path: '',
+  invoice_issuer_url: '',
   invoice_issuer_invoice_number: '',
   invoice_issuer_bank_name: '', invoice_issuer_bank_branch: '',
   invoice_issuer_bank_account_type: '', invoice_issuer_bank_account_number: '',
@@ -35,7 +37,8 @@ const EMPTY: IssuerSettings = {
 // テキスト系（保存対象）— ロゴパスは別エンドポイントで管理
 const TEXT_KEYS: (keyof IssuerSettings)[] = [
   'invoice_issuer_name', 'invoice_issuer_postal_code', 'invoice_issuer_address',
-  'invoice_issuer_tel', 'invoice_issuer_fax', 'invoice_issuer_invoice_number',
+  'invoice_issuer_tel', 'invoice_issuer_fax', 'invoice_issuer_url',
+  'invoice_issuer_invoice_number',
   'invoice_issuer_bank_name', 'invoice_issuer_bank_branch',
   'invoice_issuer_bank_account_type', 'invoice_issuer_bank_account_number',
   'invoice_issuer_bank_account_holder',
@@ -176,6 +179,10 @@ export default function InvoiceIssuerSettingsPage() {
             <Input value={form.invoice_issuer_fax ?? ''} onChange={(e) => set('invoice_issuer_fax')(e.target.value)} />
           </Field>
         </div>
+        <Field label="ホームページURL">
+          <Input value={form.invoice_issuer_url ?? ''} onChange={(e) => set('invoice_issuer_url')(e.target.value)}
+            placeholder="https://www.aizen-sol.co.jp" />
+        </Field>
         <Field label="適格請求書発行事業者登録番号 (T+13桁)">
           <Input value={form.invoice_issuer_invoice_number ?? ''} onChange={(e) => set('invoice_issuer_invoice_number')(e.target.value)}
             placeholder="T1234567890123" />
