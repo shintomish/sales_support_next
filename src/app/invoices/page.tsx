@@ -6,6 +6,7 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import SortableHeader from '@/components/SortableHeader';
+import { useAuthStore } from '@/store/authStore';
 
 interface InvoiceListItem {
   id: number;
@@ -15,6 +16,7 @@ interface InvoiceListItem {
   issued_date: string;
   due_date: string | null;
   status: 'draft' | 'issued';
+  approved: boolean;
   total: string;
   customer_name_snapshot: string | null;
   pdf_path: string | null;
@@ -42,13 +44,31 @@ const yen = (n: string | number) => `¥${Number(n).toLocaleString()}`;
 type SortField = 'invoice_number' | 'year_month' | 'customer' | 'deal' | 'issued_date' | 'total' | 'status';
 
 export default function InvoicesPage() {
+  const user = useAuthStore((s) => s.user);
+  const canApprove = user?.role === 'tenant_admin' || user?.role === 'super_admin';
+
   const [items, setItems]         = useState<InvoiceListItem[]>([]);
   const [yearMonth, setYearMonth] = useState('');
   const [status, setStatus]       = useState<'' | 'draft' | 'issued'>('');
   const [q, setQ]                 = useState('');
   const [loading, setLoading]     = useState(false);
+  const [approvingId, setApprovingId] = useState<number | null>(null);
   const [sortBy, setSortBy]       = useState<SortField>('issued_date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const handleApprove = async (id: number) => {
+    if (!confirm('承認すると電子印付き PDF を再生成します。よろしいですか？')) return;
+    setApprovingId(id);
+    try {
+      await apiClient.post(`/api/v1/invoices/${id}/approve`);
+      fetchData();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '承認に失敗しました';
+      alert(msg);
+    } finally {
+      setApprovingId(null);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -146,15 +166,16 @@ export default function InvoicesPage() {
                 <th className="text-left px-2 py-3 font-semibold w-[90px]">請求日</th>
                 <SortableHeader label="税込合計" field="total"    sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[110px]" />
                 <th className="text-center px-2 py-3 font-semibold w-[80px]">状態</th>
+                <th className="text-center px-2 py-3 font-semibold w-[100px]">承認</th>
                 <th className="px-2 py-3 text-center font-semibold w-[70px]">PDF</th>
                 <th className="px-2 py-3 text-center font-semibold w-[70px]">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
+                <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
               ) : sortedItems.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">請求書がありません</td></tr>
+                <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">請求書がありません</td></tr>
               ) : sortedItems.map((r, idx) => (
                 <tr key={r.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
                   <td className="px-2 py-3 font-mono text-xs truncate">{r.invoice_number}</td>
@@ -166,10 +187,26 @@ export default function InvoicesPage() {
                   <td className="px-2 py-3 text-right tabular-nums font-semibold">{yen(r.total)}</td>
                   <td className="px-2 py-3 text-center">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      r.status === 'issued' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                      r.approved ? 'bg-blue-100 text-blue-700'
+                        : r.status === 'issued' ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-500'
                     }`}>
-                      {r.status === 'issued' ? '発行済' : '下書き'}
+                      {r.approved ? '承認済' : r.status === 'issued' ? '発行済' : '下書き'}
                     </span>
+                  </td>
+                  <td className="px-2 py-3 text-center">
+                    {r.approved ? (
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">承認済</span>
+                    ) : (
+                      <button
+                        onClick={() => handleApprove(r.id)}
+                        disabled={!canApprove || approvingId === r.id}
+                        title={canApprove ? 'クリックで承認 → 電子印付き PDF を再生成' : '承認権限がありません（管理者のみ）'}
+                        className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {approvingId === r.id ? '承認中…' : '非承認'}
+                      </button>
+                    )}
                   </td>
                   <td className="px-2 py-3 text-center">
                     {r.pdf_path
