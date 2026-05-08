@@ -523,19 +523,35 @@ export default function DeliveriesPage() {
     }
   }
 
-  // 一斉配信履歴 アコーディオンからの再送信
-  const handleResendCampaignHistory = async (campaignId: number, historyId: number, to: string) => {
-    if (!confirm(`${to} に再送信しますか？`)) return
-    setResendingHistoryId(historyId)
+  // キャンペーン一括再送信モーダル
+  const [bulkResend, setBulkResend] = useState<{
+    campaignId: number
+    subject:    string
+    body:       string
+  } | null>(null)
+  const [bulkResendSending, setBulkResendSending] = useState(false)
+  const [bulkResendError, setBulkResendError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (bulkResend) setBulkResendError(null)
+  }, [bulkResend])
+
+  const handleBulkResendSend = async () => {
+    if (!bulkResend) return
+    if (!confirm('配信先全員に再送信します。よろしいですか？')) return
+    setBulkResendSending(true)
+    setBulkResendError(null)
     try {
-      await axios.post(`/api/v1/delivery-campaigns/${campaignId}/histories/${historyId}/resend`)
-      // キャンペーン詳細を再取得（accordion キャッシュも更新）
-      const res = await axios.get<CampaignDetail>(`/api/v1/delivery-campaigns/${campaignId}`)
-      setCampDetailCache(prev => ({ ...prev, [campaignId]: res.data }))
+      await axios.post(`/api/v1/delivery-campaigns/${bulkResend.campaignId}/resend-bulk`, {
+        subject: bulkResend.subject,
+        body:    bulkResend.body,
+      })
+      setBulkResend(null)
+      fetchCampaigns()
     } catch (e) {
-      alert((e as ApiError).response?.data?.message ?? '再送信に失敗しました')
+      setBulkResendError((e as ApiError).response?.data?.message ?? '再送信に失敗しました')
     } finally {
-      setResendingHistoryId(null)
+      setBulkResendSending(false)
     }
   }
 
@@ -1531,6 +1547,26 @@ export default function DeliveriesPage() {
                                     <span className="text-xs text-gray-500">
                                       送信数: {detail.total_count}件（成功: {detail.success_count} / 失敗: {detail.failed_count}）
                                     </span>
+                                    {camp.latest_resent_at && (
+                                      <span className="text-xs text-amber-600">
+                                        再送信: {new Date(camp.latest_resent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                                      </span>
+                                    )}
+                                    <div className="ml-auto">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setBulkResend({
+                                            campaignId: camp.id,
+                                            subject:    detail.subject,
+                                            body:       detail.body ?? '',
+                                          })
+                                        }}
+                                        className="text-xs text-orange-600 hover:underline"
+                                      >
+                                        ↻ 再送信
+                                      </button>
+                                    </div>
                                   </div>
                                   <p className="text-sm font-semibold text-gray-800 mb-1">{detail.subject}</p>
                                   <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans break-words">{detail.body?.replace(/<%Name%>/g, '（各配信先名）')}</pre>
@@ -1576,16 +1612,6 @@ export default function DeliveriesPage() {
                                                 ↗ 送信
                                               </button>
                                             )}
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleResendCampaignHistory(camp.id, h.id, h.email)
-                                              }}
-                                              disabled={resendingHistoryId === h.id}
-                                              className="text-xs text-orange-600 hover:underline disabled:opacity-50 disabled:no-underline"
-                                            >
-                                              {resendingHistoryId === h.id ? '送信中…' : '↻ 再送信'}
-                                            </button>
                                           </div>
                                         </div>
                                         <p className="text-sm font-semibold text-gray-800 mb-1">{h.reply_subject ?? '（件名なし）'}</p>
@@ -2380,6 +2406,63 @@ export default function DeliveriesPage() {
                 className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
               >
                 {newFormSaving ? '登録中...' : '登録'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── キャンペーン一括再送信モーダル ───────────────── */}
+      {bulkResend && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">一括再送信</h2>
+            <p className="text-xs text-gray-500 mb-4">
+              有効な配信先全員に再配信します。件名・本文は編集できます。
+            </p>
+
+            {bulkResendError && (
+              <div className="mb-3 px-3 py-2 bg-red-50 text-red-700 text-sm rounded">
+                {bulkResendError}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">件名</label>
+                <input
+                  type="text"
+                  value={bulkResend.subject}
+                  onChange={e => setBulkResend(f => f ? { ...f, subject: e.target.value } : f)}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">本文</label>
+                <textarea
+                  value={bulkResend.body}
+                  onChange={e => setBulkResend(f => f ? { ...f, body: e.target.value } : f)}
+                  rows={20}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+                <p className="text-xs text-gray-400 mt-1">※ &lt;%Name%&gt; は配信先名に置換されます</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-5">
+              <button
+                onClick={() => setBulkResend(null)}
+                disabled={bulkResendSending}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleBulkResendSend}
+                disabled={bulkResendSending || !bulkResend.subject || !bulkResend.body}
+                className="px-4 py-2 text-sm text-white bg-orange-600 hover:bg-orange-700 disabled:opacity-50 rounded"
+              >
+                {bulkResendSending ? '送信準備中…' : '配信先リストへ一括再送信'}
               </button>
             </div>
           </div>
