@@ -54,7 +54,12 @@ const previousMonth = (): string => {
 type SortField = 'invoice_number' | 'customer_name' | 'subject' | 'to' | 'sent_at' | 'sent_by';
 
 const yen = (n: string | number | null | undefined) => n == null ? '-' : `¥${Number(n).toLocaleString()}`;
-const fmt = (s: string | null) => s ? s.replace('T', ' ').slice(0, 16) : '-';
+/** mail: yyyy-mm-dd hh:mm / post: yyyy-mm-dd */
+const fmtSent = (s: string | null, method: 'mail' | 'post' | null) => {
+  if (!s) return '-';
+  const cleaned = s.replace('T', ' ');
+  return method === 'post' ? cleaned.slice(0, 10) : cleaned.slice(0, 16);
+};
 
 export default function InvoiceSendHistoriesPage() {
   const [items,   setItems]   = useState<HistoryRow[]>([]);
@@ -166,8 +171,8 @@ export default function InvoiceSendHistoriesPage() {
                 <th className="text-right  px-2 py-3 font-semibold w-[100px]">金額</th>
                 <th className="text-center px-2 py-3 font-semibold w-[80px]">手段</th>
                 <th className="text-center px-2 py-3 font-semibold w-[70px]">状態</th>
-                <th className="text-left   px-2 py-3 font-semibold w-[180px]">添付/同封物</th>
-                <SortableHeader label="送信日時" field="sent_at" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[120px]" />
+                <th className="text-left   px-2 py-3 font-semibold w-[80px]">添付</th>
+                <SortableHeader label="送信/発送日" field="sent_at" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[140px]" />
                 <SortableHeader label="送信者"   field="sent_by" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
               </tr>
             </thead>
@@ -213,12 +218,10 @@ export default function InvoiceSendHistoriesPage() {
                   </td>
                   <td className="px-2 py-2 text-xs text-gray-500 truncate" title={r.attachments_meta?.join(' / ')}>
                     {r.attachments_meta && r.attachments_meta.length > 0
-                      ? (r.method === 'post'
-                          ? r.attachments_meta.join(' / ')
-                          : `📎 ${r.attachments_meta.length}件`)
+                      ? `📎 ${r.attachments_meta.length}件`
                       : '-'}
                   </td>
-                  <td className="px-2 py-2 text-gray-600 text-xs truncate">{fmt(r.sent_at)}</td>
+                  <td className="px-2 py-2 text-gray-600 text-xs truncate">{fmtSent(r.sent_at, r.method)}</td>
                   <td className="px-2 py-2 text-gray-600 text-xs truncate">{r.sent_by_name ?? '-'}</td>
                 </tr>
               ))}
