@@ -113,21 +113,21 @@ export default function InvoiceSendHistoriesPage() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-          <table className="min-w-full text-sm">
+        <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+          <table className="min-w-full text-sm whitespace-nowrap">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
-                <th className="text-left px-3 py-3 font-semibold whitespace-nowrap">送信日時</th>
+                <th className="text-left   px-3 py-3 font-semibold">請求書番号</th>
+                <th className="text-left   px-3 py-3 font-semibold">対象月</th>
+                <th className="text-left   px-3 py-3 font-semibold">取引先</th>
+                <th className="text-left   px-3 py-3 font-semibold">件名</th>
+                <th className="text-left   px-3 py-3 font-semibold">送信日時</th>
+                <th className="text-right  px-3 py-3 font-semibold">金額</th>
+                <th className="text-left   px-3 py-3 font-semibold">TO</th>
                 <th className="text-center px-3 py-3 font-semibold">手段</th>
                 <th className="text-center px-3 py-3 font-semibold">状態</th>
-                <th className="text-left px-3 py-3 font-semibold">請求書番号</th>
-                <th className="text-left px-3 py-3 font-semibold">対象月</th>
-                <th className="text-left px-3 py-3 font-semibold">取引先</th>
-                <th className="text-right px-3 py-3 font-semibold">金額</th>
-                <th className="text-left px-3 py-3 font-semibold">TO</th>
-                <th className="text-left px-3 py-3 font-semibold">件名</th>
-                <th className="text-left px-3 py-3 font-semibold">添付</th>
-                <th className="text-left px-3 py-3 font-semibold">送信者</th>
+                <th className="text-left   px-3 py-3 font-semibold">添付</th>
+                <th className="text-left   px-3 py-3 font-semibold">送信者</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -137,7 +137,23 @@ export default function InvoiceSendHistoriesPage() {
                 <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">送信履歴はありません</td></tr>
               ) : items.map((r) => (
                 <tr key={r.id} className="hover:bg-blue-50">
-                  <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{fmt(r.sent_at)}</td>
+                  <td className="px-3 py-2 font-mono text-xs">
+                    {r.invoice_id ? (
+                      <Link href={`/invoices/${r.invoice_id}`} className="text-blue-600 hover:underline">
+                        {r.invoice_number}
+                      </Link>
+                    ) : '-'}
+                  </td>
+                  <td className="px-3 py-2 text-gray-600">{r.invoice_year_month ?? '-'}</td>
+                  <td className="px-3 py-2 text-gray-800 truncate max-w-[200px]" title={r.customer_name ?? ''}>
+                    {r.customer_name ?? '-'}
+                  </td>
+                  <td className="px-3 py-2 truncate max-w-[260px]" title={r.subject ?? ''}>{r.subject ?? '-'}</td>
+                  <td className="px-3 py-2 text-gray-600">{fmt(r.sent_at)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{yen(r.invoice_total)}</td>
+                  <td className="px-3 py-2 text-gray-600 text-xs truncate max-w-[200px]" title={r.to_emails?.join(', ')}>
+                    {r.to_emails?.join(', ') ?? '-'}
+                  </td>
                   <td className="px-3 py-2 text-center">
                     <span className={`px-2 py-0.5 rounded text-xs ${
                       r.method === 'mail' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
@@ -152,22 +168,6 @@ export default function InvoiceSendHistoriesPage() {
                       {r.status === 'sent' ? '送信済' : '失敗'}
                     </span>
                   </td>
-                  <td className="px-3 py-2 font-mono text-xs">
-                    {r.invoice_id ? (
-                      <Link href={`/invoices/${r.invoice_id}`} className="text-blue-600 hover:underline">
-                        {r.invoice_number}
-                      </Link>
-                    ) : '-'}
-                  </td>
-                  <td className="px-3 py-2 text-gray-600">{r.invoice_year_month ?? '-'}</td>
-                  <td className="px-3 py-2 text-gray-800 truncate max-w-[200px]" title={r.customer_name ?? ''}>
-                    {r.customer_name ?? '-'}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{yen(r.invoice_total)}</td>
-                  <td className="px-3 py-2 text-gray-600 text-xs truncate max-w-[200px]" title={r.to_emails?.join(', ')}>
-                    {r.to_emails?.join(', ') ?? '-'}
-                  </td>
-                  <td className="px-3 py-2 truncate max-w-[260px]" title={r.subject ?? ''}>{r.subject ?? '-'}</td>
                   <td className="px-3 py-2 text-xs text-gray-500 truncate max-w-[180px]" title={r.attachments_meta?.join(' / ')}>
                     {r.attachments_meta && r.attachments_meta.length > 0
                       ? `📎 ${r.attachments_meta.length}件`
