@@ -206,6 +206,46 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const [coverModalOpen, setCoverModalOpen] = useState(false);
+  const [coverItems, setCoverItems] = useState({ invoice: true, timesheet: false, transport: false });
+
+  const openCoverLetter = async () => {
+    if (!coverItems.invoice && !coverItems.timesheet && !coverItems.transport) {
+      alert('同封物を1つ以上選択してください'); return;
+    }
+    setBusy(true);
+    try {
+      const params = new URLSearchParams({
+        invoice:   coverItems.invoice ? '1' : '0',
+        timesheet: coverItems.timesheet ? '1' : '0',
+        transport: coverItems.transport ? '1' : '0',
+      });
+      const res = await apiClient.get(`/api/v1/invoices/${id}/cover-letter?${params}`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      window.open(url, '_blank');
+      setCoverModalOpen(false);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '送付状の生成に失敗しました';
+      alert(msg);
+    } finally { setBusy(false); }
+  };
+
+  const [envelopeModalOpen, setEnvelopeModalOpen] = useState(false);
+  const [envelopeWithZaichu, setEnvelopeWithZaichu] = useState(true);
+
+  const openEnvelope = async () => {
+    setBusy(true);
+    try {
+      const res = await apiClient.get(`/api/v1/invoices/${id}/envelope?zaichu=${envelopeWithZaichu ? 1 : 0}`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      window.open(url, '_blank');
+      setEnvelopeModalOpen(false);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '封筒の生成に失敗しました';
+      alert(msg);
+    } finally { setBusy(false); }
+  };
+
   const remove = async () => {
     const label = invoice?.status === 'issued' ? '発行済' : '下書き';
     if (!confirm(`この請求書（${label}）を削除します。\n誤発行のリカバリ用です。よろしいですか？`)) return;
@@ -411,12 +451,77 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <Button onClick={generatePdf} disabled={busy} className="bg-blue-600 hover:bg-blue-700 text-white">
             📄 PDF 生成
           </Button>
+          <Button variant="outline" onClick={() => setCoverModalOpen(true)} disabled={busy}>
+            📋 送付状 PDF
+          </Button>
+          <Button variant="outline" onClick={() => setEnvelopeModalOpen(true)} disabled={busy}>
+            ✉️ 長3封筒 PDF
+          </Button>
           <Button variant="outline" onClick={remove} disabled={busy}
             className="text-red-600 border-red-200 hover:bg-red-50 ml-auto">
             削除
           </Button>
         </div>
       </div>
+
+      {/* 封筒モーダル */}
+      {envelopeModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setEnvelopeModalOpen(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4">長3封筒 - 設定</h2>
+            <div className="space-y-2 mb-5">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="radio" name="zaichu" checked={envelopeWithZaichu}
+                  onChange={() => setEnvelopeWithZaichu(true)} />
+                「請求書在中」付き
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="radio" name="zaichu" checked={!envelopeWithZaichu}
+                  onChange={() => setEnvelopeWithZaichu(false)} />
+                「請求書在中」なし（一般用途）
+              </label>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEnvelopeModalOpen(false)} disabled={busy}>キャンセル</Button>
+              <Button onClick={openEnvelope} disabled={busy} className="bg-blue-600 hover:bg-blue-700 text-white">
+                {busy ? '生成中...' : 'PDF を開く'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 送付状モーダル */}
+      {coverModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setCoverModalOpen(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4">送付状 - 同封物の選択</h2>
+            <div className="space-y-2 mb-5">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={coverItems.invoice}
+                  onChange={(e) => setCoverItems(p => ({ ...p, invoice: e.target.checked }))} />
+                御請求書
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={coverItems.timesheet}
+                  onChange={(e) => setCoverItems(p => ({ ...p, timesheet: e.target.checked }))} />
+                勤務表
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={coverItems.transport}
+                  onChange={(e) => setCoverItems(p => ({ ...p, transport: e.target.checked }))} />
+                交通費明細書
+              </label>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setCoverModalOpen(false)} disabled={busy}>キャンセル</Button>
+              <Button onClick={openCoverLetter} disabled={busy} className="bg-blue-600 hover:bg-blue-700 text-white">
+                {busy ? '生成中...' : 'PDF を開く'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
