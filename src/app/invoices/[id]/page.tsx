@@ -277,20 +277,28 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [postSentAt, setPostSentAt]       = useState<string>(new Date().toISOString().slice(0, 10));
   const [postNote, setPostNote]           = useState('');
   const [postItems, setPostItems]         = useState({ invoice: false, cover: false, timesheet: false, transport: false });
+  const [postTo, setPostTo]               = useState<string[]>([]);
+  const [postCandidates, setPostCandidates] = useState<MailCandidate[]>([]);
 
   const openPostModal = async () => {
     setBusy(true);
     try {
-      // 最新の郵送記録を取得して、あれば反映
       const res = await apiClient.get<{
-        sent_at: string | null;
-        note: string | null;
-        attachments_meta: string[] | null;
-      } | null>(`/api/v1/invoices/${id}/latest-post`);
-      if (res.data) {
-        setPostSentAt(res.data.sent_at ?? new Date().toISOString().slice(0, 10));
-        setPostNote(res.data.note ?? '');
-        const items = res.data.attachments_meta ?? [];
+        latest: {
+          sent_at: string | null;
+          note: string | null;
+          attachments_meta: string[] | null;
+          to_recipients: string[] | null;
+        } | null;
+        candidates: MailCandidate[];
+      }>(`/api/v1/invoices/${id}/latest-post`);
+      setPostCandidates(res.data.candidates ?? []);
+      const latest = res.data.latest;
+      if (latest) {
+        setPostSentAt(latest.sent_at ?? new Date().toISOString().slice(0, 10));
+        setPostNote(latest.note ?? '');
+        setPostTo(latest.to_recipients ?? []);
+        const items = latest.attachments_meta ?? [];
         setPostItems({
           invoice:   items.includes('請求書'),
           cover:     items.includes('送付状'),
@@ -300,12 +308,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       } else {
         setPostSentAt(new Date().toISOString().slice(0, 10));
         setPostNote('');
+        setPostTo([]);
         setPostItems({ invoice: false, cover: false, timesheet: false, transport: false });
       }
       setPostModalOpen(true);
     } catch {
       setPostSentAt(new Date().toISOString().slice(0, 10));
       setPostNote('');
+      setPostTo([]);
       setPostItems({ invoice: false, cover: false, timesheet: false, transport: false });
       setPostModalOpen(true);
     } finally { setBusy(false); }
@@ -321,9 +331,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         postItems.transport ? '交通費明細書'   : null,
       ].filter(Boolean);
       await apiClient.post(`/api/v1/invoices/${id}/record-post`, {
-        sent_at: postSentAt,
-        note:    postNote || null,
+        sent_at:       postSentAt,
+        note:          postNote || null,
         items,
+        to_recipients: postTo,
       });
       setPostModalOpen(false);
       showToast('記録しました', 'success');
@@ -678,6 +689,30 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             <h2 className="text-lg font-bold mb-4">📮 郵送記録</h2>
 
             <div className="space-y-3">
+              {/* TO 候補（クリックで TO に追加） */}
+              {postCandidates.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">候補（クリックで TO に追加）:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {postCandidates.map((c) => (
+                      <button key={c.email || c.name}
+                        type="button"
+                        onClick={() => { if (!postTo.includes(c.name)) setPostTo([...postTo, c.name]); }}
+                        className="text-xs px-2 py-0.5 rounded bg-gray-100 hover:bg-blue-100 text-gray-700">
+                        {c.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">TO（カンマ区切り）</label>
+                <Input value={postTo.join(', ')}
+                  onChange={(e) => setPostTo(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                  placeholder="氏名" />
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">郵送日</label>
                 <Input type="date" value={postSentAt} onChange={(e) => setPostSentAt(e.target.value)} />
