@@ -352,7 +352,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       fd.append('body', bodyToSend);
       fd.append('attach_invoice', attachInvoice ? '1' : '0');
       attachFiles.forEach((f) => fd.append('attachments[]', f));
-      await apiClient.post(`/api/v1/invoices/${id}/send-mail`, fd);
+      await apiClient.post(`/api/v1/invoices/${id}/send-mail`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       setMailModalOpen(false);
       alert('メールを送信しました');
     } catch (err: unknown) {
