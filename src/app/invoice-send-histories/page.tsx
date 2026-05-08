@@ -10,6 +10,7 @@ interface HistoryRow {
   id: number;
   method: 'mail' | 'post';
   to_emails: string[] | null;
+  to_names: string[] | null;
   cc_emails: string[] | null;
   subject: string | null;
   attachments_meta: string[] | null;
@@ -113,21 +114,21 @@ export default function InvoiceSendHistoriesPage() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-          <table className="min-w-full text-sm whitespace-nowrap">
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+          <table className="w-full text-sm table-fixed">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
-                <th className="text-left   px-3 py-3 font-semibold">請求書番号</th>
-                <th className="text-left   px-3 py-3 font-semibold">対象月</th>
-                <th className="text-left   px-3 py-3 font-semibold">取引先</th>
-                <th className="text-left   px-3 py-3 font-semibold">件名</th>
-                <th className="text-left   px-3 py-3 font-semibold">送信日時</th>
-                <th className="text-right  px-3 py-3 font-semibold">金額</th>
-                <th className="text-left   px-3 py-3 font-semibold">TO</th>
-                <th className="text-center px-3 py-3 font-semibold">手段</th>
-                <th className="text-center px-3 py-3 font-semibold">状態</th>
-                <th className="text-left   px-3 py-3 font-semibold">添付</th>
-                <th className="text-left   px-3 py-3 font-semibold">送信者</th>
+                <th className="text-left   px-2 py-3 font-semibold w-[150px]">請求書番号</th>
+                <th className="text-left   px-2 py-3 font-semibold w-[70px]">対象月</th>
+                <th className="text-left   px-2 py-3 font-semibold w-[150px]">取引先</th>
+                <th className="text-left   px-2 py-3 font-semibold">件名</th>
+                <th className="text-left   px-2 py-3 font-semibold w-[120px]">送信日時</th>
+                <th className="text-right  px-2 py-3 font-semibold w-[100px]">金額</th>
+                <th className="text-left   px-2 py-3 font-semibold w-[120px]">TO</th>
+                <th className="text-center px-2 py-3 font-semibold w-[80px]">手段</th>
+                <th className="text-center px-2 py-3 font-semibold w-[70px]">状態</th>
+                <th className="text-left   px-2 py-3 font-semibold w-[70px]">添付</th>
+                <th className="text-left   px-2 py-3 font-semibold w-[100px]">送信者</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -137,43 +138,43 @@ export default function InvoiceSendHistoriesPage() {
                 <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">送信履歴はありません</td></tr>
               ) : items.map((r) => (
                 <tr key={r.id} className="hover:bg-blue-50">
-                  <td className="px-3 py-2 font-mono text-xs">
+                  <td className="px-2 py-2 font-mono text-xs truncate" title={r.invoice_number ?? ''}>
                     {r.invoice_id ? (
                       <Link href={`/invoices/${r.invoice_id}`} className="text-blue-600 hover:underline">
                         {r.invoice_number}
                       </Link>
                     ) : '-'}
                   </td>
-                  <td className="px-3 py-2 text-gray-600">{r.invoice_year_month ?? '-'}</td>
-                  <td className="px-3 py-2 text-gray-800 truncate max-w-[200px]" title={r.customer_name ?? ''}>
+                  <td className="px-2 py-2 text-gray-600 truncate">{r.invoice_year_month ?? '-'}</td>
+                  <td className="px-2 py-2 text-gray-800 truncate" title={r.customer_name ?? ''}>
                     {r.customer_name ?? '-'}
                   </td>
-                  <td className="px-3 py-2 truncate max-w-[260px]" title={r.subject ?? ''}>{r.subject ?? '-'}</td>
-                  <td className="px-3 py-2 text-gray-600">{fmt(r.sent_at)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{yen(r.invoice_total)}</td>
-                  <td className="px-3 py-2 text-gray-600 text-xs truncate max-w-[200px]" title={r.to_emails?.join(', ')}>
-                    {r.to_emails?.join(', ') ?? '-'}
+                  <td className="px-2 py-2 truncate" title={r.subject ?? ''}>{r.subject ?? '-'}</td>
+                  <td className="px-2 py-2 text-gray-600 text-xs truncate">{fmt(r.sent_at)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums truncate">{yen(r.invoice_total)}</td>
+                  <td className="px-2 py-2 text-gray-600 text-xs truncate" title={r.to_emails?.join(', ')}>
+                    {r.to_names && r.to_names.length > 0 ? r.to_names.join(', ') : (r.to_emails?.join(', ') ?? '-')}
                   </td>
-                  <td className="px-3 py-2 text-center">
-                    <span className={`px-2 py-0.5 rounded text-xs ${
+                  <td className="px-2 py-2 text-center">
+                    <span className={`px-1.5 py-0.5 rounded text-xs ${
                       r.method === 'mail' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
                     }`}>
-                      {r.method === 'mail' ? '📧 メール' : '📮 郵送'}
+                      {r.method === 'mail' ? '📧' : '📮'}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-center">
-                    <span className={`px-2 py-0.5 rounded text-xs ${
+                  <td className="px-2 py-2 text-center">
+                    <span className={`px-1.5 py-0.5 rounded text-xs ${
                       r.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     }`}>
                       {r.status === 'sent' ? '送信済' : '失敗'}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-xs text-gray-500 truncate max-w-[180px]" title={r.attachments_meta?.join(' / ')}>
+                  <td className="px-2 py-2 text-xs text-gray-500 truncate" title={r.attachments_meta?.join(' / ')}>
                     {r.attachments_meta && r.attachments_meta.length > 0
                       ? `📎 ${r.attachments_meta.length}件`
                       : '-'}
                   </td>
-                  <td className="px-3 py-2 text-gray-600 text-xs">{r.sent_by_name ?? '-'}</td>
+                  <td className="px-2 py-2 text-gray-600 text-xs truncate">{r.sent_by_name ?? '-'}</td>
                 </tr>
               ))}
             </tbody>
