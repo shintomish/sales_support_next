@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import axios from '@/lib/axios'
 import { useRouter, useParams } from 'next/navigation'
+import type { ApiError } from '@/lib/error-helpers'
 
 // ── 型定義 ────────────────────────────────────────────────
 
@@ -11,6 +12,9 @@ type SendHistory = {
   email: string
   name: string | null
   status: 'sent' | 'failed' | 'replied'
+  sent_at: string | null
+  resent_at: string | null
+  parent_history_id: number | null
   replied_at: string | null
   reply_subject: string | null
   reply_received_at: string | null
@@ -93,12 +97,32 @@ export default function CampaignDetailPage() {
   const [statusFilter, setStatusFilter] = useState<'' | 'sent' | 'failed' | 'replied'>('')
   const [search, setSearch] = useState('')
   const [replyModal, setReplyModal] = useState<SendHistory | null>(null)
+  const [resendingId, setResendingId] = useState<number | null>(null)
 
-  useEffect(() => {
+  const fetchCampaign = () => {
     axios.get(`/api/v1/delivery-campaigns/${id}`)
       .then(res => setCampaign(res.data))
       .catch(() => router.push('/deliveries'))
-  }, [id, router])
+  }
+
+  useEffect(() => {
+    fetchCampaign()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
+
+  const handleResend = async (h: SendHistory) => {
+    if (!confirm(`${h.email} に再送信しますか？`)) return
+    setResendingId(h.id)
+    try {
+      await axios.post(`/api/v1/delivery-campaigns/${id}/histories/${h.id}/resend`)
+      fetchCampaign()
+    } catch (e) {
+      const err = e as ApiError
+      alert(err.response?.data?.message ?? '再送信に失敗しました')
+    } finally {
+      setResendingId(null)
+    }
+  }
 
   const filtered = campaign?.histories.filter(h => {
     if (statusFilter && h.status !== statusFilter) return false
@@ -231,7 +255,10 @@ export default function CampaignDetailPage() {
               <th className="px-4 py-3 text-left">名前</th>
               <th className="px-4 py-3 text-left">メールアドレス</th>
               <th className="px-4 py-3 text-center">状態</th>
+              <th className="px-4 py-3 text-left whitespace-nowrap">送信日時</th>
+              <th className="px-4 py-3 text-left whitespace-nowrap">再送信日時</th>
               <th className="px-4 py-3 text-left">返信</th>
+              <th className="px-4 py-3 text-center">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -240,9 +267,14 @@ export default function CampaignDetailPage() {
                 key={h.id}
                 className={`transition-colors ${
                   h.status === 'replied' ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'
-                }`}
+                } ${h.parent_history_id ? 'border-l-2 border-l-amber-300' : ''}`}
               >
-                <td className="px-4 py-3 text-gray-800">{h.name ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-800">
+                  {h.name ?? '-'}
+                  {h.parent_history_id && (
+                    <span className="ml-2 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">再送</span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-gray-600 text-xs">{h.email}</td>
                 <td className="px-4 py-3 text-center">
                   {{
@@ -250,6 +282,12 @@ export default function CampaignDetailPage() {
                     failed:  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">失敗</span>,
                     replied: <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">返信あり</span>,
                   }[h.status]}
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                  {h.sent_at ? new Date(h.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                  {h.resent_at ? new Date(h.resent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}
                 </td>
                 <td className="px-4 py-3">
                   {h.status === 'replied' && h.replied_at ? (
@@ -259,7 +297,7 @@ export default function CampaignDetailPage() {
                         className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-xs font-medium group"
                       >
                         <span className="text-base">📩</span>
-                        <span className="group-hover:underline truncate max-w-[280px]">{h.reply_subject}</span>
+                        <span className="group-hover:underline truncate max-w-[240px]">{h.reply_subject}</span>
                       </button>
                       <p className="text-xs text-gray-400 mt-0.5 pl-6">
                         {new Date(h.replied_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
@@ -269,11 +307,22 @@ export default function CampaignDetailPage() {
                     <span className="text-xs text-gray-300">—</span>
                   )}
                 </td>
+                <td className="px-4 py-3 text-center">
+                  {(h.status === 'sent' || h.status === 'replied' || h.status === 'failed') && (
+                    <button
+                      onClick={() => handleResend(h)}
+                      disabled={resendingId === h.id}
+                      className="text-xs text-orange-600 hover:underline disabled:opacity-50 disabled:no-underline"
+                    >
+                      {resendingId === h.id ? '送信中…' : '再送信'}
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                   該当する履歴がありません。
                 </td>
               </tr>

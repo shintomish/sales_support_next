@@ -420,6 +420,93 @@ export default function DeliveriesPage() {
     }
   }
 
+  // スレッド詳細を再取得（再送信後など）
+  const reloadThreadDetail = async (t: ProposalThread) => {
+    const key = `${t.type}-${t.source_id}`
+    const path = t.type === 'project'
+      ? `/api/v1/project-mails/${t.source_id}/thread`
+      : `/api/v1/engineer-mails/${t.source_id}/thread`
+    try {
+      const res = await axios.get<{ thread: ThreadMessage[] }>(path)
+      setThreadCache(prev => ({ ...prev, [key]: res.data.thread ?? [] }))
+    } catch { /* noop */ }
+  }
+
+  // 受信→送信（提案メールとして単発送信）
+  const [replyCompose, setReplyCompose] = useState<{
+    sourceType: 'project' | 'engineer'
+    sourceId:   number
+    to:         string
+    toName:     string | null
+    subject:    string
+  } | null>(null)
+  const [replyComposeBody, setReplyComposeBody] = useState('')
+  const [replyComposeSending, setReplyComposeSending] = useState(false)
+  const [replyComposeError, setReplyComposeError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (replyCompose) {
+      setReplyComposeBody('')
+      setReplyComposeError(null)
+    }
+  }, [replyCompose])
+
+  const handleReplyComposeSend = async () => {
+    if (!replyCompose) return
+    setReplyComposeSending(true)
+    setReplyComposeError(null)
+    try {
+      const path = replyCompose.sourceType === 'project'
+        ? `/api/v1/project-mails/${replyCompose.sourceId}/send-proposal`
+        : `/api/v1/engineer-mails/${replyCompose.sourceId}/send-proposal`
+      const form = new FormData()
+      form.append('to',      replyCompose.to)
+      if (replyCompose.toName) form.append('to_name', replyCompose.toName)
+      form.append('subject', replyCompose.subject)
+      form.append('body',    replyComposeBody)
+      await axios.post(path, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+      const composedThread = { type: replyCompose.sourceType, source_id: replyCompose.sourceId } as ProposalThread
+      setReplyCompose(null)
+      reloadThreadDetail(composedThread)
+    } catch (e) {
+      setReplyComposeError((e as ApiError).response?.data?.message ?? '送信に失敗しました')
+    } finally {
+      setReplyComposeSending(false)
+    }
+  }
+
+  // 送信→再送信
+  const [resendingHistoryId, setResendingHistoryId] = useState<number | null>(null)
+  const handleResendThread = async (campaignId: number, historyId: number, to: string, t: ProposalThread) => {
+    if (!confirm(`${to} に再送信しますか？`)) return
+    setResendingHistoryId(historyId)
+    try {
+      await axios.post(`/api/v1/delivery-campaigns/${campaignId}/histories/${historyId}/resend`)
+      reloadThreadDetail(t)
+    } catch (e) {
+      alert((e as ApiError).response?.data?.message ?? '再送信に失敗しました')
+    } finally {
+      setResendingHistoryId(null)
+    }
+  }
+
+  // 添付ファイルダウンロード
+  const handleDownloadAttachment = async (emailId: number, att: ThreadAttachment) => {
+    try {
+      const res = await axios.get(`/api/v1/emails/${emailId}/attachments/${att.id}/download`, {
+        responseType: 'blob',
+      })
+      const url = URL.createObjectURL(new Blob([res.data], { type: att.mime_type ?? 'application/octet-stream' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = att.filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert((e as ApiError).response?.data?.message ?? '添付ファイルの取得に失敗しました')
+    }
+  }
+
   const [importing, setImporting] = useState(false)
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null)
   const [importResult, setImportResult] = useState<string | null>(null)
@@ -1587,6 +1674,11 @@ export default function DeliveriesPage() {
                                 <span className="text-xs text-gray-400">
                                   {formatDateTime((m.sent_at ?? m.received_at) ?? '')}
                                 </span>
+                                {m.resent_at && (
+                                  <span className="text-xs text-amber-600">
+                                    再送信: {formatDateTime(m.resent_at)}
+                                  </span>
+                                )}
                                 {m.type === 'sent' && m.total_count != null && (
                                   <span className="text-xs text-gray-500">
                                     送信数: {m.total_count}件（成功: {m.success_count ?? 0} / 失敗: {m.failed_count ?? 0}）
@@ -1597,11 +1689,53 @@ export default function DeliveriesPage() {
                                     From: {m.from_name ?? m.from ?? ''}
                                   </span>
                                 )}
+                                <div className="ml-auto flex items-center gap-2">
+                                  {m.type === 'received' && m.from && (
+                                    <button
+                                      onClick={() => setReplyCompose({
+                                        sourceType: t.type, sourceId: t.source_id,
+                                        to: m.from!, toName: m.from_name ?? null,
+                                        subject: m.subject?.startsWith('Re:') ? m.subject : `Re: ${m.subject ?? ''}`,
+                                      })}
+                                      className="text-xs text-blue-600 hover:underline"
+                                    >
+                                      ↗ 送信
+                                    </button>
+                                  )}
+                                  {m.type === 'sent' && m.history_id && m.campaign_id && (
+                                    <button
+                                      onClick={() => handleResendThread(m.campaign_id!, m.history_id!, m.to ?? '', t)}
+                                      disabled={resendingHistoryId === m.history_id}
+                                      className="text-xs text-orange-600 hover:underline disabled:opacity-50 disabled:no-underline"
+                                    >
+                                      {resendingHistoryId === m.history_id ? '送信中…' : '↻ 再送信'}
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                               <p className="text-sm font-semibold text-gray-800 mb-1">{m.subject}</p>
                               <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans break-words">
                                 {m.type === 'sent' ? (m.body ?? '') : (m.body_text ?? '')}
                               </pre>
+                              {m.type === 'received' && m.attachments && m.attachments.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-2">
+                                  {m.attachments.map(att => (
+                                    <button
+                                      key={att.id}
+                                      onClick={() => handleDownloadAttachment(m.email_id!, att)}
+                                      className="inline-flex items-center gap-1 text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 rounded px-2 py-1"
+                                      title={att.mime_type ?? ''}
+                                    >
+                                      📎 {att.filename}
+                                      {att.size != null && (
+                                        <span className="text-gray-400 ml-1">
+                                          ({Math.ceil(att.size / 1024)}KB)
+                                        </span>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -2128,6 +2262,69 @@ export default function DeliveriesPage() {
                 className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
               >
                 {newFormSaving ? '登録中...' : '登録'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 受信メールへの返信モーダル ─────────────────── */}
+      {replyCompose && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">受信メールに送信</h2>
+
+            {replyComposeError && (
+              <div className="mb-3 px-3 py-2 bg-red-50 text-red-700 text-sm rounded">
+                {replyComposeError}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">宛先</label>
+                <input
+                  type="email"
+                  value={replyCompose.to}
+                  onChange={e => setReplyCompose(f => f ? { ...f, to: e.target.value } : f)}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">件名</label>
+                <input
+                  type="text"
+                  value={replyCompose.subject}
+                  onChange={e => setReplyCompose(f => f ? { ...f, subject: e.target.value } : f)}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">本文</label>
+                <textarea
+                  value={replyComposeBody}
+                  onChange={e => setReplyComposeBody(e.target.value)}
+                  rows={12}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  placeholder="本文を入力..."
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-5">
+              <button
+                onClick={() => setReplyCompose(null)}
+                disabled={replyComposeSending}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleReplyComposeSend}
+                disabled={replyComposeSending || !replyCompose.to || !replyCompose.subject || !replyComposeBody}
+                className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
+              >
+                {replyComposeSending ? '送信中…' : '送信する'}
               </button>
             </div>
           </div>
