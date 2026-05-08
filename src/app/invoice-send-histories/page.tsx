@@ -206,7 +206,7 @@ export default function InvoiceSendHistoriesPage() {
                     <span className={`px-1.5 py-0.5 rounded text-xs ${
                       r.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     }`}>
-                      {r.status === 'sent' ? '送信済' : '失敗'}
+                      {r.status === 'sent' ? (r.method === 'post' ? '発送済' : '送信済') : '失敗'}
                     </span>
                   </td>
                   <td className="px-2 py-2 text-xs text-gray-500 truncate" title={r.attachments_meta?.join(' / ')}>
