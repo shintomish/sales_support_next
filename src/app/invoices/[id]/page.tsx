@@ -274,7 +274,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [postItems, setPostItems]         = useState({ invoice: true, cover: false, timesheet: false, transport: false });
 
   const recordPost = async () => {
-    if (!confirm(`${postSentAt} に郵送したことを記録します。よろしいですか？`)) return;
     setBusy(true);
     try {
       const items = [
@@ -289,7 +288,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         items,
       });
       setPostModalOpen(false);
-      alert('郵送記録を保存しました');
+      setToast('記録しました');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '記録に失敗しました';
       alert(msg);
