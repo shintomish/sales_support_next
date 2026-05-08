@@ -271,7 +271,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [postModalOpen, setPostModalOpen] = useState(false);
   const [postSentAt, setPostSentAt]       = useState<string>(new Date().toISOString().slice(0, 10));
   const [postNote, setPostNote]           = useState('');
-  const [postItems, setPostItems]         = useState({ invoice: true, cover: false, timesheet: false, transport: false });
+  const [postItems, setPostItems]         = useState({ invoice: false, cover: false, timesheet: false, transport: false });
 
   const recordPost = async () => {
     setBusy(true);
@@ -622,7 +622,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <Button variant="outline" onClick={() => {
               setPostSentAt(new Date().toISOString().slice(0, 10));
               setPostNote('');
-              setPostItems({ invoice: true, cover: false, timesheet: false, transport: false });
+              setPostItems({ invoice: false, cover: false, timesheet: false, transport: false });
               setPostModalOpen(true);
             }}
             disabled={busy || !invoice.approved}
