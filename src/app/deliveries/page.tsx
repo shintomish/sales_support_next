@@ -23,8 +23,8 @@ type DeliveryAddress = {
 }
 
 const UNSUBSCRIBE_REASON_LABEL: Record<string, string> = {
-  self_unsubscribed: '本人による停止',
-  user_disabled:     'ユーザーにより停止',
+  self_unsubscribed: '担当者による停止',
+  user_disabled:     '客先により停止',
   system:            'システム',
 }
 
@@ -2318,8 +2318,8 @@ export default function DeliveriesPage() {
                     className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                   >
                     <option value="">未設定</option>
-                    <option value="user_disabled">ユーザーにより停止</option>
-                    <option value="self_unsubscribed">本人による停止</option>
+                    <option value="user_disabled">客先により停止</option>
+                    <option value="self_unsubscribed">担当者による停止</option>
                     <option value="system">システム</option>
                   </select>
                 </div>
