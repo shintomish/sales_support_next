@@ -19,6 +19,26 @@ interface InvoiceLine {
   is_expense?: boolean;
 }
 
+interface MailCandidate { name: string; email: string }
+interface MailTemplate {
+  subject: string;
+  body: string;
+  candidates: MailCandidate[];
+  delivery_method: 'mail' | 'post' | 'both' | null;
+}
+interface SendHistoryRow {
+  id: number;
+  method: 'mail' | 'post';
+  to_emails: string[] | null;
+  cc_emails: string[] | null;
+  subject: string | null;
+  attachments_meta: string[] | null;
+  status: 'sent' | 'failed';
+  error_message: string | null;
+  sent_at: string | null;
+  sent_by_name: string | null;
+}
+
 interface Invoice {
   id: number;
   invoice_number: string;
@@ -246,6 +266,62 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     } finally { setBusy(false); }
   };
 
+  // メール送信モーダル
+  const [mailModalOpen, setMailModalOpen] = useState(false);
+  const [mailTo, setMailTo]               = useState<string[]>([]);
+  const [mailCc, setMailCc]               = useState<string[]>([]);
+  const [mailSubject, setMailSubject]     = useState('');
+  const [mailBody, setMailBody]           = useState('');
+  const [mailCandidates, setMailCandidates] = useState<MailCandidate[]>([]);
+  const [mailDeliveryMethod, setMailDeliveryMethod] = useState<'mail' | 'post' | 'both' | null>(null);
+  const [attachInvoice, setAttachInvoice] = useState(true);
+  const [attachCover, setAttachCover]     = useState(false);
+  const [mailCoverItems, setMailCoverItems] = useState({ invoice: true, timesheet: false, transport: false });
+  const [sendHistories, setSendHistories] = useState<SendHistoryRow[]>([]);
+
+  const openMailModal = async () => {
+    setBusy(true);
+    try {
+      const [tplRes, histRes] = await Promise.all([
+        apiClient.get<MailTemplate>(`/api/v1/invoices/${id}/mail-template`),
+        apiClient.get<{ data: SendHistoryRow[] }>(`/api/v1/invoices/${id}/send-histories`),
+      ]);
+      setMailSubject(tplRes.data.subject);
+      setMailBody(tplRes.data.body);
+      setMailCandidates(tplRes.data.candidates ?? []);
+      setMailDeliveryMethod(tplRes.data.delivery_method);
+      setSendHistories(histRes.data.data ?? []);
+      setMailTo([]); setMailCc([]);
+      setAttachInvoice(true); setAttachCover(false);
+      setMailModalOpen(true);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'テンプレート取得に失敗しました';
+      alert(msg);
+    } finally { setBusy(false); }
+  };
+
+  const sendMail = async () => {
+    if (mailTo.length === 0) { alert('TO を1件以上指定してください'); return; }
+    if (!mailSubject || !mailBody) { alert('件名・本文を入力してください'); return; }
+    setBusy(true);
+    try {
+      await apiClient.post(`/api/v1/invoices/${id}/send-mail`, {
+        to_emails: mailTo,
+        cc_emails: mailCc,
+        subject:   mailSubject,
+        body:      mailBody,
+        attach_invoice:      attachInvoice,
+        attach_cover_letter: attachCover,
+        cover_items:         mailCoverItems,
+      });
+      setMailModalOpen(false);
+      alert('メールを送信しました');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'メール送信に失敗しました';
+      alert(msg);
+    } finally { setBusy(false); }
+  };
+
   const remove = async () => {
     const label = invoice?.status === 'issued' ? '発行済' : '下書き';
     if (!confirm(`この請求書（${label}）を削除します。\n誤発行のリカバリ用です。よろしいですか？`)) return;
@@ -457,12 +533,133 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <Button variant="outline" onClick={() => setEnvelopeModalOpen(true)} disabled={busy}>
             ✉️ 長3封筒 PDF
           </Button>
+          <Button variant="outline" onClick={openMailModal} disabled={busy}>
+            📧 メール送信
+          </Button>
           <Button variant="outline" onClick={remove} disabled={busy}
             className="text-red-600 border-red-200 hover:bg-red-50 ml-auto">
             削除
           </Button>
         </div>
       </div>
+
+      {/* メール送信モーダル */}
+      {mailModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setMailModalOpen(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold">📧 請求書をメールで送信</h2>
+              {mailDeliveryMethod && (
+                <span className={`text-xs px-2 py-1 rounded ${
+                  mailDeliveryMethod === 'mail' ? 'bg-blue-100 text-blue-700'
+                  : mailDeliveryMethod === 'both' ? 'bg-purple-100 text-purple-700'
+                  : 'bg-amber-100 text-amber-700'
+                }`}>
+                  顧客送付方法: {mailDeliveryMethod === 'mail' ? 'メール' : mailDeliveryMethod === 'both' ? 'メール+郵送' : '郵送のみ'}
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {/* 送信先候補（クリックで TO に追加） */}
+              {mailCandidates.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">候補（クリックで TO に追加）:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {mailCandidates.map((c) => (
+                      <button key={c.email}
+                        type="button"
+                        onClick={() => { if (!mailTo.includes(c.email)) setMailTo([...mailTo, c.email]); }}
+                        className="text-xs px-2 py-0.5 rounded bg-gray-100 hover:bg-blue-100 text-gray-700">
+                        {c.name} &lt;{c.email}&gt;
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">TO（カンマ区切り）</label>
+                <Input value={mailTo.join(', ')}
+                  onChange={(e) => setMailTo(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                  placeholder="example@company.co.jp, ..." />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">CC（カンマ区切り・任意）</label>
+                <Input value={mailCc.join(', ')}
+                  onChange={(e) => setMailCc(e.target.value.split(',').map(s => s.trim()).filter(Boolean))} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">件名</label>
+                <Input value={mailSubject} onChange={(e) => setMailSubject(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">本文</label>
+                <textarea value={mailBody} onChange={(e) => setMailBody(e.target.value)} rows={12}
+                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm font-mono" />
+              </div>
+
+              <div className="border-t border-gray-100 pt-3">
+                <p className="text-xs font-semibold text-gray-700 mb-2">添付</p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={attachInvoice} onChange={(e) => setAttachInvoice(e.target.checked)} />
+                  請求書 PDF（{invoice.invoice_number}.pdf）
+                </label>
+                <label className="flex items-center gap-2 text-sm mt-1">
+                  <input type="checkbox" checked={attachCover} onChange={(e) => setAttachCover(e.target.checked)} />
+                  送付状 PDF
+                </label>
+                {attachCover && (
+                  <div className="ml-6 mt-1 space-y-1 text-xs">
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={mailCoverItems.invoice}
+                        onChange={(e) => setMailCoverItems(p => ({ ...p, invoice: e.target.checked }))} />
+                      御請求書
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={mailCoverItems.timesheet}
+                        onChange={(e) => setMailCoverItems(p => ({ ...p, timesheet: e.target.checked }))} />
+                      勤務表
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={mailCoverItems.transport}
+                        onChange={(e) => setMailCoverItems(p => ({ ...p, transport: e.target.checked }))} />
+                      交通費明細書
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* 送信履歴 */}
+              {sendHistories.length > 0 && (
+                <div className="border-t border-gray-100 pt-3">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">送信履歴</p>
+                  <div className="text-xs space-y-1 max-h-32 overflow-y-auto">
+                    {sendHistories.map((h) => (
+                      <div key={h.id} className="flex items-center gap-2">
+                        <span className={`px-1.5 py-0.5 rounded ${h.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {h.status === 'sent' ? '送信済' : '失敗'}
+                        </span>
+                        <span className="text-gray-500">{h.sent_at?.replace('T', ' ').slice(0, 16)}</span>
+                        <span className="text-gray-700 truncate">{h.subject}</span>
+                        <span className="text-gray-400 text-[10px]">→ {h.to_emails?.join(', ')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5">
+              <Button variant="outline" onClick={() => setMailModalOpen(false)} disabled={busy}>キャンセル</Button>
+              <Button onClick={sendMail} disabled={busy || mailTo.length === 0}
+                className="bg-blue-600 hover:bg-blue-700 text-white">
+                {busy ? '送信中…' : '送信する'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 封筒モーダル */}
       {envelopeModalOpen && (

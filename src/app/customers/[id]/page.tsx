@@ -47,6 +47,7 @@ interface Customer {
   invoice_number: string | null;
   payment_site: number | null;
   vendor_payment_site: number | null;
+  invoice_delivery_method: 'mail' | 'post' | 'both' | null;
   primary_contact: { id: number; name: string; email: string | null } | null;
   created_at: string;
   contacts: Contact[];
@@ -193,6 +194,14 @@ export default function CustomerDetailPage() {
               <p className="text-xs text-gray-400 mb-1">支払サイト（仕入先）</p>
               <p className="text-sm font-medium text-gray-800">
                 {customer.vendor_payment_site != null ? `${customer.vendor_payment_site}日` : <Em />}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">請求書送付方法</p>
+              <p className="text-sm font-medium text-gray-800">
+                {customer.invoice_delivery_method === 'mail' ? '✉️ メール'
+                 : customer.invoice_delivery_method === 'both' ? '✉️ メール + 📮 郵送'
+                 : '📮 郵送'}
               </p>
             </div>
             {customer.primary_contact && (

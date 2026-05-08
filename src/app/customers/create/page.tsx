@@ -123,6 +123,23 @@ export default function CustomerCreatePage() {
             ))}
 
             <div className="space-y-1.5 col-span-2">
+              <Label htmlFor="invoice_delivery_method" className="text-sm font-medium text-gray-700">
+                請求書送付方法
+              </Label>
+              <select
+                id="invoice_delivery_method"
+                name="invoice_delivery_method"
+                value={form.invoice_delivery_method ?? 'post'}
+                onChange={(e) => setForm(p => ({ ...p, invoice_delivery_method: e.target.value }))}
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="post">郵送</option>
+                <option value="mail">メール</option>
+                <option value="both">メール + 郵送</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5 col-span-2">
               <Label htmlFor="notes" className="text-sm font-medium text-gray-700">備考</Label>
               <textarea
                 id="notes" rows={4}
