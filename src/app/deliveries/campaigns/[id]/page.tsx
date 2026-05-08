@@ -98,6 +98,8 @@ export default function CampaignDetailPage() {
   const [search, setSearch] = useState('')
   const [replyModal, setReplyModal] = useState<SendHistory | null>(null)
   const [resendingId, setResendingId] = useState<number | null>(null)
+  const PAGE_SIZE = 200
+  const [page, setPage] = useState(1)
 
   const fetchCampaign = () => {
     axios.get(`/api/v1/delivery-campaigns/${id}`)
@@ -132,6 +134,12 @@ export default function CampaignDetailPage() {
     }
     return true
   }) ?? []
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const paged      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  // フィルタ変更で件数が減ったらページを戻す
+  useEffect(() => { if (page > totalPages) setPage(totalPages) }, [totalPages, page])
 
   const repliedCount = campaign?.histories.filter(h => h.status === 'replied').length ?? 0
   const replyRate = campaign && campaign.success_count > 0
@@ -231,12 +239,12 @@ export default function CampaignDetailPage() {
           type="text"
           placeholder="メール・名前で検索"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); setPage(1) }}
           className="border border-gray-300 rounded px-3 py-2 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-blue-300"
         />
         <select
           value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
+          onChange={e => { setStatusFilter(e.target.value as typeof statusFilter); setPage(1) }}
           className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
         >
           <option value="">すべて</option>
@@ -245,12 +253,16 @@ export default function CampaignDetailPage() {
           <option value="failed">失敗</option>
         </select>
         <span className="text-sm text-gray-500">{filtered.length} 件</span>
+        {totalPages > 1 && (
+          <span className="text-xs text-gray-400 ml-auto">{safePage} / {totalPages} ページ</span>
+        )}
       </div>
 
-      {/* 送信履歴テーブル */}
+      {/* 送信履歴テーブル — ヘッダ固定・本体縦スクロール */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-gray-600">
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 460px)' }}>
+        <table className="min-w-full text-sm whitespace-nowrap">
+          <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
             <tr>
               <th className="px-4 py-3 text-left">名前</th>
               <th className="px-4 py-3 text-left">メールアドレス</th>
@@ -262,7 +274,7 @@ export default function CampaignDetailPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filtered.map(h => (
+            {paged.map(h => (
               <tr
                 key={h.id}
                 className={`transition-colors ${
@@ -329,7 +341,23 @@ export default function CampaignDetailPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
+
+      {/* ページネーション */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-3">
+          <span className="text-xs text-gray-500">
+            {(safePage - 1) * PAGE_SIZE + 1}〜{Math.min(safePage * PAGE_SIZE, filtered.length)} / {filtered.length} 件
+          </span>
+          <div className="flex gap-2">
+            <button disabled={safePage <= 1} onClick={() => setPage(p => p - 1)}
+              className="text-xs border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">前へ</button>
+            <button disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)}
+              className="text-xs border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">次へ</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
