@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import SortableHeader from '@/components/SortableHeader';
 
 interface HistoryRow {
   id: number;
@@ -42,17 +43,56 @@ const recentMonths = (): string[] => {
   return arr;
 };
 
+/** 当月-1 の YYYY-MM を返す */
+const previousMonth = (): string => {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+type SortField = 'invoice_number' | 'customer_name' | 'subject' | 'to' | 'sent_at' | 'sent_by';
+
 const yen = (n: string | number | null | undefined) => n == null ? '-' : `¥${Number(n).toLocaleString()}`;
 const fmt = (s: string | null) => s ? s.replace('T', ' ').slice(0, 16) : '-';
 
 export default function InvoiceSendHistoriesPage() {
   const [items,   setItems]   = useState<HistoryRow[]>([]);
   const [total,   setTotal]   = useState(0);
-  const [yearMonth, setYearMonth] = useState('');
+  const [yearMonth, setYearMonth] = useState<string>(previousMonth());
   const [status,  setStatus]  = useState<'' | 'sent' | 'failed'>('');
   const [method,  setMethod]  = useState<'' | 'mail' | 'post'>('');
   const [q,       setQ]       = useState('');
   const [loading, setLoading] = useState(false);
+  const [sortBy,  setSortBy]  = useState<SortField>('sent_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (field: string) => {
+    const f = field as SortField;
+    if (sortBy === f) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(f); setSortOrder('asc'); }
+  };
+
+  const sortedItems = useMemo(() => {
+    const arr = [...items];
+    const key = (r: HistoryRow): string => {
+      switch (sortBy) {
+        case 'invoice_number': return r.invoice_number ?? '';
+        case 'customer_name':  return r.customer_name ?? '';
+        case 'subject':        return r.subject ?? '';
+        case 'to':             return (r.to_names ?? r.to_emails ?? []).join(', ');
+        case 'sent_at':        return r.sent_at ?? '';
+        case 'sent_by':        return r.sent_by_name ?? '';
+      }
+    };
+    arr.sort((a, b) => {
+      const ka = key(a), kb = key(b);
+      if (ka < kb) return sortOrder === 'asc' ? -1 : 1;
+      if (ka > kb) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [items, sortBy, sortOrder]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -118,17 +158,17 @@ export default function InvoiceSendHistoriesPage() {
           <table className="w-full text-sm table-fixed">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
-                <th className="text-left   px-2 py-3 font-semibold w-[150px]">請求書番号</th>
+                <SortableHeader label="請求書番号" field="invoice_number" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[150px]" />
                 <th className="text-left   px-2 py-3 font-semibold w-[70px]">対象月</th>
-                <th className="text-left   px-2 py-3 font-semibold w-[150px]">取引先</th>
-                <th className="text-left   px-2 py-3 font-semibold">件名</th>
-                <th className="text-left   px-2 py-3 font-semibold w-[120px]">送信日時</th>
+                <SortableHeader label="取引先" field="customer_name" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[150px]" />
+                <SortableHeader label="件名"   field="subject"       sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3" />
+                <SortableHeader label="TO"     field="to"            sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[120px]" />
                 <th className="text-right  px-2 py-3 font-semibold w-[100px]">金額</th>
-                <th className="text-left   px-2 py-3 font-semibold w-[120px]">TO</th>
                 <th className="text-center px-2 py-3 font-semibold w-[80px]">手段</th>
                 <th className="text-center px-2 py-3 font-semibold w-[70px]">状態</th>
                 <th className="text-left   px-2 py-3 font-semibold w-[70px]">添付</th>
-                <th className="text-left   px-2 py-3 font-semibold w-[100px]">送信者</th>
+                <SortableHeader label="送信日時" field="sent_at" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[120px]" />
+                <SortableHeader label="送信者"   field="sent_by" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -136,7 +176,7 @@ export default function InvoiceSendHistoriesPage() {
                 <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
               ) : items.length === 0 ? (
                 <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">送信履歴はありません</td></tr>
-              ) : items.map((r) => (
+              ) : sortedItems.map((r) => (
                 <tr key={r.id} className="hover:bg-blue-50">
                   <td className="px-2 py-2 font-mono text-xs truncate" title={r.invoice_number ?? ''}>
                     {r.invoice_id ? (
@@ -150,16 +190,16 @@ export default function InvoiceSendHistoriesPage() {
                     {r.customer_name ?? '-'}
                   </td>
                   <td className="px-2 py-2 truncate" title={r.subject ?? ''}>{r.subject ?? '-'}</td>
-                  <td className="px-2 py-2 text-gray-600 text-xs truncate">{fmt(r.sent_at)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums truncate">{yen(r.invoice_total)}</td>
                   <td className="px-2 py-2 text-gray-600 text-xs truncate" title={r.to_emails?.join(', ')}>
                     {r.to_names && r.to_names.length > 0 ? r.to_names.join(', ') : (r.to_emails?.join(', ') ?? '-')}
                   </td>
+                  <td className="px-2 py-2 text-right tabular-nums truncate">{yen(r.invoice_total)}</td>
                   <td className="px-2 py-2 text-center">
-                    <span className={`px-1.5 py-0.5 rounded text-xs ${
+                    <span title={r.method === 'mail' ? 'メール' : '郵送'}
+                      className={`px-1.5 py-0.5 rounded text-xs cursor-help ${
                       r.method === 'mail' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
                     }`}>
-                      {r.method === 'mail' ? '📧' : '📮'}
+                      {r.method === 'mail' ? '📧 メール' : '📮 郵送'}
                     </span>
                   </td>
                   <td className="px-2 py-2 text-center">
@@ -174,6 +214,7 @@ export default function InvoiceSendHistoriesPage() {
                       ? `📎 ${r.attachments_meta.length}件`
                       : '-'}
                   </td>
+                  <td className="px-2 py-2 text-gray-600 text-xs truncate">{fmt(r.sent_at)}</td>
                   <td className="px-2 py-2 text-gray-600 text-xs truncate">{r.sent_by_name ?? '-'}</td>
                 </tr>
               ))}
