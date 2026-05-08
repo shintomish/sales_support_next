@@ -650,30 +650,29 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               <div>
                 <p className="text-xs font-semibold text-gray-700 mb-2">同封物</p>
                 <div className="space-y-1 text-sm">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="appearance-auto w-4 h-4 cursor-pointer"
-                      checked={postItems.invoice}
-                      onChange={(e) => setPostItems(p => ({ ...p, invoice: e.target.checked }))} />
-                    請求書
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="appearance-auto w-4 h-4 cursor-pointer"
-                      checked={postItems.cover}
-                      onChange={(e) => setPostItems(p => ({ ...p, cover: e.target.checked }))} />
-                    送付状
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="appearance-auto w-4 h-4 cursor-pointer"
-                      checked={postItems.timesheet}
-                      onChange={(e) => setPostItems(p => ({ ...p, timesheet: e.target.checked }))} />
-                    勤務表
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="appearance-auto w-4 h-4 cursor-pointer"
-                      checked={postItems.transport}
-                      onChange={(e) => setPostItems(p => ({ ...p, transport: e.target.checked }))} />
-                    交通費明細書
-                  </label>
+                  {([
+                    { key: 'invoice'   as const, label: '請求書' },
+                    { key: 'cover'     as const, label: '送付状' },
+                    { key: 'timesheet' as const, label: '勤務表' },
+                    { key: 'transport' as const, label: '交通費明細書' },
+                  ]).map((it) => (
+                    <button key={it.key} type="button"
+                      onClick={() => setPostItems(p => ({ ...p, [it.key]: !p[it.key] }))}
+                      className="flex items-center gap-2 w-full text-left">
+                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded border-2 transition-colors ${
+                        postItems[it.key]
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'bg-white border-gray-400'
+                      }`}>
+                        {postItems[it.key] && (
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.8 3.8 6.8-6.8a1 1 0 011.4 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </span>
+                      {it.label}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div>
