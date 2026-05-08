@@ -70,11 +70,14 @@ export default function TimesheetsPage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   const dealId = Number(id);
 
+  const months = recentMonths();
+  // デフォルトは前月（当月-1）。請求集計画面と揃える
   const [deal,    setDeal]    = useState<Deal | null>(null);
   const [records, setRecords] = useState<Record<string, WorkRecord>>({});
   const [contract, setContract] = useState<ContractSettlement | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>(months[1] ?? months[0]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -95,8 +98,6 @@ export default function TimesheetsPage({ params }: { params: Promise<{ id: strin
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const months = recentMonths();
-
   return (
     <div className="h-full flex flex-col p-6 max-w-7xl mx-auto w-full">
       <div className="flex-shrink-0 mb-4">
@@ -110,7 +111,19 @@ export default function TimesheetsPage({ params }: { params: Promise<{ id: strin
             <span className="font-semibold">{deal.title}</span>
           </p>
         )}
-        <p className="text-xs text-gray-400 mt-1">直近12ヶ月分を表示。行をクリックで編集</p>
+      </div>
+
+      {/* 年月セレクト */}
+      <div className="flex-shrink-0 mb-3 flex items-center gap-3">
+        <label className="text-sm font-semibold text-gray-700">対象月</label>
+        <select
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+          className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {months.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <span className="text-xs text-gray-400">行をクリックで編集</span>
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -133,7 +146,7 @@ export default function TimesheetsPage({ params }: { params: Promise<{ id: strin
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
-              ) : months.map((ym) => {
+              ) : [selectedMonth].map((ym) => {
                 const r = records[ym];
                 const excess = computeExcessHours(r?.actual_hours ?? null, contract);
                 return (
