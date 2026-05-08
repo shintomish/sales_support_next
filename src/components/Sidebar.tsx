@@ -57,10 +57,11 @@ export default function Sidebar() {
     {
       type: 'group', key: 'invoicing', label: '請求書管理', icon: '🧾', sesOnly: true,
       items: [
-        { label: 'SES台帳',    path: '/ses-contracts',     icon: '📋' },
-        { label: '勤務表',     path: '/timesheets',        icon: '⏰' },
-        { label: '請求書一覧', path: '/invoices',          icon: '📄' },
-        { label: '請求集計',   path: '/billing-summaries', icon: '💴' },
+        { label: 'SES台帳',     path: '/ses-contracts',          icon: '📋' },
+        { label: '勤務表',      path: '/timesheets',             icon: '⏰' },
+        { label: '請求書作成',  path: '/billing-summaries',      icon: '💴' },
+        { label: '請求書一覧',  path: '/invoices',               icon: '📄' },
+        { label: '請求書送信履歴', path: '/invoice-send-histories', icon: '📤' },
       ],
     },
     {
