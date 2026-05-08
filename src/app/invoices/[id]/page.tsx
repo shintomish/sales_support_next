@@ -573,7 +573,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <Button variant="outline" onClick={() => save()} disabled={busy}>
             {busy ? '保存中...' : '保存'}
           </Button>
-          <Button onClick={generatePdf} disabled={busy} className="bg-blue-600 hover:bg-blue-700 text-white">
+          <Button onClick={generatePdf}
+            disabled={busy || invoice.approved}
+            title={invoice.approved ? '承認済の請求書は再生成できません' : '保存して PDF を生成'}
+            className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
             📄 PDF 生成
           </Button>
           <Button variant="outline" onClick={() => setCoverModalOpen(true)} disabled={busy}>
