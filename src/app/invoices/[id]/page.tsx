@@ -649,7 +649,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               </div>
               <div>
                 <p className="text-xs font-semibold text-gray-700 mb-2">同封物</p>
-                <div className="space-y-1.5 text-sm">
+                <div className="flex flex-wrap gap-2">
                   {([
                     { key: 'invoice'   as const, label: '請求書' },
                     { key: 'cover'     as const, label: '送付状' },
@@ -661,27 +661,21 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                       <button key={it.key} type="button"
                         onClick={() => setPostItems(p => ({ ...p, [it.key]: !p[it.key] }))}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          width: '100%', textAlign: 'left',
-                          padding: '4px 6px', borderRadius: 4,
-                          background: checked ? '#eff6ff' : 'transparent',
-                          border: 'none', cursor: 'pointer',
-                          fontSize: 14, color: '#1f2937',
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          padding: '6px 12px', borderRadius: 999,
+                          background: checked ? '#2563eb' : '#f3f4f6',
+                          color: checked ? '#fff' : '#374151',
+                          border: checked ? '2px solid #2563eb' : '2px solid #d1d5db',
+                          fontSize: 13, fontWeight: 500,
+                          cursor: 'pointer',
                         }}>
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                          width: 20, height: 20, borderRadius: 4, flexShrink: 0,
-                          background: checked ? '#2563eb' : '#fff',
-                          border: checked ? '2px solid #2563eb' : '2px solid #9ca3af',
-                          color: '#fff', fontWeight: 'bold', fontSize: 14, lineHeight: 1,
-                        }}>
-                          {checked && '✓'}
-                        </span>
+                        <span style={{ fontSize: 14, lineHeight: 1 }}>{checked ? '✓' : '＋'}</span>
                         {it.label}
                       </button>
                     );
                   })}
                 </div>
+                <p className="text-xs text-gray-400 mt-1">タップで選択／解除</p>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">備考（任意）</label>
