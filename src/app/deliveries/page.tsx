@@ -37,6 +37,7 @@ type EditAddressForm = {
   tel: string
   occupation: string
   is_active: boolean
+  unsubscribe_reason: string
 }
 
 type SavedAddressState = {
@@ -157,6 +158,13 @@ type PaginatedThreads = {
   total: number
 }
 
+type ThreadAttachment = {
+  id: number
+  filename: string
+  mime_type: string | null
+  size: number | null
+}
+
 type ThreadMessage = {
   type: 'sent' | 'received'
   campaign_id?: number
@@ -170,11 +178,13 @@ type ThreadMessage = {
   body?: string
   body_text?: string
   sent_at?: string | null
+  resent_at?: string | null
   received_at?: string | null
   status?: string
   total_count?: number
   success_count?: number
   failed_count?: number
+  attachments?: ThreadAttachment[]
 }
 
 const THREAD_STATUS_COLORS: Record<string, string> = {
@@ -770,7 +780,7 @@ export default function DeliveriesPage() {
   // ── 編集モーダル ─────────────────────────────────────
   const [editingAddrId, setEditingAddrId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState<EditAddressForm>({
-    email: '', name: '', zip_code: '', prefecture: '', address: '', tel: '', occupation: '', is_active: true,
+    email: '', name: '', zip_code: '', prefecture: '', address: '', tel: '', occupation: '', is_active: true, unsubscribe_reason: '',
   })
   const [editFormError, setEditFormError] = useState<string | null>(null)
   const [editFormSaving, setEditFormSaving] = useState(false)
@@ -778,14 +788,15 @@ export default function DeliveriesPage() {
   const startEditAddress = (addr: DeliveryAddress) => {
     setEditingAddrId(addr.id)
     setEditForm({
-      email:      addr.email,
-      name:       addr.name ?? '',
-      zip_code:   addr.zip_code ?? '',
-      prefecture: addr.prefecture ?? '',
-      address:    addr.address ?? '',
-      tel:        addr.tel ?? '',
-      occupation: addr.occupation ?? '',
-      is_active:  addr.is_active,
+      email:              addr.email,
+      name:               addr.name ?? '',
+      zip_code:           addr.zip_code ?? '',
+      prefecture:         addr.prefecture ?? '',
+      address:            addr.address ?? '',
+      tel:                addr.tel ?? '',
+      occupation:         addr.occupation ?? '',
+      is_active:          addr.is_active,
+      unsubscribe_reason: addr.unsubscribe_reason ?? '',
     })
     setEditFormError(null)
   }
@@ -796,14 +807,15 @@ export default function DeliveriesPage() {
     setEditFormError(null)
     try {
       await axios.patch(`/api/v1/delivery-addresses/${editingAddrId}`, {
-        email:      editForm.email,
-        name:       editForm.name || null,
-        zip_code:   editForm.zip_code || null,
-        prefecture: editForm.prefecture || null,
-        address:    editForm.address || null,
-        tel:        editForm.tel || null,
-        occupation: editForm.occupation || null,
-        is_active:  editForm.is_active,
+        email:              editForm.email,
+        name:               editForm.name || null,
+        zip_code:           editForm.zip_code || null,
+        prefecture:         editForm.prefecture || null,
+        address:            editForm.address || null,
+        tel:                editForm.tel || null,
+        occupation:         editForm.occupation || null,
+        is_active:          editForm.is_active,
+        unsubscribe_reason: editForm.is_active ? null : (editForm.unsubscribe_reason || null),
       })
       setEditingAddrId(null)
       fetchAddresses()
@@ -2019,6 +2031,21 @@ export default function DeliveriesPage() {
                   有効（一斉配信に含める）
                 </label>
               </div>
+              {!editForm.is_active && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">停止理由</label>
+                  <select
+                    value={editForm.unsubscribe_reason}
+                    onChange={e => setEditForm(f => ({ ...f, unsubscribe_reason: e.target.value }))}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  >
+                    <option value="">未設定</option>
+                    <option value="user_disabled">ユーザーにより停止</option>
+                    <option value="self_unsubscribed">本人による停止</option>
+                    <option value="system">システム</option>
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
