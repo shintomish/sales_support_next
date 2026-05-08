@@ -651,25 +651,25 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <p className="text-xs font-semibold text-gray-700 mb-2">同封物</p>
                 <div className="space-y-1 text-sm">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="w-4 h-4 accent-blue-600"
+                    <input type="checkbox" style={{ width: 16, height: 16, accentColor: '#2563eb', appearance: 'auto' }}
                       checked={postItems.invoice}
                       onChange={(e) => setPostItems(p => ({ ...p, invoice: e.target.checked }))} />
                     請求書
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="w-4 h-4 accent-blue-600"
+                    <input type="checkbox" style={{ width: 16, height: 16, accentColor: '#2563eb', appearance: 'auto' }}
                       checked={postItems.cover}
                       onChange={(e) => setPostItems(p => ({ ...p, cover: e.target.checked }))} />
                     送付状
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="w-4 h-4 accent-blue-600"
+                    <input type="checkbox" style={{ width: 16, height: 16, accentColor: '#2563eb', appearance: 'auto' }}
                       checked={postItems.timesheet}
                       onChange={(e) => setPostItems(p => ({ ...p, timesheet: e.target.checked }))} />
                     勤務表
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="w-4 h-4 accent-blue-600"
+                    <input type="checkbox" style={{ width: 16, height: 16, accentColor: '#2563eb', appearance: 'auto' }}
                       checked={postItems.transport}
                       onChange={(e) => setPostItems(p => ({ ...p, transport: e.target.checked }))} />
                     交通費明細書
