@@ -35,6 +35,7 @@ export default function CustomerEditPage() {
   const [isSupplier, setIsSupplier] = useState(false);
   const [isCustomer, setIsCustomer] = useState(true);
   const [primaryContactId, setPrimaryContactId] = useState<string>('');
+  const [secondaryContactIds, setSecondaryContactIds] = useState<string[]>(['', '', '', '']);
   const [contacts, setContacts]     = useState<ContactItem[]>([]);
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
@@ -67,6 +68,13 @@ export default function CustomerEditPage() {
       setIsSupplier(!!c.is_supplier);
       setIsCustomer(!!c.is_customer);
       setPrimaryContactId(c.primary_contact_id?.toString() ?? '');
+      const sec = (c.secondary_contact_ids ?? []) as number[];
+      setSecondaryContactIds([
+        sec[0]?.toString() ?? '',
+        sec[1]?.toString() ?? '',
+        sec[2]?.toString() ?? '',
+        sec[3]?.toString() ?? '',
+      ]);
       setContacts(c.contacts ?? []);
     } catch (err: unknown) {
       if ((err as ApiError).response?.status === 401) router.push('/login');
@@ -111,6 +119,7 @@ export default function CustomerEditPage() {
         is_supplier: isSupplier,
         is_customer: isCustomer,
         primary_contact_id: primaryContactId || null,
+        secondary_contact_ids: secondaryContactIds.filter(Boolean).map((s) => Number(s)),
       });
       setIsDirty(false);
       router.push(`/customers/${id}`);
@@ -220,20 +229,54 @@ export default function CustomerEditPage() {
             </div>
 
             {contacts.length > 0 && (
-              <div className="space-y-1.5 col-span-2 md:col-span-1">
-                <Label className="text-sm font-medium text-gray-700">主担当者</Label>
-                <select
-                  value={primaryContactId}
-                  onChange={e => { setPrimaryContactId(e.target.value); setIsDirty(true); }}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">選択しない</option>
-                  {contacts.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}{c.email ? ` (${c.email})` : ''}
-                    </option>
-                  ))}
-                </select>
+              <div className="space-y-3 col-span-2">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">主担当者</Label>
+                  <select
+                    value={primaryContactId}
+                    onChange={e => { setPrimaryContactId(e.target.value); setIsDirty(true); }}
+                    className="w-full md:w-1/2 border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">選択しない</option>
+                    {contacts.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}{c.email ? ` (${c.email})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {[0, 1, 2, 3].map((i) => {
+                  // 既に他のスロットで選ばれている contact id は除外（自スロットの値は残す）
+                  const taken = new Set<string>([
+                    primaryContactId,
+                    ...secondaryContactIds.filter((_, j) => j !== i),
+                  ].filter(Boolean));
+                  const filtered = contacts.filter(c =>
+                    !taken.has(String(c.id)) || String(c.id) === secondaryContactIds[i]
+                  );
+                  return (
+                    <div key={i}>
+                      <Label className="text-sm font-medium text-gray-700">担当者{i + 2}</Label>
+                      <select
+                        value={secondaryContactIds[i]}
+                        onChange={e => {
+                          const next = [...secondaryContactIds];
+                          next[i] = e.target.value;
+                          setSecondaryContactIds(next);
+                          setIsDirty(true);
+                        }}
+                        className="w-full md:w-1/2 border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">選択しない</option>
+                        {filtered.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}{c.email ? ` (${c.email})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
