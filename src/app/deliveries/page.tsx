@@ -439,13 +439,23 @@ export default function DeliveriesPage() {
   }
 
   // 受信→送信（提案メールとして単発送信）
-  const [replyCompose, setReplyCompose] = useState<{
+  // mode='thread': 提案スレッドからの返信（project-mails / engineer-mails の send-proposal）
+  // mode='campaign': 一斉配信履歴アコーディオンからの返信（delivery-campaigns/{id}/send-reply）
+  type ReplyComposeState = {
+    mode:     'thread'
     sourceType: 'project' | 'engineer'
     sourceId:   number
     to:         string
     toName:     string | null
     subject:    string
-  } | null>(null)
+  } | {
+    mode:        'campaign'
+    campaignId:  number
+    to:          string
+    toName:      string | null
+    subject:     string
+  }
+  const [replyCompose, setReplyCompose] = useState<ReplyComposeState | null>(null)
   const [replyComposeBody, setReplyComposeBody] = useState('')
   const [replyComposeSending, setReplyComposeSending] = useState(false)
   const [replyComposeError, setReplyComposeError] = useState<string | null>(null)
@@ -462,18 +472,35 @@ export default function DeliveriesPage() {
     setReplyComposeSending(true)
     setReplyComposeError(null)
     try {
-      const path = replyCompose.sourceType === 'project'
-        ? `/api/v1/project-mails/${replyCompose.sourceId}/send-proposal`
-        : `/api/v1/engineer-mails/${replyCompose.sourceId}/send-proposal`
-      const form = new FormData()
-      form.append('to',      replyCompose.to)
-      if (replyCompose.toName) form.append('to_name', replyCompose.toName)
-      form.append('subject', replyCompose.subject)
-      form.append('body',    replyComposeBody)
-      await axios.post(path, form, { headers: { 'Content-Type': 'multipart/form-data' } })
-      const composedThread = { type: replyCompose.sourceType, source_id: replyCompose.sourceId } as ProposalThread
-      setReplyCompose(null)
-      reloadThreadDetail(composedThread)
+      if (replyCompose.mode === 'thread') {
+        const path = replyCompose.sourceType === 'project'
+          ? `/api/v1/project-mails/${replyCompose.sourceId}/send-proposal`
+          : `/api/v1/engineer-mails/${replyCompose.sourceId}/send-proposal`
+        const form = new FormData()
+        form.append('to',      replyCompose.to)
+        if (replyCompose.toName) form.append('to_name', replyCompose.toName)
+        form.append('subject', replyCompose.subject)
+        form.append('body',    replyComposeBody)
+        await axios.post(path, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+        const composedThread = { type: replyCompose.sourceType, source_id: replyCompose.sourceId } as ProposalThread
+        setReplyCompose(null)
+        reloadThreadDetail(composedThread)
+      } else {
+        const campaignId = replyCompose.campaignId
+        await axios.post(`/api/v1/delivery-campaigns/${campaignId}/send-reply`, {
+          to:      replyCompose.to,
+          to_name: replyCompose.toName,
+          subject: replyCompose.subject,
+          body:    replyComposeBody,
+        })
+        setReplyCompose(null)
+        // 一覧と展開中アコーディオンを再取得
+        fetchCampaigns()
+        try {
+          const res = await axios.get<CampaignDetail>(`/api/v1/delivery-campaigns/${campaignId}`)
+          setCampDetailCache(prev => ({ ...prev, [campaignId]: res.data }))
+        } catch { /* noop */ }
+      }
     } catch (e) {
       setReplyComposeError((e as ApiError).response?.data?.message ?? '送信に失敗しました')
     } finally {
@@ -1513,12 +1540,6 @@ export default function DeliveriesPage() {
                                 {detail.histories.filter(h => h.status === 'replied').length > 0 && (
                                   <div className="space-y-3">
                                     {detail.histories.filter(h => h.status === 'replied').map(h => {
-                                      const sourceType: 'project' | 'engineer' | null =
-                                        camp.project_mail_id ? 'project'
-                                        : camp.engineer_mail_source_id ? 'engineer'
-                                        : null
-                                      const sourceId =
-                                        camp.project_mail_id ?? camp.engineer_mail_source_id ?? null
                                       const replyFrom = h.reply_from ?? h.email
                                       const replyFromName = h.reply_from_name ?? h.name ?? null
                                       return (
@@ -1537,12 +1558,13 @@ export default function DeliveriesPage() {
                                             </span>
                                           )}
                                           <div className="ml-auto flex items-center gap-2">
-                                            {sourceType && sourceId && replyFrom && (
+                                            {replyFrom && (
                                               <button
                                                 onClick={(e) => {
                                                   e.stopPropagation()
                                                   setReplyCompose({
-                                                    sourceType, sourceId,
+                                                    mode: 'campaign',
+                                                    campaignId: camp.id,
                                                     to: replyFrom, toName: replyFromName,
                                                     subject: (h.reply_subject ?? '').startsWith('Re:')
                                                       ? (h.reply_subject ?? '')
@@ -1788,6 +1810,7 @@ export default function DeliveriesPage() {
                                   {m.type === 'received' && m.from && (
                                     <button
                                       onClick={() => setReplyCompose({
+                                        mode: 'thread',
                                         sourceType: t.type, sourceId: t.source_id,
                                         to: m.from!, toName: m.from_name ?? null,
                                         subject: m.subject?.startsWith('Re:') ? m.subject : `Re: ${m.subject ?? ''}`,
