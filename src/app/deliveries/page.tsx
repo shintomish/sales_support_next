@@ -18,6 +18,14 @@ type DeliveryAddress = {
   tel: string | null
   occupation: string | null
   is_active: boolean
+  unsubscribe_reason: string | null
+  unsubscribed_at: string | null
+}
+
+const UNSUBSCRIBE_REASON_LABEL: Record<string, string> = {
+  self_unsubscribed: '本人による停止',
+  user_disabled:     'ユーザーにより停止',
+  system:            'システム',
 }
 
 type EditAddressForm = {
@@ -1085,6 +1093,7 @@ export default function DeliveriesPage() {
                   <SortableHeader label="メールアドレス" field="email" sortField={addrSortBy} sortOrder={addrSortOrder} onSort={handleAddrSort} className="px-4 py-3" />
                   <SortableHeader label="職種" field="occupation" sortField={addrSortBy} sortOrder={addrSortOrder} onSort={handleAddrSort} className="px-4 py-3" />
                   <SortableHeader label="状態" field="is_active" sortField={addrSortBy} sortOrder={addrSortOrder} onSort={handleAddrSort} className="px-4 py-3 text-center" />
+                  <th className="px-4 py-3 text-center">停止理由</th>
                   <th className="px-4 py-3 text-center">操作</th>
                 </tr>
               </thead>
@@ -1121,6 +1130,13 @@ export default function DeliveriesPage() {
                         {addr.is_active ? '有効' : '無効'}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-center text-xs text-gray-600">
+                      {addr.is_active
+                        ? '—'
+                        : (addr.unsubscribe_reason
+                            ? (UNSUBSCRIBE_REASON_LABEL[addr.unsubscribe_reason] ?? addr.unsubscribe_reason)
+                            : '—')}
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-3">
                         <button
@@ -1141,7 +1157,7 @@ export default function DeliveriesPage() {
                 ))}
                 {addresses?.data.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                       配信先がありません。CSVをインポートしてください。
                     </td>
                   </tr>
