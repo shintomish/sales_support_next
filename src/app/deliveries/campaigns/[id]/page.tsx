@@ -258,19 +258,19 @@ export default function CampaignDetailPage() {
         )}
       </div>
 
-      {/* 送信履歴テーブル — ヘッダ固定・本体縦スクロール */}
+      {/* 送信履歴テーブル — ヘッダ固定・本体縦スクロール（横スクロールなし） */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 460px)' }}>
-        <table className="min-w-full text-sm whitespace-nowrap">
+        <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 460px)' }}>
+        <table className="w-full text-sm table-fixed">
           <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
             <tr>
-              <th className="px-4 py-3 text-left">名前</th>
-              <th className="px-4 py-3 text-left">メールアドレス</th>
-              <th className="px-4 py-3 text-center">状態</th>
-              <th className="px-4 py-3 text-left whitespace-nowrap">送信日時</th>
-              <th className="px-4 py-3 text-left whitespace-nowrap">再送信日時</th>
-              <th className="px-4 py-3 text-left">返信</th>
-              <th className="px-4 py-3 text-center">操作</th>
+              <th className="px-3 py-3 text-left w-[140px]">名前</th>
+              <th className="px-3 py-3 text-left">メールアドレス</th>
+              <th className="px-3 py-3 text-center w-[80px]">状態</th>
+              <th className="px-3 py-3 text-left w-[140px]">送信日時</th>
+              <th className="px-3 py-3 text-left w-[140px]">再送信日時</th>
+              <th className="px-3 py-3 text-left">返信</th>
+              <th className="px-3 py-3 text-center w-[80px]">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -281,27 +281,27 @@ export default function CampaignDetailPage() {
                   h.status === 'replied' ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'
                 } ${h.parent_history_id ? 'border-l-2 border-l-amber-300' : ''}`}
               >
-                <td className="px-4 py-3 text-gray-800">
+                <td className="px-3 py-3 text-gray-800 truncate" title={h.name ?? ''}>
                   {h.name ?? '-'}
                   {h.parent_history_id && (
-                    <span className="ml-2 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">再送</span>
+                    <span className="ml-1 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">再送</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-gray-600 text-xs">{h.email}</td>
-                <td className="px-4 py-3 text-center">
+                <td className="px-3 py-3 text-gray-600 text-xs truncate" title={h.email}>{h.email}</td>
+                <td className="px-3 py-3 text-center">
                   {{
                     sent:    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">送信済</span>,
                     failed:  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">失敗</span>,
                     replied: <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">返信あり</span>,
                   }[h.status]}
                 </td>
-                <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                <td className="px-3 py-3 text-xs text-gray-600 truncate">
                   {h.sent_at ? new Date(h.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}
                 </td>
-                <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                <td className="px-3 py-3 text-xs text-gray-600 truncate">
                   {h.resent_at ? new Date(h.resent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-3 py-3 truncate">
                   {h.status === 'replied' && h.replied_at ? (
                     <div>
                       <button
@@ -319,7 +319,7 @@ export default function CampaignDetailPage() {
                     <span className="text-xs text-gray-300">—</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-center">
+                <td className="px-3 py-3 text-center">
                   {(h.status === 'sent' || h.status === 'replied' || h.status === 'failed') && (
                     <button
                       onClick={() => handleResend(h)}
