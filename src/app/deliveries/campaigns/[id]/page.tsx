@@ -260,7 +260,7 @@ export default function CampaignDetailPage() {
 
       {/* 送信履歴テーブル — ヘッダ固定・本体縦スクロール（横スクロールなし） */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 460px)' }}>
+        <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 560px)' }}>
         <table className="w-full text-sm table-fixed">
           <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
             <tr>
