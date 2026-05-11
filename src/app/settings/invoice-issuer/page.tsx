@@ -13,7 +13,8 @@ interface IssuerSettings {
   invoice_issuer_tel: string | null;
   invoice_issuer_fax: string | null;
   invoice_issuer_logo_path: string | null;
-  invoice_issuer_seal_path: string | null;
+  invoice_issuer_round_seal_path: string | null;
+  invoice_issuer_square_seal_path: string | null;
   invoice_issuer_url: string | null;
   invoice_issuer_invoice_number: string | null;
   invoice_issuer_bank_name: string | null;
@@ -26,12 +27,23 @@ interface IssuerSettings {
 const EMPTY: IssuerSettings = {
   invoice_issuer_name: '', invoice_issuer_postal_code: '', invoice_issuer_address: '',
   invoice_issuer_tel: '', invoice_issuer_fax: '', invoice_issuer_logo_path: '',
-  invoice_issuer_seal_path: '',
+  invoice_issuer_round_seal_path: '',
+  invoice_issuer_square_seal_path: '',
   invoice_issuer_url: '',
   invoice_issuer_invoice_number: '',
   invoice_issuer_bank_name: '', invoice_issuer_bank_branch: '',
   invoice_issuer_bank_account_type: '', invoice_issuer_bank_account_number: '',
   invoice_issuer_bank_account_holder: '',
+};
+
+type SealType = 'round' | 'square';
+const SEAL_FIELD: Record<SealType, keyof IssuerSettings> = {
+  round:  'invoice_issuer_round_seal_path',
+  square: 'invoice_issuer_square_seal_path',
+};
+const SEAL_LABEL: Record<SealType, string> = {
+  round:  '丸印（請求書・注文書）',
+  square: '角印（見積書）',
 };
 
 // テキスト系（保存対象）— ロゴパスは別エンドポイントで管理
@@ -50,7 +62,8 @@ export default function InvoiceIssuerSettingsPage() {
   const [busy, setBusy]       = useState(false);
   const [toast, setToast]     = useState<string | null>(null);
   const fileInputRef          = useRef<HTMLInputElement>(null);
-  const sealInputRef          = useRef<HTMLInputElement>(null);
+  const roundSealInputRef     = useRef<HTMLInputElement>(null);
+  const squareSealInputRef    = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     apiClient.get<IssuerSettings>('/api/v1/settings/invoice-issuer')
@@ -117,34 +130,36 @@ export default function InvoiceIssuerSettingsPage() {
     }
   };
 
-  const uploadSeal = async (file: File) => {
+  const uploadSeal = async (type: SealType, file: File) => {
     setBusy(true);
     try {
       const fd = new FormData();
       fd.append('seal', file);
-      const res = await apiClient.post<{ invoice_issuer_seal_path: string }>(
-        '/api/v1/settings/invoice-issuer/seal',
+      const field = SEAL_FIELD[type];
+      const res = await apiClient.post<Record<string, string>>(
+        `/api/v1/settings/invoice-issuer/seal/${type}`,
         fd,
         { headers: { 'Content-Type': 'multipart/form-data' } },
       );
-      setForm((p) => ({ ...p, invoice_issuer_seal_path: res.data.invoice_issuer_seal_path }));
-      setToast('電子印をアップロードしました');
+      setForm((p) => ({ ...p, [field]: res.data[field] }));
+      setToast(`${SEAL_LABEL[type]} をアップロードしました`);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'アップロードに失敗しました';
       alert(msg);
     } finally {
       setBusy(false);
-      if (sealInputRef.current) sealInputRef.current.value = '';
+      const ref = type === 'round' ? roundSealInputRef : squareSealInputRef;
+      if (ref.current) ref.current.value = '';
     }
   };
 
-  const removeSeal = async () => {
-    if (!confirm('電子印を削除しますか？')) return;
+  const removeSeal = async (type: SealType) => {
+    if (!confirm(`${SEAL_LABEL[type]} を削除しますか？`)) return;
     setBusy(true);
     try {
-      await apiClient.delete('/api/v1/settings/invoice-issuer/seal');
-      setForm((p) => ({ ...p, invoice_issuer_seal_path: '' }));
-      setToast('電子印を削除しました');
+      await apiClient.delete(`/api/v1/settings/invoice-issuer/seal/${type}`);
+      setForm((p) => ({ ...p, [SEAL_FIELD[type]]: '' }));
+      setToast(`${SEAL_LABEL[type]} を削除しました`);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '削除に失敗しました';
       alert(msg);
@@ -221,33 +236,29 @@ export default function InvoiceIssuerSettingsPage() {
           </div>
         </div>
 
-        {/* 電子印 */}
+        {/* 電子印 — 丸印 / 角印 2 種 */}
         <div className="border-t border-gray-100 pt-4 mt-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">電子印</h2>
-          <p className="text-xs text-gray-400 mb-3">PNG / JPG / GIF / WebP（2MB まで）。請求書PDFの発行者名右側に押印されます。</p>
-          <div className="flex items-center gap-4">
-            {form.invoice_issuer_seal_path
-              // eslint-disable-next-line @next/next/no-img-element
-              ? <img src={form.invoice_issuer_seal_path} alt="seal"
-                  className="h-20 w-20 border border-gray-200 rounded object-contain bg-white p-1" />
-              : <div className="h-20 w-20 border border-dashed border-gray-300 rounded flex items-center justify-center text-xs text-gray-400">未設定</div>
-            }
-            <div className="flex flex-col gap-2">
-              <input
-                ref={sealInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadSeal(f); }}
-                className="text-xs"
-                disabled={busy}
-              />
-              {form.invoice_issuer_seal_path && (
-                <Button variant="outline" onClick={removeSeal} disabled={busy}
-                  className="text-red-600 border-red-200 hover:bg-red-50 text-xs">
-                  電子印を削除
-                </Button>
-              )}
-            </div>
+          <p className="text-xs text-gray-400 mb-3">PNG / JPG / GIF / WebP（2MB まで）。透過 PNG 推奨。承認済の帳票 PDF に押印されます。</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SealBlock
+              type="round"
+              imageUrl={form.invoice_issuer_round_seal_path}
+              inputRef={roundSealInputRef}
+              busy={busy}
+              onPick={(f) => uploadSeal('round', f)}
+              onRemove={() => removeSeal('round')}
+              note="請求書・注文書 PDF に押印"
+            />
+            <SealBlock
+              type="square"
+              imageUrl={form.invoice_issuer_square_seal_path}
+              inputRef={squareSealInputRef}
+              busy={busy}
+              onPick={(f) => uploadSeal('square', f)}
+              onRemove={() => removeSeal('square')}
+              note="見積書 PDF に押印"
+            />
           </div>
         </div>
 
@@ -292,6 +303,49 @@ function Field({ label, children, className }: { label: string; children: React.
     <div className={className}>
       <label className="block text-xs font-semibold text-gray-700 mb-1">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function SealBlock({
+  type, imageUrl, inputRef, busy, onPick, onRemove, note,
+}: {
+  type: SealType;
+  imageUrl: string | null;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  busy: boolean;
+  onPick: (f: File) => void;
+  onRemove: () => void;
+  note: string;
+}) {
+  return (
+    <div className="border border-gray-200 rounded-md p-3">
+      <div className="text-xs font-semibold text-gray-700 mb-1">{SEAL_LABEL[type]}</div>
+      <div className="text-[11px] text-gray-400 mb-2">{note}</div>
+      <div className="flex items-center gap-3">
+        {imageUrl
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={imageUrl} alt={`${type} seal`}
+              className="h-20 w-20 border border-gray-200 rounded object-contain bg-white p-1" />
+          : <div className="h-20 w-20 border border-dashed border-gray-300 rounded flex items-center justify-center text-[11px] text-gray-400">未設定</div>
+        }
+        <div className="flex flex-col gap-2 min-w-0">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); }}
+            className="text-xs max-w-full"
+            disabled={busy}
+          />
+          {imageUrl && (
+            <Button variant="outline" onClick={onRemove} disabled={busy}
+              className="text-red-600 border-red-200 hover:bg-red-50 text-xs">
+              削除
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
