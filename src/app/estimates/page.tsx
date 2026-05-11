@@ -62,6 +62,7 @@ export default function EstimatesPage() {
   const canApprove = user?.role === 'tenant_admin' || user?.role === 'super_admin';
   const searchParams = useSearchParams();
   const initialApproval = (searchParams.get('approval_status') as ApprovalStatus | null) ?? '';
+  const initialCreate   = searchParams.get('create') === '1';
 
   const [items, setItems]               = useState<EstimateListItem[]>([]);
   const [status, setStatus]             = useState<'' | 'draft' | 'issued'>('');
@@ -72,8 +73,8 @@ export default function EstimatesPage() {
   const [sortBy, setSortBy]             = useState<SortField>('issued_date');
   const [sortOrder, setSortOrder]       = useState<'asc' | 'desc'>('desc');
 
-  // 新規見積モーダル
-  const [createOpen, setCreateOpen]     = useState(false);
+  // 新規見積モーダル（?create=1 で自動オープン）
+  const [createOpen, setCreateOpen]     = useState(initialCreate);
   const [creating, setCreating]         = useState(false);
   const [customers, setCustomers]       = useState<CustomerLookup[]>([]);
   const [custSearch, setCustSearch]     = useState('');

@@ -59,12 +59,20 @@ export default function Sidebar() {
     {
       type: 'group', key: 'invoicing', label: '販売管理', icon: '🧾', sesOnly: true,
       items: [
-        { label: 'SES台帳',     path: '/ses-contracts',          icon: '📋' },
-        { label: '勤務表',      path: '/timesheets',             icon: '⏰' },
-        { label: '請求書作成',  path: '/billing-summaries',      icon: '💴' },
-        { label: '請求書一覧',  path: '/invoices',               icon: '📄', badge: pendingApprovalCount + rejectedInvoiceCount },
-        { label: '見積書一覧',  path: '/estimates',              icon: '📝' },
-        { label: '請求書送信履歴', path: '/invoice-send-histories', icon: '📤' },
+        { label: 'SES台帳',         path: '/ses-contracts',                 icon: '📋' },
+        { label: '勤務表',          path: '/timesheets',                    icon: '⏰' },
+        // ── 見積書（doc_type=estimate）─────────────────────
+        { label: '見積書作成',      path: '/estimates?create=1',            icon: '🧮' },
+        { label: '見積書一覧',      path: '/estimates',                     icon: '📝' },
+        { label: '見積書送信履歴',  path: '/estimate-send-histories',       icon: '📤' },
+        // ── 注文書（doc_type=purchase_order）※未実装 ───────
+        { label: '注文書作成',      path: '/purchase-orders/create',        icon: '🧾' },
+        { label: '注文書一覧',      path: '/purchase-orders',               icon: '📦' },
+        { label: '注文書送信履歴',  path: '/purchase-order-send-histories', icon: '📤' },
+        // ── 請求書 ─────────────────────────────────────────
+        { label: '請求書作成',      path: '/billing-summaries',             icon: '💴' },
+        { label: '請求書一覧',      path: '/invoices',                      icon: '📄', badge: pendingApprovalCount + rejectedInvoiceCount },
+        { label: '請求書送信履歴',  path: '/invoice-send-histories',        icon: '📤' },
       ],
     },
     {
