@@ -7,6 +7,7 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Toast from '@/components/Toast';
+import { useAuthStore } from '@/store/authStore';
 
 interface InvoiceLine {
   id?: number;
@@ -57,6 +58,8 @@ interface Invoice {
   due_date: string | null;
   status: 'draft' | 'issued';
   approved: boolean;
+  approval_status: 'draft' | 'pending' | 'approved' | 'rejected';
+  approval_comment: string | null;
   notes: string | null;
   subtotal: string;
   tax: string;
@@ -75,12 +78,28 @@ const TAX_OPTIONS = [
   { value: '0',    label: '非課税' },
 ];
 
+const APPROVAL_LABEL: Record<Invoice['approval_status'], string> = {
+  draft:    '未申請',
+  pending:  '承認待ち',
+  approved: '承認済',
+  rejected: '差戻し',
+};
+
+const APPROVAL_BADGE_CLASS: Record<Invoice['approval_status'], string> = {
+  draft:    'bg-gray-100 text-gray-600',
+  pending:  'bg-amber-100 text-amber-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-700',
+};
+
 const yen = (n: string | number | null | undefined) =>
   n == null ? '-' : `¥${Number(n).toLocaleString()}`;
 
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const user = useAuthStore((s) => s.user);
+  const canApprove = user?.role === 'tenant_admin' || user?.role === 'super_admin';
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
@@ -465,6 +484,52 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const handleSubmitApproval = async () => {
+    if (!confirm('この請求書を承認申請します。よろしいですか？')) return;
+    setBusy(true);
+    try {
+      const res = await apiClient.post<Invoice>(`/api/v1/invoices/${id}/submit-approval`);
+      setInvoice(res.data);
+      showToast('承認申請しました', 'success');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '承認申請に失敗しました';
+      alert(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!confirm('この請求書を承認します。よろしいですか？')) return;
+    setBusy(true);
+    try {
+      const res = await apiClient.post<Invoice>(`/api/v1/invoices/${id}/approve`);
+      setInvoice(res.data);
+      showToast('承認しました', 'success');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '承認に失敗しました';
+      alert(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReject = async () => {
+    const comment = prompt('却下理由を入力してください（必須）');
+    if (!comment) return;
+    setBusy(true);
+    try {
+      const res = await apiClient.post<Invoice>(`/api/v1/invoices/${id}/reject`, { comment });
+      setInvoice(res.data);
+      showToast('却下しました', 'success');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '却下に失敗しました';
+      alert(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading || !invoice) {
     return <div className="p-6 text-gray-400">読み込み中...</div>;
   }
@@ -480,6 +545,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             {invoice.status === 'issued'
               ? <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">発行済</span>
               : <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">下書き</span>}
+            <span className={`text-xs px-2 py-1 rounded ${APPROVAL_BADGE_CLASS[invoice.approval_status]}`}>
+              {APPROVAL_LABEL[invoice.approval_status]}
+            </span>
             {invoice.pdf_path && (
               <a href={invoice.pdf_path} target="_blank" rel="noreferrer"
                  className="text-blue-600 hover:underline text-sm">📄 PDF を開く</a>
@@ -490,6 +558,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           🏢 {invoice.customer_name_snapshot} / {invoice.deal?.title} / 対象 {invoice.year_month}
           {invoice.engineer_name_snapshot && ` / 👤 ${invoice.engineer_name_snapshot}`}
         </p>
+        {invoice.approval_status === 'rejected' && invoice.approval_comment && (
+          <div className="mt-3 px-4 py-2.5 rounded-md bg-red-50 border border-red-200 text-sm">
+            <p className="font-semibold text-red-700">⚠ 却下されました</p>
+            <p className="text-red-600 mt-1 whitespace-pre-wrap">{invoice.approval_comment}</p>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto bg-white rounded-lg border border-gray-200 p-6 space-y-6">
@@ -648,7 +722,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         </Field>
 
         {/* アクション */}
-        <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
+        <div className="flex items-center gap-2 pt-4 border-t border-gray-200 flex-wrap">
           <Button variant="outline" onClick={() => save()} disabled={busy}>
             {busy ? '保存中...' : '保存'}
           </Button>
@@ -675,6 +749,28 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             title={invoice.approved ? '郵送記録を残す' : '承認済みのみ郵送記録できます'}>
             📮 郵送記録
           </Button>
+
+          {/* 承認ワークフロー */}
+          {(invoice.approval_status === 'draft' || invoice.approval_status === 'rejected') && (
+            <Button onClick={handleSubmitApproval} disabled={busy}
+              className="bg-amber-600 hover:bg-amber-700 text-white">
+              📝 承認申請
+            </Button>
+          )}
+          {invoice.approval_status === 'pending' && canApprove && (
+            <>
+              <Button onClick={handleApprove} disabled={busy}
+                className="bg-green-600 hover:bg-green-700 text-white">
+                ✓ 承認
+              </Button>
+              <Button onClick={handleReject} disabled={busy}
+                variant="outline"
+                className="text-red-600 border-red-200 hover:bg-red-50">
+                ✗ 却下
+              </Button>
+            </>
+          )}
+
           <Button variant="outline" onClick={remove} disabled={busy}
             className="text-red-600 border-red-200 hover:bg-red-50 ml-auto">
             削除

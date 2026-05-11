@@ -11,9 +11,32 @@ export interface OverdueTask {
   customer: { company_name: string } | null;
 }
 
+export interface PendingApproval {
+  id: number;
+  invoice_number: string;
+  doc_type: 'invoice' | 'estimate' | 'purchase_order';
+  total: number;
+  customer: { company_name: string } | null;
+  updated_at: string | null;
+}
+
+export interface RejectedInvoice {
+  id: number;
+  invoice_number: string;
+  doc_type: 'invoice' | 'estimate' | 'purchase_order';
+  total: number;
+  customer: { company_name: string } | null;
+  approval_comment: string | null;
+  updated_at: string | null;
+}
+
 export interface NotificationData {
   overdue_tasks: OverdueTask[];
   overdue_tasks_count: number;
+  pending_approvals?: PendingApproval[];
+  pending_approvals_count?: number;
+  rejected_invoices?: RejectedInvoice[];
+  rejected_invoices_count?: number;
 }
 
 export function useNotifications() {

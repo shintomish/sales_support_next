@@ -2,11 +2,14 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import SortableHeader from '@/components/SortableHeader';
 import { useAuthStore } from '@/store/authStore';
+
+type ApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejected';
 
 interface InvoiceListItem {
   id: number;
@@ -17,12 +20,27 @@ interface InvoiceListItem {
   due_date: string | null;
   status: 'draft' | 'issued';
   approved: boolean;
+  approval_status: ApprovalStatus;
+  approval_comment: string | null;
   total: string;
   customer_name_snapshot: string | null;
   pdf_path: string | null;
   customer?: { id: number; company_name: string } | null;
   deal?: { id: number; title: string } | null;
 }
+
+const APPROVAL_LABEL: Record<ApprovalStatus, string> = {
+  draft:    '下書き',
+  pending:  '承認待ち',
+  approved: '承認済',
+  rejected: '却下',
+};
+const APPROVAL_BADGE_CLASS: Record<ApprovalStatus, string> = {
+  draft:    'bg-gray-100 text-gray-600',
+  pending:  'bg-amber-100 text-amber-700',
+  approved: 'bg-blue-100 text-blue-700',
+  rejected: 'bg-rose-100 text-rose-700',
+};
 
 interface PaginatedRes {
   data: InvoiceListItem[];
@@ -54,19 +72,22 @@ type SortField = 'invoice_number' | 'year_month' | 'customer' | 'deal' | 'issued
 export default function InvoicesPage() {
   const user = useAuthStore((s) => s.user);
   const canApprove = user?.role === 'tenant_admin' || user?.role === 'super_admin';
+  const searchParams = useSearchParams();
+  const initialApproval = (searchParams.get('approval_status') as ApprovalStatus | null) ?? '';
 
   const [items, setItems]         = useState<InvoiceListItem[]>([]);
   const [yearMonth, setYearMonth] = useState<string>(previousMonth());
   const [status, setStatus]       = useState<'' | 'draft' | 'issued'>('');
+  const [approvalStatus, setApprovalStatus] = useState<'' | ApprovalStatus>(initialApproval);
   const [q, setQ]                 = useState('');
   const [loading, setLoading]     = useState(false);
-  const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [busyId, setBusyId]       = useState<number | null>(null);
   const [sortBy, setSortBy]       = useState<SortField>('issued_date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const handleApprove = async (id: number) => {
     if (!confirm('承認すると電子印付き PDF を再生成します。よろしいですか？')) return;
-    setApprovingId(id);
+    setBusyId(id);
     try {
       await apiClient.post(`/api/v1/invoices/${id}/approve`);
       fetchData();
@@ -74,7 +95,36 @@ export default function InvoicesPage() {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '承認に失敗しました';
       alert(msg);
     } finally {
-      setApprovingId(null);
+      setBusyId(null);
+    }
+  };
+
+  const handleSubmit = async (id: number) => {
+    if (!confirm('承認申請しますか？')) return;
+    setBusyId(id);
+    try {
+      await apiClient.post(`/api/v1/invoices/${id}/submit-approval`);
+      fetchData();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '申請に失敗しました';
+      alert(msg);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleReject = async (id: number) => {
+    const comment = prompt('却下理由を入力してください');
+    if (!comment) return;
+    setBusyId(id);
+    try {
+      await apiClient.post(`/api/v1/invoices/${id}/reject`, { comment });
+      fetchData();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '却下に失敗しました';
+      alert(msg);
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -82,15 +132,16 @@ export default function InvoicesPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (yearMonth) params.set('year_month', yearMonth);
-      if (status)    params.set('status', status);
-      if (q.trim())  params.set('q', q.trim());
+      if (yearMonth)       params.set('year_month', yearMonth);
+      if (status)          params.set('status', status);
+      if (approvalStatus)  params.set('approval_status', approvalStatus);
+      if (q.trim())        params.set('q', q.trim());
       const res = await apiClient.get<PaginatedRes>(`/api/v1/invoices?${params.toString()}`);
       setItems(res.data.data ?? []);
     } finally {
       setLoading(false);
     }
-  }, [yearMonth, status, q]);
+  }, [yearMonth, status, approvalStatus, q]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -151,6 +202,17 @@ export default function InvoicesPage() {
             <option value="issued">発行済</option>
           </select>
         </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">承認</label>
+          <select value={approvalStatus} onChange={(e) => setApprovalStatus(e.target.value as '' | ApprovalStatus)}
+            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white">
+            <option value="">すべて</option>
+            <option value="draft">下書き</option>
+            <option value="pending">承認待ち</option>
+            <option value="approved">承認済</option>
+            <option value="rejected">却下</option>
+          </select>
+        </div>
         <div className="flex-1 min-w-[200px]">
           <label className="block text-xs font-semibold text-gray-700 mb-1">検索</label>
           <Input type="text" placeholder="請求書番号・取引先名" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -203,18 +265,37 @@ export default function InvoicesPage() {
                     </span>
                   </td>
                   <td className="px-2 py-3 text-center">
-                    {r.approved ? (
-                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">承認済</span>
-                    ) : (
-                      <button
-                        onClick={() => handleApprove(r.id)}
-                        disabled={!canApprove || approvingId === r.id}
-                        title={canApprove ? 'クリックで承認 → 電子印付き PDF を再生成' : '承認権限がありません（管理者のみ）'}
-                        className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    <div className="flex flex-col items-center gap-1">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${APPROVAL_BADGE_CLASS[r.approval_status]}`}
+                        title={r.approval_status === 'rejected' && r.approval_comment ? `理由: ${r.approval_comment}` : ''}
                       >
-                        {approvingId === r.id ? '承認中…' : '非承認'}
-                      </button>
-                    )}
+                        {APPROVAL_LABEL[r.approval_status]}
+                      </span>
+                      {/* アクションボタン: 状態に応じて表示 */}
+                      {r.approval_status === 'draft' || r.approval_status === 'rejected' ? (
+                        <button
+                          onClick={() => handleSubmit(r.id)}
+                          disabled={busyId === r.id}
+                          className="text-[10px] text-blue-600 hover:underline disabled:opacity-50"
+                        >
+                          {busyId === r.id ? '処理中…' : '申請'}
+                        </button>
+                      ) : r.approval_status === 'pending' && canApprove ? (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleApprove(r.id)}
+                            disabled={busyId === r.id}
+                            className="text-[10px] text-blue-600 hover:underline disabled:opacity-50"
+                          >承認</button>
+                          <button
+                            onClick={() => handleReject(r.id)}
+                            disabled={busyId === r.id}
+                            className="text-[10px] text-rose-600 hover:underline disabled:opacity-50"
+                          >却下</button>
+                        </div>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-2 py-3 text-center">
                     {r.pdf_path

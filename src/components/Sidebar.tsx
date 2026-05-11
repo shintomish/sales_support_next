@@ -29,8 +29,10 @@ export default function Sidebar() {
   const user     = useAuthStore((state) => state.user);
 
   const { data: notifData } = useNotifications();
-  const overdueCount  = notifData?.overdue_tasks_count ?? 0;
-  const overdueTasks  = notifData?.overdue_tasks ?? [];
+  const overdueCount   = notifData?.overdue_tasks_count ?? 0;
+  const overdueTasks   = notifData?.overdue_tasks ?? [];
+  const pendingApprovalCount = notifData?.pending_approvals_count ?? 0;
+  const rejectedInvoiceCount = notifData?.rejected_invoices_count ?? 0;
   const { unreadCount: unreadEmails } = useUnreadEmailCount();
 
   const sesEnabled = !!user?.tenant?.ses_enabled;
@@ -55,12 +57,12 @@ export default function Sidebar() {
       ],
     },
     {
-      type: 'group', key: 'invoicing', label: '請求書管理', icon: '🧾', sesOnly: true,
+      type: 'group', key: 'invoicing', label: '販売管理', icon: '🧾', sesOnly: true,
       items: [
         { label: 'SES台帳',     path: '/ses-contracts',          icon: '📋' },
         { label: '勤務表',      path: '/timesheets',             icon: '⏰' },
         { label: '請求書作成',  path: '/billing-summaries',      icon: '💴' },
-        { label: '請求書一覧',  path: '/invoices',               icon: '📄' },
+        { label: '請求書一覧',  path: '/invoices',               icon: '📄', badge: pendingApprovalCount + rejectedInvoiceCount },
         { label: '請求書送信履歴', path: '/invoice-send-histories', icon: '📤' },
       ],
     },
@@ -243,6 +245,44 @@ export default function Sidebar() {
             </div>
             <button
               onClick={() => router.push('/tasks?due_filter=overdue')}
+              className="mt-2 w-full text-xs text-red-300 hover:text-white transition-colors text-left"
+            >
+              確認する →
+            </button>
+          </div>
+        )}
+
+        {/* 承認待ちサマリー（テナント管理者以上のみ） */}
+        {pendingApprovalCount > 0 && (
+          <div className="mx-4 mb-3 px-3 py-2.5 rounded-lg bg-amber-900/40 border border-amber-700/50">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">📝</span>
+              <div>
+                <p className="text-xs text-amber-200 font-semibold">承認待ち</p>
+                <p className="text-xs text-amber-300">{pendingApprovalCount}件が承認待ち</p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push('/invoices?approval_status=pending')}
+              className="mt-2 w-full text-xs text-amber-200 hover:text-white transition-colors text-left"
+            >
+              確認する →
+            </button>
+          </div>
+        )}
+
+        {/* 却下サマリー（一般メンバー向け） */}
+        {rejectedInvoiceCount > 0 && (
+          <div className="mx-4 mb-3 px-3 py-2.5 rounded-lg bg-red-900/40 border border-red-700/50">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">⚠</span>
+              <div>
+                <p className="text-xs text-red-300 font-semibold">差戻し</p>
+                <p className="text-xs text-red-400">{rejectedInvoiceCount}件が差戻されました</p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push('/invoices?approval_status=rejected')}
               className="mt-2 w-full text-xs text-red-300 hover:text-white transition-colors text-left"
             >
               確認する →
