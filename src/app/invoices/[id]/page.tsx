@@ -259,19 +259,40 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   };
 
   const [coverModalOpen, setCoverModalOpen] = useState(false);
-  const [coverItems, setCoverItems] = useState({ invoice: true, timesheet: false, transport: false });
+  // doc_type ごとに既定でチェックする項目を切り替える
+  const [coverItems, setCoverItems] = useState({
+    invoice: true, timesheet: false, transport: false,    // 請求書
+    estimate: true,                                       // 見積書
+    purchase_order: true, acknowledgement: true,          // 注文書
+  });
+  const [coverCustomItem, setCoverCustomItem] = useState('');
+
+  const buildCoverItemNames = (): string[] => {
+    const names: string[] = [];
+    if (invoice?.doc_type === 'estimate') {
+      if (coverItems.estimate) names.push('御見積書');
+    } else if (invoice?.doc_type === 'purchase_order') {
+      if (coverItems.purchase_order) names.push('御注文書');
+      if (coverItems.acknowledgement) names.push('御注文請書');
+    } else {
+      if (coverItems.invoice)   names.push('御請求書');
+      if (coverItems.timesheet) names.push('勤務表');
+      if (coverItems.transport) names.push('交通費明細書');
+    }
+    const custom = coverCustomItem.trim();
+    if (custom) names.push(custom);
+    return names;
+  };
 
   const openCoverLetter = async () => {
-    if (!coverItems.invoice && !coverItems.timesheet && !coverItems.transport) {
+    const names = buildCoverItemNames();
+    if (names.length === 0) {
       alert('同封物を1つ以上選択してください'); return;
     }
     setBusy(true);
     try {
-      const params = new URLSearchParams({
-        invoice:   coverItems.invoice ? '1' : '0',
-        timesheet: coverItems.timesheet ? '1' : '0',
-        transport: coverItems.transport ? '1' : '0',
-      });
+      const params = new URLSearchParams();
+      names.forEach((n) => params.append('items[]', n));
       const res = await apiClient.get(`/api/v1/invoices/${id}/cover-letter?${params}`, { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       window.open(url, '_blank');
@@ -283,12 +304,30 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   };
 
   const [envelopeModalOpen, setEnvelopeModalOpen] = useState(false);
-  const [envelopeWithZaichu, setEnvelopeWithZaichu] = useState(true);
+  // 朱印の文言の集合。doc_type ごとに既定セットアップ。両方オンも可（複数朱印を縦に並べる）
+  const [envelopeZaichuLabels, setEnvelopeZaichuLabels] = useState<string[]>([]);
+
+  // envelope モーダルを開いた時に doc_type のデフォルトをセット
+  useEffect(() => {
+    if (!envelopeModalOpen || !invoice) return;
+    const defaults = invoice.doc_type === 'estimate' ? ['見積書在中']
+                   : invoice.doc_type === 'purchase_order' ? ['注文書・請書在中']
+                   : ['請求書在中'];
+    setEnvelopeZaichuLabels(defaults);
+  }, [envelopeModalOpen, invoice]);
+
+  const toggleEnvelopeZaichu = (label: string) => {
+    setEnvelopeZaichuLabels((prev) =>
+      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
+    );
+  };
 
   const openEnvelope = async () => {
     setBusy(true);
     try {
-      const res = await apiClient.get(`/api/v1/invoices/${id}/envelope?zaichu=${envelopeWithZaichu ? 1 : 0}`, { responseType: 'blob' });
+      const params = new URLSearchParams();
+      envelopeZaichuLabels.forEach((l) => params.append('zaichu_labels[]', l));
+      const res = await apiClient.get(`/api/v1/invoices/${id}/envelope?${params}`, { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       window.open(url, '_blank');
       setEnvelopeModalOpen(false);
@@ -477,12 +516,18 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const removeAttachFile = (idx: number) => setAttachFiles((prev) => prev.filter((_, i) => i !== idx));
 
   const remove = async () => {
-    const label = invoice?.status === 'issued' ? '発行済' : '下書き';
-    if (!confirm(`この請求書（${label}）を削除します。\n誤発行のリカバリ用です。よろしいですか？`)) return;
+    const docLabel = invoice?.doc_type === 'estimate' ? '見積書'
+                   : invoice?.doc_type === 'purchase_order' ? '注文書'
+                   : '請求書';
+    const statusLabel = invoice?.status === 'issued' ? '発行済' : '下書き';
+    if (!confirm(`この${docLabel}（${statusLabel}）を削除します。\n誤発行のリカバリ用です。よろしいですか？`)) return;
     setBusy(true);
     try {
       await apiClient.delete(`/api/v1/invoices/${id}`);
-      router.push('/invoices');
+      const back = invoice?.doc_type === 'estimate' ? '/estimates'
+                 : invoice?.doc_type === 'purchase_order' ? '/purchase-orders'
+                 : '/invoices';
+      router.push(back);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '削除に失敗しました';
       alert(msg);
@@ -561,9 +606,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             {invoice.status === 'issued'
               ? <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">発行済</span>
               : <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">下書き</span>}
-            <span className={`text-xs px-2 py-1 rounded ${APPROVAL_BADGE_CLASS[invoice.approval_status]}`}>
-              {APPROVAL_LABEL[invoice.approval_status]}
-            </span>
+            {invoice.doc_type !== 'estimate' && (
+              <span className={`text-xs px-2 py-1 rounded ${APPROVAL_BADGE_CLASS[invoice.approval_status]}`}>
+                {APPROVAL_LABEL[invoice.approval_status]}
+              </span>
+            )}
             {invoice.pdf_path && (
               <a href={invoice.pdf_path} target="_blank" rel="noreferrer"
                  className="text-blue-600 hover:underline text-sm">
@@ -591,23 +638,43 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       <div className="flex-1 min-h-0 overflow-auto bg-white rounded-lg border border-gray-200 p-6 space-y-6">
         {/* メタ情報 */}
         <div className="grid grid-cols-3 gap-4">
-          <Field label="請求日">
+          <Field label={invoice.doc_type === 'estimate' ? '見積日'
+                       : invoice.doc_type === 'purchase_order' ? '注文日'
+                       : '請求日'}>
             <Input type="date" value={issuedDate} onChange={(e) => setIssuedDate(e.target.value)} />
           </Field>
-          <Field label="支払期限">
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-          </Field>
+          {invoice.doc_type === 'invoice' && (
+            <Field label="支払期限">
+              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            </Field>
+          )}
         </div>
 
-        {/* 番号類 */}
-        <div className="grid grid-cols-3 gap-4">
-          <Field label="注文番号">
-            <Input value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} placeholder="PO-..." />
-          </Field>
-          <Field label="見積番号">
-            <Input value={quoteNumber} onChange={(e) => setQuoteNumber(e.target.value)} />
-          </Field>
-        </div>
+        {/* 番号類 (estimate は自身の番号のみで表示省略) */}
+        {invoice.doc_type !== 'estimate' && (
+          <div className="grid grid-cols-3 gap-4">
+            {invoice.doc_type === 'purchase_order' && (
+              <>
+                <Field label="注文番号">
+                  <Input value={invoice.invoice_number} disabled className="bg-gray-50 text-gray-500" />
+                </Field>
+                <Field label="見積番号">
+                  <Input value={quoteNumber} onChange={(e) => setQuoteNumber(e.target.value)} placeholder="EST-..." />
+                </Field>
+              </>
+            )}
+            {invoice.doc_type === 'invoice' && (
+              <>
+                <Field label="注文番号">
+                  <Input value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} placeholder="ORD-..." />
+                </Field>
+                <Field label="見積番号">
+                  <Input value={quoteNumber} onChange={(e) => setQuoteNumber(e.target.value)} placeholder="EST-..." />
+                </Field>
+              </>
+            )}
+          </div>
+        )}
 
         {/* 左側ヘッダー (E)(F)(G) */}
         <div className="grid grid-cols-3 gap-4">
@@ -772,14 +839,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             📮 郵送記録
           </Button>
 
-          {/* 承認ワークフロー */}
-          {(invoice.approval_status === 'draft' || invoice.approval_status === 'rejected') && (
+          {/* 承認ワークフロー（estimate は担当者ベースのため非表示） */}
+          {invoice.doc_type !== 'estimate' && (invoice.approval_status === 'draft' || invoice.approval_status === 'rejected') && (
             <Button onClick={handleSubmitApproval} disabled={busy}
               className="bg-amber-600 hover:bg-amber-700 text-white">
               📝 承認申請
             </Button>
           )}
-          {invoice.approval_status === 'pending' && canApprove && (
+          {invoice.doc_type !== 'estimate' && invoice.approval_status === 'pending' && canApprove && (
             <>
               <Button onClick={handleApprove} disabled={busy}
                 className="bg-green-600 hover:bg-green-700 text-white">
@@ -1016,18 +1083,20 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       {envelopeModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setEnvelopeModalOpen(false)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-4">長3封筒 - 設定</h2>
+            <h2 className="text-lg font-bold mb-4">長3封筒 - 朱印選択</h2>
+            <p className="text-xs text-gray-500 mb-3">複数選択可。すべて未選択の場合は朱印なし。</p>
             <div className="space-y-2 mb-5">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="radio" name="zaichu" checked={envelopeWithZaichu}
-                  onChange={() => setEnvelopeWithZaichu(true)} />
-                「請求書在中」付き
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="radio" name="zaichu" checked={!envelopeWithZaichu}
-                  onChange={() => setEnvelopeWithZaichu(false)} />
-                「請求書在中」なし（一般用途）
-              </label>
+              {(invoice.doc_type === 'estimate' ? ['見積書在中']
+                : invoice.doc_type === 'purchase_order' ? ['注文書在中', '注文書・請書在中']
+                : ['請求書在中']
+              ).map((label) => (
+                <label key={label} className="flex items-center gap-2 text-sm">
+                  <input type="checkbox"
+                    checked={envelopeZaichuLabels.includes(label)}
+                    onChange={() => toggleEnvelopeZaichu(label)} />
+                  「{label}」朱印
+                </label>
+              ))}
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setEnvelopeModalOpen(false)} disabled={busy}>キャンセル</Button>
@@ -1045,21 +1114,52 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-4">送付状 - 同封物の選択</h2>
             <div className="space-y-2 mb-5">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={coverItems.invoice}
-                  onChange={(e) => setCoverItems(p => ({ ...p, invoice: e.target.checked }))} />
-                御請求書
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={coverItems.timesheet}
-                  onChange={(e) => setCoverItems(p => ({ ...p, timesheet: e.target.checked }))} />
-                勤務表
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={coverItems.transport}
-                  onChange={(e) => setCoverItems(p => ({ ...p, transport: e.target.checked }))} />
-                交通費明細書
-              </label>
+              {invoice.doc_type === 'estimate' && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={coverItems.estimate}
+                    onChange={(e) => setCoverItems(p => ({ ...p, estimate: e.target.checked }))} />
+                  御見積書
+                </label>
+              )}
+              {invoice.doc_type === 'purchase_order' && (
+                <>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={coverItems.purchase_order}
+                      onChange={(e) => setCoverItems(p => ({ ...p, purchase_order: e.target.checked }))} />
+                    御注文書
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={coverItems.acknowledgement}
+                      onChange={(e) => setCoverItems(p => ({ ...p, acknowledgement: e.target.checked }))} />
+                    御注文請書
+                  </label>
+                </>
+              )}
+              {invoice.doc_type === 'invoice' && (
+                <>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={coverItems.invoice}
+                      onChange={(e) => setCoverItems(p => ({ ...p, invoice: e.target.checked }))} />
+                    御請求書
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={coverItems.timesheet}
+                      onChange={(e) => setCoverItems(p => ({ ...p, timesheet: e.target.checked }))} />
+                    勤務表
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={coverItems.transport}
+                      onChange={(e) => setCoverItems(p => ({ ...p, transport: e.target.checked }))} />
+                    交通費明細書
+                  </label>
+                </>
+              )}
+              <div className="pt-2 border-t border-gray-100">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">他（入力値）</label>
+                <Input type="text" value={coverCustomItem}
+                  onChange={(e) => setCoverCustomItem(e.target.value)}
+                  placeholder="例: 会社案内 / カタログ / 名刺 など" />
+              </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setCoverModalOpen(false)} disabled={busy}>キャンセル</Button>

@@ -56,7 +56,22 @@ interface PaginatedRes {
 
 const yen = (n: string | number) => `¥${Number(n).toLocaleString()}`;
 
-type SortField = 'invoice_number' | 'customer' | 'issued_date' | 'total' | 'status';
+const recentMonths = (): string[] => {
+  const arr: string[] = [''];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    arr.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return arr;
+};
+
+const currentMonth = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+type SortField = 'invoice_number' | 'customer' | 'year_month' | 'issued_date' | 'total' | 'status';
 
 export default function PurchaseOrdersPage() {
   const user = useAuthStore((s) => s.user);
@@ -66,6 +81,7 @@ export default function PurchaseOrdersPage() {
   const initialCreate   = searchParams.get('create') === '1';
 
   const [items, setItems]               = useState<PurchaseOrderListItem[]>([]);
+  const [yearMonth, setYearMonth]       = useState<string>(currentMonth());
   const [status, setStatus]             = useState<'' | 'draft' | 'issued'>('');
   const [approvalStatus, setApprovalStatus] = useState<'' | ApprovalStatus>(initialApproval);
   const [q, setQ]                       = useState('');
@@ -92,6 +108,7 @@ export default function PurchaseOrdersPage() {
     try {
       const params = new URLSearchParams();
       params.set('doc_type', 'purchase_order');
+      if (yearMonth)      params.set('year_month', yearMonth);
       if (status)         params.set('status', status);
       if (approvalStatus) params.set('approval_status', approvalStatus);
       if (q.trim())       params.set('q', q.trim());
@@ -100,7 +117,7 @@ export default function PurchaseOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [status, approvalStatus, q]);
+  }, [yearMonth, status, approvalStatus, q]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -112,9 +129,18 @@ export default function PurchaseOrdersPage() {
     const t = setTimeout(async () => {
       try {
         const res = await apiClient.get<{ data: CustomerLookup[] }>('/api/v1/customers', {
-          params: { search: custSearch || undefined, page: 1 },
+          // 注文書/注文請書は仕入先(is_supplier=true)向け。両方フラグの顧客も含まれる
+          params: { search: custSearch || undefined, page: 1, per_page: 500, type: 'supplier' },
         });
-        if (!cancelled) setCustomers(res.data.data ?? []);
+        if (!cancelled) {
+          const list = res.data.data ?? [];
+          // 株式会社/有限会社/合同会社 などの法人格を除去した名前で五十音/英字ソート
+          const sortKey = (n: string) => n
+            .replace(/^(株式会社|有限会社|合同会社|一般社団法人|公益財団法人)\s*/u, '')
+            .replace(/\s*(株式会社|有限会社|合同会社|一般社団法人|公益財団法人)\s*$/u, '');
+          list.sort((a, b) => sortKey(a.company_name).localeCompare(sortKey(b.company_name), 'ja'));
+          setCustomers(list);
+        }
       } finally {
         if (!cancelled) setCustLoading(false);
       }
@@ -172,8 +198,8 @@ export default function PurchaseOrdersPage() {
       setCreateOpen(false);
       setForm({ customer_id: '', subject_name: '', issued_date: new Date().toISOString().slice(0, 10), notes: '' });
       setCustSearch('');
-      // 作成した注文書の編集ページへ遷移（請求書詳細を流用）
-      window.location.href = `/invoices/${res.data.id}`;
+      // 作成した注文書の編集ページへ遷移
+      window.location.href = `/purchase-orders/${res.data.id}`;
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
       const msg = e?.response?.data?.message
@@ -197,6 +223,7 @@ export default function PurchaseOrdersPage() {
       switch (sortBy) {
         case 'invoice_number': return r.invoice_number;
         case 'customer':       return r.customer_name_snapshot ?? r.customer?.company_name ?? '';
+        case 'year_month':     return r.year_month;
         case 'issued_date':    return r.issued_date ?? '';
         case 'total':          return Number(r.total);
         case 'status':         return r.status;
@@ -222,6 +249,13 @@ export default function PurchaseOrdersPage() {
       </div>
 
       <div className="flex-shrink-0 flex flex-wrap items-end gap-3 mb-4 bg-white p-4 rounded-lg border border-gray-200">
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">対象月</label>
+          <select value={yearMonth} onChange={(e) => setYearMonth(e.target.value)}
+            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white">
+            {recentMonths().map((m) => <option key={m || 'all'} value={m}>{m || '全期間'}</option>)}
+          </select>
+        </div>
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1">ステータス</label>
           <select value={status} onChange={(e) => setStatus(e.target.value as '' | 'draft' | 'issued')}
@@ -259,6 +293,7 @@ export default function PurchaseOrdersPage() {
               <tr>
                 <SortableHeader label="注文番号"   field="invoice_number" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[200px]" />
                 <th className="text-left px-2 py-3 font-semibold w-[200px]">請書番号</th>
+                <SortableHeader label="対象月"     field="year_month"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[80px]" />
                 <SortableHeader label="取引先"     field="customer"       sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[180px]" />
                 <th className="text-left px-2 py-3 font-semibold">件名</th>
                 <SortableHeader label="発行日"     field="issued_date"    sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
@@ -271,13 +306,14 @@ export default function PurchaseOrdersPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
+                <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
               ) : sortedItems.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">注文書がありません</td></tr>
+                <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">注文書がありません</td></tr>
               ) : sortedItems.map((r, idx) => (
                 <tr key={r.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
                   <td className="px-2 py-3 font-mono text-xs truncate">{r.invoice_number}</td>
                   <td className="px-2 py-3 font-mono text-xs text-gray-600 truncate">{r.acknowledgement_no ?? '-'}</td>
+                  <td className="px-2 py-3 text-gray-600 truncate">{r.year_month}</td>
                   <td className="px-2 py-3 text-gray-800 truncate" title={r.customer_name_snapshot ?? r.customer?.company_name ?? ''}>{r.customer_name_snapshot ?? r.customer?.company_name ?? '-'}</td>
                   <td className="px-2 py-3 truncate" title={r.subject_name ?? ''}>{r.subject_name ?? '-'}</td>
                   <td className="px-2 py-3 text-gray-600">{r.issued_date}</td>
@@ -334,7 +370,7 @@ export default function PurchaseOrdersPage() {
                     </div>
                   </td>
                   <td className="px-2 py-3 text-center">
-                    <Link href={`/invoices/${r.id}`} className="text-xs text-gray-700 hover:underline">詳細</Link>
+                    <Link href={`/purchase-orders/${r.id}`} className="text-xs text-gray-700 hover:underline">詳細</Link>
                   </td>
                 </tr>
               ))}

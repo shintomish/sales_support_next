@@ -7,9 +7,6 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import SortableHeader from '@/components/SortableHeader';
-import { useAuthStore } from '@/store/authStore';
-
-type ApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejected';
 
 interface EstimateListItem {
   id: number;
@@ -19,9 +16,6 @@ interface EstimateListItem {
   valid_until_text: string | null;
   subject_name: string | null;
   status: 'draft' | 'issued';
-  approved: boolean;
-  approval_status: ApprovalStatus;
-  approval_comment: string | null;
   total: string;
   customer_name_snapshot: string | null;
   pdf_path: string | null;
@@ -35,19 +29,6 @@ interface CustomerLookup {
   invoice_code: string | null;
 }
 
-const APPROVAL_LABEL: Record<ApprovalStatus, string> = {
-  draft:    '下書き',
-  pending:  '承認待ち',
-  approved: '承認済',
-  rejected: '却下',
-};
-const APPROVAL_BADGE_CLASS: Record<ApprovalStatus, string> = {
-  draft:    'bg-gray-100 text-gray-600',
-  pending:  'bg-amber-100 text-amber-700',
-  approved: 'bg-blue-100 text-blue-700',
-  rejected: 'bg-rose-100 text-rose-700',
-};
-
 interface PaginatedRes {
   data: EstimateListItem[];
   meta?: { current_page: number; last_page: number; total: number };
@@ -55,21 +36,32 @@ interface PaginatedRes {
 
 const yen = (n: string | number) => `¥${Number(n).toLocaleString()}`;
 
-type SortField = 'invoice_number' | 'customer' | 'issued_date' | 'total' | 'status';
+const recentMonths = (): string[] => {
+  const arr: string[] = [''];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    arr.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return arr;
+};
+
+const currentMonth = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+type SortField = 'invoice_number' | 'customer' | 'year_month' | 'issued_date' | 'total' | 'status';
 
 export default function EstimatesPage() {
-  const user = useAuthStore((s) => s.user);
-  const canApprove = user?.role === 'tenant_admin' || user?.role === 'super_admin';
   const searchParams = useSearchParams();
-  const initialApproval = (searchParams.get('approval_status') as ApprovalStatus | null) ?? '';
   const initialCreate   = searchParams.get('create') === '1';
 
   const [items, setItems]               = useState<EstimateListItem[]>([]);
+  const [yearMonth, setYearMonth]       = useState<string>(currentMonth());
   const [status, setStatus]             = useState<'' | 'draft' | 'issued'>('');
-  const [approvalStatus, setApprovalStatus] = useState<'' | ApprovalStatus>(initialApproval);
   const [q, setQ]                       = useState('');
   const [loading, setLoading]           = useState(false);
-  const [busyId, setBusyId]             = useState<number | null>(null);
   const [sortBy, setSortBy]             = useState<SortField>('issued_date');
   const [sortOrder, setSortOrder]       = useState<'asc' | 'desc'>('desc');
 
@@ -92,15 +84,15 @@ export default function EstimatesPage() {
     try {
       const params = new URLSearchParams();
       params.set('doc_type', 'estimate');
+      if (yearMonth)      params.set('year_month', yearMonth);
       if (status)         params.set('status', status);
-      if (approvalStatus) params.set('approval_status', approvalStatus);
       if (q.trim())       params.set('q', q.trim());
       const res = await apiClient.get<PaginatedRes>(`/api/v1/invoices?${params.toString()}`);
       setItems(res.data.data ?? []);
     } finally {
       setLoading(false);
     }
-  }, [status, approvalStatus, q]);
+  }, [yearMonth, status, q]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -112,9 +104,18 @@ export default function EstimatesPage() {
     const t = setTimeout(async () => {
       try {
         const res = await apiClient.get<{ data: CustomerLookup[] }>('/api/v1/customers', {
-          params: { search: custSearch || undefined, page: 1 },
+          // 見積書は売上先(is_customer=true)向け。両方フラグの顧客も含まれる
+          params: { search: custSearch || undefined, page: 1, per_page: 500, type: 'customer' },
         });
-        if (!cancelled) setCustomers(res.data.data ?? []);
+        if (!cancelled) {
+          const list = res.data.data ?? [];
+          // 株式会社/有限会社/合同会社 などの法人格を除去した名前で五十音/英字ソート
+          const sortKey = (n: string) => n
+            .replace(/^(株式会社|有限会社|合同会社|一般社団法人|公益財団法人)\s*/u, '')
+            .replace(/\s*(株式会社|有限会社|合同会社|一般社団法人|公益財団法人)\s*$/u, '');
+          list.sort((a, b) => sortKey(a.company_name).localeCompare(sortKey(b.company_name), 'ja'));
+          setCustomers(list);
+        }
       } finally {
         if (!cancelled) setCustLoading(false);
       }
@@ -122,42 +123,6 @@ export default function EstimatesPage() {
     return () => { cancelled = true; clearTimeout(t); };
   }, [createOpen, custSearch]);
 
-  const handleSubmit = async (id: number) => {
-    if (!confirm('承認申請しますか？')) return;
-    setBusyId(id);
-    try {
-      await apiClient.post(`/api/v1/invoices/${id}/submit-approval`);
-      fetchData();
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '申請に失敗しました';
-      alert(msg);
-    } finally { setBusyId(null); }
-  };
-
-  const handleApprove = async (id: number) => {
-    if (!confirm('承認すると電子印付き PDF を再生成します。よろしいですか？')) return;
-    setBusyId(id);
-    try {
-      await apiClient.post(`/api/v1/invoices/${id}/approve`);
-      fetchData();
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '承認に失敗しました';
-      alert(msg);
-    } finally { setBusyId(null); }
-  };
-
-  const handleReject = async (id: number) => {
-    const comment = prompt('却下理由を入力してください');
-    if (!comment) return;
-    setBusyId(id);
-    try {
-      await apiClient.post(`/api/v1/invoices/${id}/reject`, { comment });
-      fetchData();
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '却下に失敗しました';
-      alert(msg);
-    } finally { setBusyId(null); }
-  };
 
   const handleCreate = async () => {
     if (!form.customer_id) { alert('顧客を選択してください'); return; }
@@ -173,8 +138,8 @@ export default function EstimatesPage() {
       setCreateOpen(false);
       setForm({ customer_id: '', subject_name: '', valid_until_text: '30日間', issued_date: new Date().toISOString().slice(0, 10), notes: '' });
       setCustSearch('');
-      // 作成した見積の編集ページへ遷移（請求書詳細を流用）
-      window.location.href = `/invoices/${res.data.id}`;
+      // 作成した見積の編集ページへ遷移
+      window.location.href = `/estimates/${res.data.id}`;
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
       const msg = e?.response?.data?.message
@@ -198,6 +163,7 @@ export default function EstimatesPage() {
       switch (sortBy) {
         case 'invoice_number': return r.invoice_number;
         case 'customer':       return r.customer_name_snapshot ?? r.customer?.company_name ?? '';
+        case 'year_month':     return r.year_month;
         case 'issued_date':    return r.issued_date ?? '';
         case 'total':          return Number(r.total);
         case 'status':         return r.status;
@@ -224,23 +190,19 @@ export default function EstimatesPage() {
 
       <div className="flex-shrink-0 flex flex-wrap items-end gap-3 mb-4 bg-white p-4 rounded-lg border border-gray-200">
         <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">対象月</label>
+          <select value={yearMonth} onChange={(e) => setYearMonth(e.target.value)}
+            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white">
+            {recentMonths().map((m) => <option key={m || 'all'} value={m}>{m || '全期間'}</option>)}
+          </select>
+        </div>
+        <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1">ステータス</label>
           <select value={status} onChange={(e) => setStatus(e.target.value as '' | 'draft' | 'issued')}
             className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white">
             <option value="">すべて</option>
             <option value="draft">下書き</option>
             <option value="issued">発行済</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1">承認</label>
-          <select value={approvalStatus} onChange={(e) => setApprovalStatus(e.target.value as '' | ApprovalStatus)}
-            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white">
-            <option value="">すべて</option>
-            <option value="draft">下書き</option>
-            <option value="pending">承認待ち</option>
-            <option value="approved">承認済</option>
-            <option value="rejected">却下</option>
           </select>
         </div>
         <div className="flex-1 min-w-[200px]">
@@ -259,13 +221,13 @@ export default function EstimatesPage() {
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
                 <SortableHeader label="見積番号"   field="invoice_number" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[200px]" />
+                <SortableHeader label="対象月"     field="year_month"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[80px]" />
                 <SortableHeader label="取引先"     field="customer"       sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[180px]" />
                 <th className="text-left px-2 py-3 font-semibold">件名</th>
                 <SortableHeader label="発行日"     field="issued_date"    sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
                 <th className="text-left px-2 py-3 font-semibold w-[90px]">有効期間</th>
                 <SortableHeader label="税込合計"   field="total"          sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[110px]" />
                 <th className="text-center px-2 py-3 font-semibold w-[80px]">状態</th>
-                <th className="text-center px-2 py-3 font-semibold w-[100px]">承認</th>
                 <th className="px-2 py-3 text-center font-semibold w-[70px]">PDF</th>
                 <th className="px-2 py-3 text-center font-semibold w-[70px]">操作</th>
               </tr>
@@ -278,6 +240,7 @@ export default function EstimatesPage() {
               ) : sortedItems.map((r, idx) => (
                 <tr key={r.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
                   <td className="px-2 py-3 font-mono text-xs truncate">{r.invoice_number}</td>
+                  <td className="px-2 py-3 text-gray-600 truncate">{r.year_month}</td>
                   <td className="px-2 py-3 text-gray-800 truncate" title={r.customer_name_snapshot ?? r.customer?.company_name ?? ''}>{r.customer_name_snapshot ?? r.customer?.company_name ?? '-'}</td>
                   <td className="px-2 py-3 truncate" title={r.subject_name ?? ''}>{r.subject_name ?? '-'}</td>
                   <td className="px-2 py-3 text-gray-600">{r.issued_date}</td>
@@ -285,44 +248,11 @@ export default function EstimatesPage() {
                   <td className="px-2 py-3 text-right tabular-nums font-semibold">{yen(r.total)}</td>
                   <td className="px-2 py-3 text-center">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      r.approved ? 'bg-blue-100 text-blue-700'
-                        : r.status === 'issued' ? 'bg-green-100 text-green-700'
+                      r.status === 'issued' ? 'bg-green-100 text-green-700'
                         : 'bg-gray-100 text-gray-500'
                     }`}>
-                      {r.approved ? '承認済' : r.status === 'issued' ? '発行済' : '下書き'}
+                      {r.status === 'issued' ? '発行済' : '下書き'}
                     </span>
-                  </td>
-                  <td className="px-2 py-3 text-center">
-                    <div className="flex flex-col items-center gap-1">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${APPROVAL_BADGE_CLASS[r.approval_status]}`}
-                        title={r.approval_status === 'rejected' && r.approval_comment ? `理由: ${r.approval_comment}` : ''}
-                      >
-                        {APPROVAL_LABEL[r.approval_status]}
-                      </span>
-                      {r.approval_status === 'draft' || r.approval_status === 'rejected' ? (
-                        <button
-                          onClick={() => handleSubmit(r.id)}
-                          disabled={busyId === r.id}
-                          className="text-[10px] text-blue-600 hover:underline disabled:opacity-50"
-                        >
-                          {busyId === r.id ? '処理中…' : '申請'}
-                        </button>
-                      ) : r.approval_status === 'pending' && canApprove ? (
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => handleApprove(r.id)}
-                            disabled={busyId === r.id}
-                            className="text-[10px] text-blue-600 hover:underline disabled:opacity-50"
-                          >承認</button>
-                          <button
-                            onClick={() => handleReject(r.id)}
-                            disabled={busyId === r.id}
-                            className="text-[10px] text-rose-600 hover:underline disabled:opacity-50"
-                          >却下</button>
-                        </div>
-                      ) : null}
-                    </div>
                   </td>
                   <td className="px-2 py-3 text-center">
                     {r.pdf_path
@@ -330,7 +260,7 @@ export default function EstimatesPage() {
                       : <span className="text-gray-300 text-xs">-</span>}
                   </td>
                   <td className="px-2 py-3 text-center">
-                    <Link href={`/invoices/${r.id}`} className="text-xs text-gray-700 hover:underline">詳細</Link>
+                    <Link href={`/estimates/${r.id}`} className="text-xs text-gray-700 hover:underline">詳細</Link>
                   </td>
                 </tr>
               ))}

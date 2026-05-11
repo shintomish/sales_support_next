@@ -184,7 +184,7 @@ export default function PurchaseOrderSendHistoriesPage() {
                 <tr key={r.id} className="hover:bg-blue-50">
                   <td className="px-2 py-2 font-mono text-xs truncate" title={r.invoice_number ?? ''}>
                     {r.invoice_id ? (
-                      <Link href={`/invoices/${r.invoice_id}`} className="text-blue-600 hover:underline">
+                      <Link href={`/purchase-orders/${r.invoice_id}`} className="text-blue-600 hover:underline">
                         {r.invoice_number}
                       </Link>
                     ) : '-'}
