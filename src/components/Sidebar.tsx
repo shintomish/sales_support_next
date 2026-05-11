@@ -63,6 +63,7 @@ export default function Sidebar() {
         { label: '勤務表',      path: '/timesheets',             icon: '⏰' },
         { label: '請求書作成',  path: '/billing-summaries',      icon: '💴' },
         { label: '請求書一覧',  path: '/invoices',               icon: '📄', badge: pendingApprovalCount + rejectedInvoiceCount },
+        { label: '見積書一覧',  path: '/estimates',              icon: '📝' },
         { label: '請求書送信履歴', path: '/invoice-send-histories', icon: '📤' },
       ],
     },
