@@ -267,14 +267,14 @@ export default function BillingSummariesPage() {
                 {group === 'deal' ? (
                   <>
                     <SortableHeader label="取引先"       field="customer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[120px]" />
-                    <SortableHeader label="請求書コード" field="invoice_code" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[90px]" />
+                    <SortableHeader label="顧客コード" field="invoice_code" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[90px]" />
                     <SortableHeader label="案件"         field="deal"         sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
                     <SortableHeader label="技術者"       field="engineer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[80px]" />
                   </>
                 ) : (
                   <>
                     <SortableHeader label="取引先"       field="customer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[180px]" />
-                    <SortableHeader label="請求書コード" field="invoice_code" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
+                    <SortableHeader label="顧客コード" field="invoice_code" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
                     <th className="text-right px-2 py-3 font-semibold w-[70px]">案件数</th>
                   </>
                 )}
@@ -366,7 +366,7 @@ export default function BillingSummariesPage() {
                           <button
                             onClick={() => issueInvoice(r.deal_id, r.customer_name)}
                             disabled={issuingId === r.deal_id || !r.invoice_code}
-                            title={!r.invoice_code ? '取引先に請求書コードが未設定です' : '請求書の下書きを作成'}
+                            title={!r.invoice_code ? '取引先に顧客コードが未設定です' : '請求書の下書きを作成'}
                             className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-block w-[72px] text-center"
                           >
                             {issuingId === r.deal_id ? '...' : '📝 下書き'}

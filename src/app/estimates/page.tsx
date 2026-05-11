@@ -364,7 +364,7 @@ export default function EstimatesPage() {
                   {!custLoading && customers.length === 0 && <option disabled>該当なし</option>}
                   {customers.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.company_name}{c.invoice_code ? ` [${c.invoice_code}]` : ' （※invoice_code未設定）'}
+                      {c.company_name}{c.invoice_code ? ` [${c.invoice_code}]` : ' （※顧客コード未設定）'}
                     </option>
                   ))}
                 </select>

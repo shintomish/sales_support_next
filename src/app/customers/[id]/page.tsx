@@ -140,7 +140,7 @@ export default function CustomerDetailPage() {
               <p className="text-sm font-medium text-gray-800">{customer.company_name}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-1">請求書コード</p>
+              <p className="text-xs text-gray-400 mb-1">顧客コード</p>
               <p className="text-sm font-medium text-gray-800">{customer.invoice_code ?? <Em />}</p>
             </div>
             <div>
