@@ -42,7 +42,10 @@ interface SendHistoryRow {
 
 interface Invoice {
   id: number;
+  doc_type: 'invoice' | 'estimate' | 'purchase_order';
   invoice_number: string;
+  acknowledgement_no: string | null;
+  acknowledgement_pdf_path: string | null;
   order_number: string | null;
   quote_number: string | null;
   subject_name: string | null;
@@ -240,9 +243,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     try {
       // 編集中の内容を先にDBへ保存（トースト抑止のため save() ではなく直接呼ぶ）
       await apiClient.put<Invoice>(`/api/v1/invoices/${id}`, buildPayload());
-      const res = await apiClient.post<{ pdf_url: string; invoice: Invoice }>(`/api/v1/invoices/${id}/pdf`);
+      const res = await apiClient.post<{ pdf_url: string; acknowledgement_pdf_url?: string; invoice: Invoice }>(`/api/v1/invoices/${id}/pdf`);
       setInvoice(res.data.invoice);
       window.open(res.data.pdf_url, '_blank');
+      // 注文書(purchase_order)の場合は請書PDFも生成されているので別タブで開く
+      if (res.data.acknowledgement_pdf_url) {
+        window.open(res.data.acknowledgement_pdf_url, '_blank');
+      }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'PDF生成に失敗しました';
       alert(msg);
@@ -538,7 +545,16 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     <div className="h-full flex flex-col p-6 max-w-6xl mx-auto w-full">
       <Toast message={toast} type={toastType} onClose={() => setToast(null)} />
       <div className="flex-shrink-0 mb-4">
-        <Link href="/invoices" className="text-sm text-blue-600 hover:underline">← 請求書一覧に戻る</Link>
+        <Link
+          href={invoice.doc_type === 'estimate' ? '/estimates'
+              : invoice.doc_type === 'purchase_order' ? '/purchase-orders'
+              : '/invoices'}
+          className="text-sm text-blue-600 hover:underline"
+        >
+          {invoice.doc_type === 'estimate' ? '← 見積書一覧に戻る'
+            : invoice.doc_type === 'purchase_order' ? '← 注文書一覧に戻る'
+            : '← 請求書一覧に戻る'}
+        </Link>
         <div className="flex items-center justify-between mt-2">
           <h1 className="text-2xl font-bold text-gray-800 font-mono">{invoice.invoice_number}</h1>
           <div className="flex items-center gap-2">
@@ -550,7 +566,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             </span>
             {invoice.pdf_path && (
               <a href={invoice.pdf_path} target="_blank" rel="noreferrer"
-                 className="text-blue-600 hover:underline text-sm">📄 PDF を開く</a>
+                 className="text-blue-600 hover:underline text-sm">
+                {invoice.doc_type === 'purchase_order' ? '📄 注文書 PDF' : '📄 PDF を開く'}
+              </a>
+            )}
+            {invoice.doc_type === 'purchase_order' && invoice.acknowledgement_pdf_path && (
+              <a href={invoice.acknowledgement_pdf_path} target="_blank" rel="noreferrer"
+                 className="text-blue-600 hover:underline text-sm">📄 注文請書 PDF</a>
             )}
           </div>
         </div>

@@ -65,8 +65,8 @@ export default function Sidebar() {
         { label: '見積書作成',      path: '/estimates?create=1',            icon: '🧮' },
         { label: '見積書一覧',      path: '/estimates',                     icon: '📝' },
         { label: '見積書送信履歴',  path: '/estimate-send-histories',       icon: '📤' },
-        // ── 注文書（doc_type=purchase_order）※未実装 ───────
-        { label: '注文書作成',      path: '/purchase-orders/create',        icon: '🧾' },
+        // ── 注文書（doc_type=purchase_order）─────────────
+        { label: '注文書作成',      path: '/purchase-orders?create=1',      icon: '🧾' },
         { label: '注文書一覧',      path: '/purchase-orders',               icon: '📦' },
         { label: '注文書送信履歴',  path: '/purchase-order-send-histories', icon: '📤' },
         // ── 請求書 ─────────────────────────────────────────
