@@ -666,6 +666,16 @@ export default function DeliveriesPage() {
   const [expandedCampId, setExpandedCampId] = useState<number | null>(null)
   const [campDetailCache, setCampDetailCache] = useState<Record<number, CampaignDetail>>({})
   const [campDetailLoadingId, setCampDetailLoadingId] = useState<number | null>(null)
+  // 配信履歴の中の送信/受信ブロック個別アコーディオン展開（キー例: `${campId}-send` / `${campId}-reply-${historyId}`）
+  const [campSubOpen, setCampSubOpen] = useState<Set<string>>(new Set())
+  const toggleCampSub = (key: string) => {
+    setCampSubOpen(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   const handleToggleCamp = async (id: number) => {
     if (expandedCampId === id) {
@@ -1442,8 +1452,8 @@ export default function DeliveriesPage() {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-            <table className="min-w-full text-sm">
+            <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+            <table className="w-full text-sm">
               <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
                 <tr>
                   <th className="px-2 py-3 w-8" />
@@ -1462,19 +1472,19 @@ export default function DeliveriesPage() {
                         sortField={campSortBy}
                         sortOrder={campSortDir}
                         onSort={(f) => handleCampSort(f as CampSortBy)}
-                        className="px-4 py-3"
+                        className={`px-4 py-3 ${col === 'subject' ? 'w-32' : col === 'project_title' ? 'w-24' : ''}`}
                       />
                       {col === 'sent_at' && (
-                        <th className="px-4 py-3 text-left whitespace-nowrap">最終再送信日時</th>
+                        <th className="px-4 py-3 text-left whitespace-nowrap">再送信日時</th>
                       )}
                     </Fragment>
                   ))}
-                  <th className="px-4 py-3 text-center">分類</th>
-                  <th className="px-4 py-3 text-center">送信数</th>
-                  <th className="px-4 py-3 text-center">成功</th>
-                  <th className="px-4 py-3 text-center">失敗</th>
-                  <th className="px-4 py-3 text-center">返信率</th>
-                  <th className="px-4 py-3 text-center">詳細</th>
+                  <th className="px-2 py-3 text-center whitespace-nowrap">分類</th>
+                  <th className="px-2 py-3 text-center whitespace-nowrap">送信数</th>
+                  <th className="px-2 py-3 text-center whitespace-nowrap">成功</th>
+                  <th className="px-2 py-3 text-center whitespace-nowrap">失敗</th>
+                  <th className="px-2 py-3 text-center whitespace-nowrap">返信率</th>
+                  <th className="px-2 py-3 text-center whitespace-nowrap">詳細</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -1497,13 +1507,13 @@ export default function DeliveriesPage() {
                           {camp.latest_resent_at ? new Date(camp.latest_resent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}
                         </td>
                         <td className="px-4 py-3 text-gray-800 whitespace-nowrap">{camp.sent_by ?? '-'}</td>
-                        <td className="px-4 py-3 w-44">
-                          <div className="truncate max-w-[176px] text-gray-800" title={camp.subject}>{camp.subject}</div>
-                        </td>
                         <td className="px-4 py-3 w-32">
-                          <div className="truncate max-w-[128px] text-gray-500 text-xs" title={camp.project_title ?? camp.engineer_mail_title ?? ''}>{camp.project_title ?? camp.engineer_mail_title ?? '-'}</div>
+                          <div className="truncate max-w-[120px] text-gray-800" title={camp.subject}>{camp.subject}</div>
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-4 py-3 w-24">
+                          <div className="truncate max-w-[88px] text-gray-500 text-xs" title={camp.project_title ?? camp.engineer_mail_title ?? ''}>{camp.project_title ?? camp.engineer_mail_title ?? '-'}</div>
+                        </td>
+                        <td className="px-2 py-3 text-center whitespace-nowrap">
                           {camp.engineer_mail_source_id != null
                             ? <span
                                 onClick={e => { e.stopPropagation(); router.push(`/engineer-mails?select=${camp.engineer_mail_source_id}`) }}
@@ -1517,10 +1527,10 @@ export default function DeliveriesPage() {
                               : <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">配信</span>
                           }
                         </td>
-                        <td className="px-4 py-3 text-center text-gray-700">{camp.total_count}</td>
-                        <td className="px-4 py-3 text-center text-green-600 font-medium">{camp.success_count}</td>
-                        <td className="px-4 py-3 text-center text-red-500">{camp.failed_count}</td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-2 py-3 text-center text-gray-700 whitespace-nowrap">{camp.total_count}</td>
+                        <td className="px-2 py-3 text-center text-green-600 font-medium whitespace-nowrap">{camp.success_count}</td>
+                        <td className="px-2 py-3 text-center text-red-500 whitespace-nowrap">{camp.failed_count}</td>
+                        <td className="px-2 py-3 text-center whitespace-nowrap">
                           {camp.replied_count != null && camp.success_count > 0 ? (
                             <div className="flex flex-col items-center gap-0.5">
                               <span className="text-blue-600 font-medium text-xs">
@@ -1532,7 +1542,7 @@ export default function DeliveriesPage() {
                             <span className="text-gray-300 text-xs">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-2 py-3 text-center whitespace-nowrap">
                           <button
                             onClick={e => {
                               e.stopPropagation()
@@ -1555,107 +1565,125 @@ export default function DeliveriesPage() {
                             )}
                             {!isDetailLoading && detail && (
                               <div className="space-y-3">
-                                {/* 送信メール */}
-                                <div className="rounded-lg border p-3 bg-blue-50 border-blue-100 ml-8">
-                                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                    <span className="text-xs font-bold text-blue-600">→ 送信</span>
-                                    <span className="text-xs text-gray-400">
-                                      {detail.sent_at ? new Date(detail.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : ''}
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                      送信数: {detail.total_count}件（成功: {detail.success_count} / 失敗: {detail.failed_count}）
-                                    </span>
-                                    {camp.latest_resent_at && (
-                                      <span className="text-xs text-amber-600">
-                                        再送信: {new Date(camp.latest_resent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
-                                      </span>
-                                    )}
-                                    <div className="ml-auto">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          setBulkResend({
-                                            campaignId: camp.id,
-                                            subject:    detail.subject,
-                                            body:       detail.body ?? '',
-                                          })
-                                        }}
-                                        className="text-xs text-orange-600 hover:underline"
+                                {/* 送信メール（個別アコーディオン） */}
+                                {(() => {
+                                  const sendKey = `${camp.id}-send`
+                                  const sendOpen = campSubOpen.has(sendKey)
+                                  return (
+                                    <div className="rounded-lg border bg-blue-50 border-blue-100 ml-8 overflow-hidden">
+                                      <div
+                                        onClick={(e) => { e.stopPropagation(); toggleCampSub(sendKey) }}
+                                        className="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-blue-100/60 flex-wrap"
                                       >
-                                        ↻ 再送信
-                                      </button>
+                                        <span className="text-gray-400 text-xs">{sendOpen ? '▼' : '▶'}</span>
+                                        <span className="text-xs font-bold text-blue-600">→ 送信</span>
+                                        <span className="text-xs text-gray-400">
+                                          {detail.sent_at ? new Date(detail.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : ''}
+                                        </span>
+                                        <span className="text-sm text-gray-800 font-medium flex-1 min-w-0 truncate">{detail.subject}</span>
+                                        <span className="text-xs text-gray-500 whitespace-nowrap">
+                                          {detail.total_count}件（成功{detail.success_count}/失敗{detail.failed_count}）
+                                        </span>
+                                        {camp.latest_resent_at && (
+                                          <span className="text-xs text-amber-600 whitespace-nowrap">
+                                            再送信: {new Date(camp.latest_resent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                                          </span>
+                                        )}
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setBulkResend({
+                                              campaignId: camp.id,
+                                              subject:    detail.subject,
+                                              body:       detail.body ?? '',
+                                            })
+                                          }}
+                                          className="text-xs text-orange-600 hover:underline ml-auto"
+                                        >
+                                          ↻ 再送信
+                                        </button>
+                                      </div>
+                                      {sendOpen && (
+                                        <div className="px-3 pb-3 pt-2 border-t border-blue-100">
+                                          <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans break-words">{detail.body?.replace(/<%Name%>/g, '（各配信先名）')}</pre>
+                                        </div>
+                                      )}
                                     </div>
-                                  </div>
-                                  <p className="text-sm font-semibold text-gray-800 mb-1">{detail.subject}</p>
-                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans break-words">{detail.body?.replace(/<%Name%>/g, '（各配信先名）')}</pre>
-                                </div>
+                                  )
+                                })()}
 
-                                {/* 返信一覧 */}
+                                {/* 返信一覧（各受信メールを個別アコーディオン） */}
                                 {detail.histories.filter(h => h.status === 'replied').length > 0 && (
                                   <div className="space-y-3">
                                     {detail.histories.filter(h => h.status === 'replied').map(h => {
                                       const replyFrom = h.reply_from ?? h.email
                                       const replyFromName = h.reply_from_name ?? h.name ?? null
+                                      const replyKey = `${camp.id}-reply-${h.id}`
+                                      const replyOpen = campSubOpen.has(replyKey)
                                       return (
-                                      <div key={h.id} className="rounded-lg border p-3 bg-white border-gray-200 mr-8">
-                                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                      <div key={h.id} className="rounded-lg border bg-white border-gray-200 mr-8 overflow-hidden">
+                                        <div
+                                          onClick={(e) => { e.stopPropagation(); toggleCampSub(replyKey) }}
+                                          className="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-50 flex-wrap"
+                                        >
+                                          <span className="text-gray-400 text-xs">{replyOpen ? '▼' : '▶'}</span>
                                           <span className="text-xs font-bold text-red-600">← 受信</span>
                                           <span className="text-xs text-gray-400">
                                             {h.replied_at ? new Date(h.replied_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : ''}
                                           </span>
-                                          <span className="text-xs text-gray-500">
-                                            From: {replyFromName ?? replyFrom}
-                                          </span>
+                                          <span className="text-sm text-gray-800 font-medium flex-1 min-w-0 truncate">{h.reply_subject ?? '（件名なし）'}</span>
+                                          <span className="text-xs text-gray-500 whitespace-nowrap">From: {replyFromName ?? replyFrom}</span>
                                           {h.resent_at && (
-                                            <span className="text-xs text-amber-600">
+                                            <span className="text-xs text-amber-600 whitespace-nowrap">
                                               再送信: {new Date(h.resent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                                             </span>
                                           )}
-                                          <div className="ml-auto flex items-center gap-2">
-                                            {replyFrom && (
-                                              <button
-                                                onClick={(e) => {
-                                                  e.stopPropagation()
-                                                  setReplyCompose({
-                                                    mode: 'campaign',
-                                                    campaignId: camp.id,
-                                                    to: replyFrom, toName: replyFromName,
-                                                    subject: (h.reply_subject ?? '').startsWith('Re:')
-                                                      ? (h.reply_subject ?? '')
-                                                      : `Re: ${h.reply_subject ?? camp.subject}`,
-                                                  })
-                                                }}
-                                                className="text-xs text-blue-600 hover:underline"
-                                              >
-                                                ↗ 送信
-                                              </button>
-                                            )}
-                                          </div>
+                                          {replyFrom && (
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                setReplyCompose({
+                                                  mode: 'campaign',
+                                                  campaignId: camp.id,
+                                                  to: replyFrom, toName: replyFromName,
+                                                  subject: (h.reply_subject ?? '').startsWith('Re:')
+                                                    ? (h.reply_subject ?? '')
+                                                    : `Re: ${h.reply_subject ?? camp.subject}`,
+                                                })
+                                              }}
+                                              className="text-xs text-blue-600 hover:underline ml-auto"
+                                            >
+                                              ↗ 送信
+                                            </button>
+                                          )}
                                         </div>
-                                        <p className="text-sm font-semibold text-gray-800 mb-1">{h.reply_subject ?? '（件名なし）'}</p>
-                                        <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans break-words">
-                                          {h.reply_body_text ?? h.reply_body_snippet ?? ''}
-                                        </pre>
-                                        {h.reply_email_id && h.reply_attachments && h.reply_attachments.length > 0 && (
-                                          <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-2">
-                                            {h.reply_attachments.map(att => (
-                                              <button
-                                                key={att.id}
-                                                onClick={(e) => {
-                                                  e.stopPropagation()
-                                                  handleDownloadAttachment(h.reply_email_id!, att)
-                                                }}
-                                                className="inline-flex items-center gap-1 text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 rounded px-2 py-1"
-                                                title={att.mime_type ?? ''}
-                                              >
-                                                📎 {att.filename}
-                                                {att.size != null && (
-                                                  <span className="text-gray-400 ml-1">
-                                                    ({Math.ceil(att.size / 1024)}KB)
-                                                  </span>
-                                                )}
-                                              </button>
-                                            ))}
+                                        {replyOpen && (
+                                          <div className="px-3 pb-3 pt-2 border-t border-gray-200">
+                                            <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans break-words">
+                                              {h.reply_body_text ?? h.reply_body_snippet ?? ''}
+                                            </pre>
+                                            {h.reply_email_id && h.reply_attachments && h.reply_attachments.length > 0 && (
+                                              <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-2">
+                                                {h.reply_attachments.map(att => (
+                                                  <button
+                                                    key={att.id}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      handleDownloadAttachment(h.reply_email_id!, att)
+                                                    }}
+                                                    className="inline-flex items-center gap-1 text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 rounded px-2 py-1"
+                                                    title={att.mime_type ?? ''}
+                                                  >
+                                                    📎 {att.filename}
+                                                    {att.size != null && (
+                                                      <span className="text-gray-400 ml-1">
+                                                        ({Math.ceil(att.size / 1024)}KB)
+                                                      </span>
+                                                    )}
+                                                  </button>
+                                                ))}
+                                              </div>
+                                            )}
                                           </div>
                                         )}
                                       </div>

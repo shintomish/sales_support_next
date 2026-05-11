@@ -19,6 +19,9 @@ type SendHistory = {
   reply_subject: string | null
   reply_received_at: string | null
   reply_body_snippet?: string | null
+  reply_body_text?: string | null
+  reply_from?: string | null
+  reply_from_name?: string | null
 }
 
 type Campaign = {
@@ -36,6 +39,8 @@ type Campaign = {
   histories: SendHistory[]
 }
 
+// ── ヘルパー ──────────────────────────────────────────────
+
 // メールアドレスからドメインを抽出（小文字化）
 function extractDomain(email: string): string | null {
   const at = email.lastIndexOf('@')
@@ -43,57 +48,18 @@ function extractDomain(email: string): string | null {
   return email.slice(at + 1).trim().toLowerCase()
 }
 
-// ── 返信本文モーダル ──────────────────────────────────────
-
-function ReplyModal({ h, campaignSubject, onClose }: { h: SendHistory; campaignSubject: string; onClose: () => void }) {
-  return (
-    <div onClick={onClose} className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div
-        onClick={e => e.stopPropagation()}
-        className="bg-white rounded-xl w-full max-w-xl max-h-[80vh] shadow-2xl overflow-hidden flex flex-col"
-      >
-        {/* ヘッダー */}
-        <div className="bg-blue-50 px-5 py-3 border-b border-blue-200 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-blue-700 mb-0.5">📩 受信メール（返信）</p>
-            <p className="text-sm font-semibold text-gray-800 truncate max-w-sm">{h.reply_subject}</p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl ml-4">✕</button>
-        </div>
-
-        {/* メタ情報 */}
-        <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 text-xs space-y-1 text-gray-600">
-          <div className="flex gap-2">
-            <span className="w-14 text-gray-400 shrink-0">差出人</span>
-            <span>{h.name ? `${h.name} ＜${h.email}＞` : h.email}</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="w-14 text-gray-400 shrink-0">受信日時</span>
-            <span>{h.replied_at ? new Date(h.replied_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}</span>
-          </div>
-        </div>
-
-        {/* 送信メールとの対応 */}
-        <div className="px-5 py-3 bg-blue-50/50 border-b border-gray-200 text-xs text-gray-600">
-          <p className="text-gray-400 mb-1">紐づいた送信メール（キャンペーン）</p>
-          <p className="text-gray-700 font-medium">📤 {campaignSubject}</p>
-        </div>
-
-        {/* 本文 */}
-        <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0">
-          <p className="text-xs text-gray-400 mb-2">本文（抜粋）</p>
-          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{h.reply_body_snippet}</p>
-        </div>
-
-        <div className="px-5 py-3 border-t border-gray-200 flex justify-end shrink-0">
-          <button onClick={onClose} className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700">
-            閉じる
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+const formatDateTime = (s: string | null | undefined): string => {
+  if (!s) return '—'
+  return new Date(s).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
 }
+
+// 本文の <%Name%> を name に置換（バックエンドが配信時に行う処理をプレビューで再現）
+const applyName = (body: string, name: string | null): string => {
+  return (body ?? '').replace(/<%Name%>/g, name ?? '')
+}
+
+const LS_SUMMARY = 'campaign_detail_summary_open'
+const LS_FILTER = 'campaign_detail_filter_open'
 
 // ── メインページ ──────────────────────────────────────────
 
@@ -104,12 +70,33 @@ export default function CampaignDetailPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [statusFilter, setStatusFilter] = useState<'' | 'sent' | 'failed' | 'replied'>('')
   const [search, setSearch] = useState('')
-  const [replyModal, setReplyModal] = useState<SendHistory | null>(null)
   const [resendingId, setResendingId] = useState<number | null>(null)
   // ドメイン一致警告モーダル: ソース企業ドメインと宛先ドメインが一致した場合のみ表示
   const [resendWarn, setResendWarn] = useState<SendHistory | null>(null)
   const PAGE_SIZE = 200
   const [page, setPage] = useState(1)
+
+  // 折りたたみ/展開状態（localStorage で永続化）
+  const [summaryOpen, setSummaryOpen] = useState(true)
+  const [filterOpen, setFilterOpen] = useState(true)
+  // 行アコーディオン展開（同時に1件のみ）
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [expandedTab, setExpandedTab] = useState<'sent' | 'reply'>('sent')
+
+  // 初回マウント時に localStorage から復元
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const s = localStorage.getItem(LS_SUMMARY)
+    const f = localStorage.getItem(LS_FILTER)
+    if (s !== null) setSummaryOpen(s !== '0')
+    if (f !== null) setFilterOpen(f !== '0')
+  }, [])
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem(LS_SUMMARY, summaryOpen ? '1' : '0')
+  }, [summaryOpen])
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem(LS_FILTER, filterOpen ? '1' : '0')
+  }, [filterOpen])
 
   const fetchCampaign = () => {
     axios.get(`/api/v1/delivery-campaigns/${id}`)
@@ -148,6 +135,16 @@ export default function CampaignDetailPage() {
     await executeResend(h)
   }
 
+  // 行アコーディオン: クリックで開閉。新規展開時は返信があれば「受信」、なければ「送信」をデフォルトに
+  const toggleExpand = (h: SendHistory) => {
+    if (expandedId === h.id) {
+      setExpandedId(null)
+    } else {
+      setExpandedId(h.id)
+      setExpandedTab(h.status === 'replied' && h.replied_at ? 'reply' : 'sent')
+    }
+  }
+
   const filtered = campaign?.histories.filter(h => {
     if (statusFilter && h.status !== statusFilter) return false
     if (search) {
@@ -160,7 +157,6 @@ export default function CampaignDetailPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage   = Math.min(page, totalPages)
   const paged      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-  // フィルタ変更で件数が減ったらページを戻す
   useEffect(() => { if (page > totalPages) setPage(totalPages) }, [totalPages, page])
 
   const repliedCount = campaign?.histories.filter(h => h.status === 'replied').length ?? 0
@@ -172,17 +168,173 @@ export default function CampaignDetailPage() {
     return <div className="p-6 text-gray-400">読み込み中...</div>
   }
 
-  return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* 返信モーダル */}
-      {replyModal && (
-        <ReplyModal
-          h={replyModal}
-          campaignSubject={campaign.subject}
-          onClose={() => setReplyModal(null)}
-        />
-      )}
+  // ── 行アコーディオン展開エリア ──────────────────────────
+  const renderExpandedPanel = (h: SendHistory) => {
+    const hasReply = h.status === 'replied' && !!h.replied_at
+    const sentBody = applyName(campaign.body, h.name)
+    const replyBody = h.reply_body_text ?? h.reply_body_snippet ?? '—'
+    const showReply = expandedTab === 'reply' && hasReply
+    return (
+      <div className="px-3 md:px-4 pb-4 pt-1 bg-gray-50/50 border-t border-gray-100">
+        {/* タブ */}
+        <div className="flex border-b border-gray-200 mb-3">
+          <button
+            type="button"
+            onClick={() => setExpandedTab('sent')}
+            className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors ${
+              expandedTab === 'sent'
+                ? 'border-blue-500 text-blue-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📤 送信
+          </button>
+          {hasReply && (
+            <button
+              type="button"
+              onClick={() => setExpandedTab('reply')}
+              className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors ${
+                expandedTab === 'reply'
+                  ? 'border-blue-500 text-blue-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              📩 受信
+            </button>
+          )}
+        </div>
 
+        {/* 内容 */}
+        {showReply ? (
+          <div className="space-y-2 text-xs">
+            <div className="grid grid-cols-[72px_1fr] gap-y-1 gap-x-3">
+              <span className="text-gray-400">件名</span>
+              <span className="text-gray-800 break-words">{h.reply_subject ?? '—'}</span>
+              <span className="text-gray-400">差出人</span>
+              <span className="text-gray-800 break-all">
+                {h.reply_from_name ? `${h.reply_from_name} ＜${h.reply_from ?? h.email}＞` : (h.reply_from ?? h.email)}
+              </span>
+              <span className="text-gray-400">受信日時</span>
+              <span className="text-gray-800">{formatDateTime(h.replied_at)}</span>
+            </div>
+            <div>
+              <p className="text-gray-400 mb-1">本文</p>
+              <pre className="bg-white border border-gray-200 rounded p-3 text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-72 overflow-y-auto">{replyBody}</pre>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2 text-xs">
+            <div className="grid grid-cols-[72px_1fr] gap-y-1 gap-x-3">
+              <span className="text-gray-400">件名</span>
+              <span className="text-gray-800 break-words">{campaign.subject}</span>
+              <span className="text-gray-400">宛先</span>
+              <span className="text-gray-800 break-all">
+                {h.name ? `${h.name} ＜${h.email}＞` : h.email}
+              </span>
+              <span className="text-gray-400">送信日時</span>
+              <span className="text-gray-800">{formatDateTime(h.sent_at)}</span>
+              {h.resent_at && (
+                <>
+                  <span className="text-gray-400">再送信日時</span>
+                  <span className="text-gray-800">{formatDateTime(h.resent_at)}</span>
+                </>
+              )}
+            </div>
+            <div>
+              <p className="text-gray-400 mb-1">本文</p>
+              <pre className="bg-white border border-gray-200 rounded p-3 text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed max-h-72 overflow-y-auto">{sentBody}</pre>
+            </div>
+          </div>
+        )}
+
+        {/* アクション */}
+        <div className="flex justify-end gap-2 mt-3">
+          <button
+            type="button"
+            onClick={() => setExpandedId(null)}
+            className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
+          >
+            閉じる
+          </button>
+          {(h.status === 'sent' || h.status === 'replied' || h.status === 'failed') && (
+            <button
+              type="button"
+              onClick={() => handleResend(h)}
+              disabled={resendingId === h.id}
+              className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded disabled:opacity-50"
+            >
+              {resendingId === h.id ? '送信中…' : '再送信'}
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ── 配信履歴行 ──────────────────────────────────────────
+  const renderHistoryRow = (h: SendHistory) => {
+    const isOpen = expandedId === h.id
+    const statusBadge = {
+      sent:    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">送信済</span>,
+      failed:  <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">失敗</span>,
+      replied: <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">返信あり</span>,
+    }[h.status]
+    return (
+      <div
+        key={h.id}
+        className={`${isOpen ? 'bg-blue-50/30' : ''} ${h.parent_history_id ? 'border-l-2 border-l-amber-300' : ''}`}
+      >
+        <button
+          type="button"
+          onClick={() => toggleExpand(h)}
+          className="w-full text-left hover:bg-gray-50 transition-colors"
+        >
+          {/* md以上: グリッド行（横スクロールなし） */}
+          <div className="hidden md:grid grid-cols-[28px_140px_minmax(160px,1.2fr)_72px_120px_minmax(120px,1.5fr)] gap-2 px-3 py-2.5 items-center">
+            <div className="text-gray-400 text-xs">{isOpen ? '▼' : '▶'}</div>
+            <div className="text-sm text-gray-800 truncate" title={h.name ?? ''}>
+              {h.name ?? '-'}
+              {h.parent_history_id && (
+                <span className="ml-1 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">再送</span>
+              )}
+            </div>
+            <div className="text-xs text-gray-600 truncate" title={h.email}>{h.email}</div>
+            <div className="text-center">{statusBadge}</div>
+            <div className="text-xs text-gray-600 whitespace-nowrap">{formatDateTime(h.sent_at)}</div>
+            <div className="text-xs truncate" title={h.reply_subject ?? ''}>
+              {h.status === 'replied' && h.reply_subject ? (
+                <span className="text-blue-700">📩 {h.reply_subject}</span>
+              ) : (
+                <span className="text-gray-300">—</span>
+              )}
+            </div>
+          </div>
+          {/* md未満: カード（縦積み） */}
+          <div className="md:hidden flex items-start gap-2 px-3 py-3">
+            <div className="text-gray-400 text-xs pt-0.5 shrink-0">{isOpen ? '▼' : '▶'}</div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium text-gray-800 truncate">{h.name ?? '-'}</span>
+                {h.parent_history_id && (
+                  <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">再送</span>
+                )}
+                {statusBadge}
+              </div>
+              <div className="text-xs text-gray-600 break-all mt-0.5">{h.email}</div>
+              <div className="text-[11px] text-gray-400 mt-0.5">{formatDateTime(h.sent_at)}</div>
+              {h.status === 'replied' && h.reply_subject && (
+                <div className="text-xs text-blue-700 truncate mt-0.5">📩 {h.reply_subject}</div>
+              )}
+            </div>
+          </div>
+        </button>
+        {isOpen && renderExpandedPanel(h)}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-screen max-w-7xl mx-auto px-3 md:px-6 py-3 md:py-4 gap-2 md:gap-3">
       {/* 再送信ドメイン一致警告モーダル */}
       {resendWarn && (
         <div
@@ -228,192 +380,137 @@ export default function CampaignDetailPage() {
         </div>
       )}
 
-      {/* ヘッダー */}
-      <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => router.push('/deliveries')} className="text-gray-400 hover:text-gray-600 text-sm">
-          ← キャンペーン一覧
+      {/* ヘッダー（常時表示） */}
+      <div className="flex-shrink-0 flex items-center gap-3">
+        <button onClick={() => router.push('/deliveries')} className="text-gray-400 hover:text-gray-600 text-sm shrink-0">
+          ← 一覧
         </button>
-        <h1 className="text-xl font-bold text-gray-800">キャンペーン詳細</h1>
+        <h1 className="text-base md:text-xl font-bold text-gray-800 truncate">キャンペーン詳細</h1>
       </div>
 
-      {/* サマリーカード */}
-      <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
-        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-          <div>
-            <span className="text-gray-500">件名</span>
-            <p className="font-medium text-gray-800 mt-0.5">{campaign.subject}</p>
-          </div>
-          <div>
-            <span className="text-gray-500">送信者</span>
-            <p className="font-medium text-gray-800 mt-0.5">{campaign.sent_by ?? '-'}</p>
-          </div>
-          <div>
-            <span className="text-gray-500">送信日時</span>
-            <p className="font-medium text-gray-800 mt-0.5">
-              {campaign.sent_at ? new Date(campaign.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}
-            </p>
-          </div>
-          <div>
-            <span className="text-gray-500">紐づき案件</span>
-            <p className="font-medium text-gray-800 mt-0.5">{campaign.project_title ?? '-'}</p>
-          </div>
-        </div>
-
-        {/* 集計バー */}
-        <div className="flex gap-6 border-t border-gray-100 pt-4">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-800">{campaign.total_count}</p>
-            <p className="text-xs text-gray-500 mt-0.5">送信数</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-green-600">{campaign.success_count}</p>
-            <p className="text-xs text-gray-500 mt-0.5">成功</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-red-500">{campaign.failed_count}</p>
-            <p className="text-xs text-gray-500 mt-0.5">失敗</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-blue-600">{repliedCount}</p>
-            <p className="text-xs text-gray-500 mt-0.5">返信あり</p>
-          </div>
-          <div className="text-center ml-auto">
-            <p className="text-2xl font-bold text-indigo-600">{replyRate}%</p>
-            <p className="text-xs text-gray-500 mt-0.5">返信率</p>
-          </div>
-        </div>
-
-        {/* 返信率プログレスバー */}
-        {campaign.success_count > 0 && (
-          <div className="mt-3">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
-              <span>返信率</span>
-              <span>{repliedCount} / {campaign.success_count} 件</span>
-            </div>
-            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${replyRate}%` }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* フィルタ */}
-      <div className="flex items-center gap-3 mb-4">
-        <input
-          type="text"
-          placeholder="メール・名前で検索"
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1) }}
-          className="border border-gray-300 rounded px-3 py-2 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-blue-300"
-        />
-        <select
-          value={statusFilter}
-          onChange={e => { setStatusFilter(e.target.value as typeof statusFilter); setPage(1) }}
-          className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+      {/* サマリーカード（折りたたみ可） */}
+      <div className="flex-shrink-0 bg-white border border-gray-200 rounded-lg">
+        <button
+          type="button"
+          onClick={() => setSummaryOpen(v => !v)}
+          className="w-full px-3 md:px-4 py-2 flex items-center justify-between gap-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
         >
-          <option value="">すべて</option>
-          <option value="sent">送信済</option>
-          <option value="replied">返信あり</option>
-          <option value="failed">失敗</option>
-        </select>
-        <span className="text-sm text-gray-500">{filtered.length} 件</span>
-        {totalPages > 1 && (
-          <span className="text-xs text-gray-400 ml-auto">{safePage} / {totalPages} ページ</span>
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="text-gray-400 text-xs shrink-0">{summaryOpen ? '▼' : '▶'}</span>
+            <span className="shrink-0">キャンペーン情報</span>
+            {!summaryOpen && (
+              <span className="text-xs text-gray-500 truncate hidden sm:inline">— {campaign.subject}</span>
+            )}
+          </span>
+          {/* 集計サマリー（常時表示） */}
+          <span className="flex items-center gap-2 md:gap-4 text-xs whitespace-nowrap shrink-0">
+            <span><span className="text-gray-400">送信</span> <span className="font-bold text-gray-800">{campaign.total_count}</span></span>
+            <span><span className="text-gray-400">成功</span> <span className="font-bold text-green-600">{campaign.success_count}</span></span>
+            <span><span className="text-gray-400">失敗</span> <span className="font-bold text-red-500">{campaign.failed_count}</span></span>
+            <span><span className="text-gray-400">返信</span> <span className="font-bold text-blue-600">{repliedCount}</span></span>
+            <span className="hidden md:inline"><span className="text-gray-400">返信率</span> <span className="font-bold text-indigo-600">{replyRate}%</span></span>
+          </span>
+        </button>
+        {summaryOpen && (
+          <div className="px-3 md:px-4 pb-3 border-t border-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 text-sm">
+              <div>
+                <span className="text-gray-500 text-xs">件名</span>
+                <p className="font-medium text-gray-800 break-words mt-0.5">{campaign.subject}</p>
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">送信者</span>
+                <p className="font-medium text-gray-800 mt-0.5">{campaign.sent_by ?? '-'}</p>
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">送信日時</span>
+                <p className="font-medium text-gray-800 mt-0.5">{formatDateTime(campaign.sent_at)}</p>
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">紐づき案件</span>
+                <p className="font-medium text-gray-800 break-words mt-0.5">{campaign.project_title ?? '-'}</p>
+              </div>
+            </div>
+            {campaign.success_count > 0 && (
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>返信率</span>
+                  <span>{repliedCount} / {campaign.success_count} 件</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                  <div className="bg-blue-500 h-2 rounded-full transition-all duration-500" style={{ width: `${replyRate}%` }} />
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
-      {/* 送信履歴テーブル — ヘッダ固定・本体縦スクロール（横スクロールなし） */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 560px)' }}>
-        <table className="w-full text-sm table-fixed">
-          <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
-            <tr>
-              <th className="px-3 py-3 text-left w-[140px]">名前</th>
-              <th className="px-3 py-3 text-left">メールアドレス</th>
-              <th className="px-3 py-3 text-center w-[80px]">状態</th>
-              <th className="px-3 py-3 text-left w-[140px]">送信日時</th>
-              <th className="px-3 py-3 text-left w-[140px]">再送信日時</th>
-              <th className="px-3 py-3 text-left">返信</th>
-              <th className="px-3 py-3 text-center w-[80px]">操作</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {paged.map(h => (
-              <tr
-                key={h.id}
-                className={`transition-colors ${
-                  h.status === 'replied' ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'
-                } ${h.parent_history_id ? 'border-l-2 border-l-amber-300' : ''}`}
-              >
-                <td className="px-3 py-3 text-gray-800 truncate" title={h.name ?? ''}>
-                  {h.name ?? '-'}
-                  {h.parent_history_id && (
-                    <span className="ml-1 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">再送</span>
-                  )}
-                </td>
-                <td className="px-3 py-3 text-gray-600 text-xs truncate" title={h.email}>{h.email}</td>
-                <td className="px-3 py-3 text-center">
-                  {{
-                    sent:    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">送信済</span>,
-                    failed:  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">失敗</span>,
-                    replied: <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">返信あり</span>,
-                  }[h.status]}
-                </td>
-                <td className="px-3 py-3 text-xs text-gray-600 truncate">
-                  {h.sent_at ? new Date(h.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}
-                </td>
-                <td className="px-3 py-3 text-xs text-gray-600 truncate">
-                  {h.resent_at ? new Date(h.resent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}
-                </td>
-                <td className="px-3 py-3 truncate">
-                  {h.status === 'replied' && h.replied_at ? (
-                    <div>
-                      <button
-                        onClick={() => setReplyModal(h)}
-                        className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-xs font-medium group"
-                      >
-                        <span className="text-base">📩</span>
-                        <span className="group-hover:underline truncate max-w-[240px]">{h.reply_subject}</span>
-                      </button>
-                      <p className="text-xs text-gray-400 mt-0.5 pl-6">
-                        {new Date(h.replied_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
-                      </p>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-gray-300">—</span>
-                  )}
-                </td>
-                <td className="px-3 py-3 text-center">
-                  {(h.status === 'sent' || h.status === 'replied' || h.status === 'failed') && (
-                    <button
-                      onClick={() => handleResend(h)}
-                      disabled={resendingId === h.id}
-                      className="text-xs text-orange-600 hover:underline disabled:opacity-50 disabled:no-underline"
-                    >
-                      {resendingId === h.id ? '送信中…' : '再送信'}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
-                  該当する履歴がありません。
-                </td>
-              </tr>
+      {/* フィルタ（折りたたみ可） */}
+      <div className="flex-shrink-0 bg-white border border-gray-200 rounded-lg">
+        <button
+          type="button"
+          onClick={() => setFilterOpen(v => !v)}
+          className="w-full px-3 md:px-4 py-2 flex items-center justify-between gap-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="text-gray-400 text-xs shrink-0">{filterOpen ? '▼' : '▶'}</span>
+            <span>絞り込み</span>
+            {!filterOpen && (statusFilter || search) && (
+              <span className="text-xs text-blue-600 shrink-0">適用中</span>
             )}
-          </tbody>
-        </table>
+          </span>
+          <span className="text-xs text-gray-500 shrink-0">{filtered.length} 件</span>
+        </button>
+        {filterOpen && (
+          <div className="px-3 md:px-4 pb-3 pt-2 border-t border-gray-100 flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              placeholder="メール・名前で検索"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1) }}
+              className="border border-gray-300 rounded px-3 py-1.5 text-sm flex-1 min-w-[180px] focus:outline-none focus:ring-2 focus:ring-blue-300"
+            />
+            <select
+              value={statusFilter}
+              onChange={e => { setStatusFilter(e.target.value as typeof statusFilter); setPage(1) }}
+              className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              <option value="">すべて</option>
+              <option value="sent">送信済</option>
+              <option value="replied">返信あり</option>
+              <option value="failed">失敗</option>
+            </select>
+            {totalPages > 1 && (
+              <span className="text-xs text-gray-400 ml-auto">{safePage} / {totalPages} ページ</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 送信履歴リスト（横スクロールなし・行アコーディオン） */}
+      <div className="flex-1 min-h-0 bg-white border border-gray-200 rounded-lg flex flex-col overflow-hidden">
+        {/* ヘッダ行（md以上のみ） */}
+        <div className="hidden md:grid grid-cols-[28px_140px_minmax(160px,1.2fr)_72px_120px_minmax(120px,1.5fr)] gap-2 px-3 py-2 bg-gray-50 text-xs font-medium text-gray-600 border-b">
+          <div></div>
+          <div>名前</div>
+          <div>メール</div>
+          <div className="text-center">状態</div>
+          <div>送信日時</div>
+          <div>返信</div>
+        </div>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden divide-y divide-gray-100">
+          {paged.length === 0 ? (
+            <div className="px-4 py-10 text-center text-gray-400 text-sm">該当する履歴がありません。</div>
+          ) : (
+            paged.map(h => renderHistoryRow(h))
+          )}
         </div>
       </div>
 
       {/* ページネーション */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-3">
+        <div className="flex-shrink-0 flex items-center justify-between">
           <span className="text-xs text-gray-500">
             {(safePage - 1) * PAGE_SIZE + 1}〜{Math.min(safePage * PAGE_SIZE, filtered.length)} / {filtered.length} 件
           </span>
