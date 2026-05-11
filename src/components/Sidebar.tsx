@@ -178,8 +178,8 @@ export default function Sidebar() {
             : 'text-gray-300 hover:bg-gray-700 hover:text-white'
         }`}
       >
-        <span>{it.icon}</span>
-        <span className="flex-1">{it.label}</span>
+        <span className="flex-shrink-0">{it.icon}</span>
+        <span className="flex-1 min-w-0 whitespace-nowrap truncate">{it.label}</span>
         {it.badge != null && it.badge > 0 && (
           <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center tabular-nums">
             {it.badge}
@@ -199,8 +199,8 @@ export default function Sidebar() {
           onClick={() => toggleGroup(g.key)}
           className="w-full text-left px-4 py-2 rounded-md text-sm transition-colors flex items-center gap-3 text-gray-200 hover:bg-gray-700 hover:text-white"
         >
-          <span>{g.icon}</span>
-          <span className="flex-1 font-semibold">{g.label}</span>
+          <span className="flex-shrink-0">{g.icon}</span>
+          <span className="flex-1 min-w-0 whitespace-nowrap truncate font-semibold">{g.label}</span>
           {!isOpen && sumBadge > 0 && (
             <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
               {sumBadge}
