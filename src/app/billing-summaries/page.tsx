@@ -196,7 +196,7 @@ export default function BillingSummariesPage() {
     <div className="h-full flex flex-col p-6 w-full">
       {/* ヘッダ */}
       <div className="flex-shrink-0 mb-4">
-        <h1 className="text-2xl font-bold text-gray-800">請求集計</h1>
+        <h1 className="text-2xl font-bold text-gray-800">請求書作成</h1>
         <p className="text-xs text-gray-400 mt-1">
           月別の請求金額を案件別・取引先別で試算（消費税10%、軽減税率は未対応）
         </p>
@@ -260,8 +260,8 @@ export default function BillingSummariesPage() {
 
       {/* テーブル */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 320px)' }}>
-          <table className="table-fixed w-full text-sm">
+        <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+          <table className="table-fixed w-full min-w-[1220px] text-sm">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
                 {group === 'deal' ? (
