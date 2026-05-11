@@ -20,8 +20,8 @@ export default function SortableHeader({ label, field, sortField, sortOrder, onS
       } ${className}`}
       onClick={() => onSort(field)}
     >
-      <span className="inline-flex items-center gap-1.5">
-        <span className={isActive ? 'font-bold' : ''}>{label}</span>
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+        <span className={`whitespace-nowrap ${isActive ? 'font-bold' : ''}`}>{label}</span>
         {isActive ? (
           <span className="inline-flex items-center justify-center bg-blue-600 text-white rounded-md px-1.5 py-0.5 text-[10px] font-bold gap-0.5 shadow-sm">
             <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">

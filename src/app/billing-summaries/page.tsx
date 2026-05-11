@@ -260,33 +260,33 @@ export default function BillingSummariesPage() {
 
       {/* テーブル */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
-          <table className="table-fixed w-full min-w-[1220px] text-sm">
+        <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+          <table className="table-fixed w-full text-sm">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
                 {group === 'deal' ? (
                   <>
-                    <SortableHeader label="取引先"       field="customer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[120px]" />
-                    <SortableHeader label="顧客コード" field="invoice_code" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[90px]" />
-                    <SortableHeader label="案件"         field="deal"         sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
-                    <SortableHeader label="技術者"       field="engineer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[80px]" />
+                    <SortableHeader label="取引先"       field="customer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[140px] whitespace-nowrap" />
+                    <SortableHeader label="顧客コード"   field="invoice_code" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[110px] whitespace-nowrap" />
+                    <SortableHeader label="案件"         field="deal"         sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px] whitespace-nowrap" />
+                    <SortableHeader label="技術者"       field="engineer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px] whitespace-nowrap" />
                   </>
                 ) : (
                   <>
-                    <SortableHeader label="取引先"       field="customer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[180px]" />
-                    <SortableHeader label="顧客コード" field="invoice_code" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
-                    <th className="text-right px-2 py-3 font-semibold w-[70px]">案件数</th>
+                    <SortableHeader label="取引先"       field="customer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[200px] whitespace-nowrap" />
+                    <SortableHeader label="顧客コード"   field="invoice_code" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[120px] whitespace-nowrap" />
+                    <th className="text-right px-2 py-3 font-semibold w-[70px] whitespace-nowrap">案件数</th>
                   </>
                 )}
-                <th className="text-right px-2 py-3 font-semibold w-[60px]">実時間</th>
-                <th className="text-right px-2 py-3 font-semibold w-[80px]">基本額</th>
-                <th className="text-right px-2 py-3 font-semibold w-[70px]">控除</th>
-                <th className="text-right px-2 py-3 font-semibold w-[70px]">超過</th>
-                <th className="text-right px-2 py-3 font-semibold w-[70px]">交通費</th>
-                <th className="text-right px-2 py-3 font-semibold w-[80px]">小計</th>
-                <th className="text-right px-2 py-3 font-semibold w-[70px]">消費税</th>
-                <SortableHeader label="請求合計" field="total" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[100px]" />
-                {group === 'deal' && <th className="text-center px-2 py-3 font-semibold w-[230px]">操作</th>}
+                <th className="text-right px-2 py-3 font-semibold w-[60px] whitespace-nowrap">実時間</th>
+                <th className="text-right px-2 py-3 font-semibold w-[80px] whitespace-nowrap">基本額</th>
+                <th className="text-right px-2 py-3 font-semibold w-[70px] whitespace-nowrap">控除</th>
+                <th className="text-right px-2 py-3 font-semibold w-[70px] whitespace-nowrap">超過</th>
+                <th className="text-right px-2 py-3 font-semibold w-[70px] whitespace-nowrap">交通費</th>
+                <th className="text-right px-2 py-3 font-semibold w-[80px] whitespace-nowrap">小計</th>
+                <th className="text-right px-2 py-3 font-semibold w-[70px] whitespace-nowrap">消費税</th>
+                <SortableHeader label="請求合計" field="total" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[130px] whitespace-nowrap" />
+                {group === 'deal' && <th className="text-center px-2 py-3 font-semibold w-[230px] whitespace-nowrap">操作</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
