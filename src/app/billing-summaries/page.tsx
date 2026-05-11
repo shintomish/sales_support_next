@@ -193,7 +193,7 @@ export default function BillingSummariesPage() {
   };
 
   return (
-    <div className="h-full flex flex-col p-6 max-w-7xl mx-auto w-full">
+    <div className="h-full flex flex-col p-6 w-full">
       {/* ヘッダ */}
       <div className="flex-shrink-0 mb-4">
         <h1 className="text-2xl font-bold text-gray-800">請求集計</h1>
@@ -260,8 +260,8 @@ export default function BillingSummariesPage() {
 
       {/* テーブル */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 320px)' }}>
-          <table className="table-fixed w-full text-sm">
+        <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+          <table className="table-fixed w-full min-w-[1220px] text-sm">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
                 {group === 'deal' ? (
