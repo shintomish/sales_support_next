@@ -25,6 +25,7 @@ type Campaign = {
   id: number
   project_mail_id: number | null
   project_title: string | null
+  source_domain: string | null
   subject: string
   body: string
   sent_at: string | null
@@ -33,6 +34,13 @@ type Campaign = {
   success_count: number
   failed_count: number
   histories: SendHistory[]
+}
+
+// メールアドレスからドメインを抽出（小文字化）
+function extractDomain(email: string): string | null {
+  const at = email.lastIndexOf('@')
+  if (at < 0) return null
+  return email.slice(at + 1).trim().toLowerCase()
 }
 
 // ── 返信本文モーダル ──────────────────────────────────────
@@ -98,6 +106,8 @@ export default function CampaignDetailPage() {
   const [search, setSearch] = useState('')
   const [replyModal, setReplyModal] = useState<SendHistory | null>(null)
   const [resendingId, setResendingId] = useState<number | null>(null)
+  // ドメイン一致警告モーダル: ソース企業ドメインと宛先ドメインが一致した場合のみ表示
+  const [resendWarn, setResendWarn] = useState<SendHistory | null>(null)
   const PAGE_SIZE = 200
   const [page, setPage] = useState(1)
 
@@ -112,8 +122,8 @@ export default function CampaignDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  const handleResend = async (h: SendHistory) => {
-    if (!confirm(`${h.email} に再送信しますか？`)) return
+  // 実送信処理（モーダル/confirm 後に呼ぶ）
+  const executeResend = async (h: SendHistory) => {
     setResendingId(h.id)
     try {
       await axios.post(`/api/v1/delivery-campaigns/${id}/histories/${h.id}/resend`)
@@ -124,6 +134,18 @@ export default function CampaignDetailPage() {
     } finally {
       setResendingId(null)
     }
+  }
+
+  const handleResend = async (h: SendHistory) => {
+    // 宛先ドメインがキャンペーンのソース企業ドメインと一致する場合は警告モーダル
+    const recipientDomain = extractDomain(h.email)
+    if (campaign?.source_domain && recipientDomain && recipientDomain === campaign.source_domain) {
+      setResendWarn(h)
+      return
+    }
+    // 通常フロー
+    if (!confirm(`${h.email} に再送信しますか？`)) return
+    await executeResend(h)
   }
 
   const filtered = campaign?.histories.filter(h => {
@@ -159,6 +181,51 @@ export default function CampaignDetailPage() {
           campaignSubject={campaign.subject}
           onClose={() => setReplyModal(null)}
         />
+      )}
+
+      {/* 再送信ドメイン一致警告モーダル */}
+      {resendWarn && (
+        <div
+          onClick={() => setResendWarn(null)}
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden"
+          >
+            <div className="bg-red-50 px-5 py-3 border-b border-red-200">
+              <p className="text-sm font-bold text-red-700">⚠️ 元請けドメインと一致しています</p>
+            </div>
+            <div className="px-5 py-4 text-sm text-gray-700 space-y-3">
+              <p>
+                配信先 <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{resendWarn.email}</span> のドメインが、
+                この案件の元請けドメイン <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{campaign.source_domain}</span> と一致しています。
+              </p>
+              <p className="text-xs text-red-600">
+                同じ案件を元請けに再送信すると、抜き額が露呈する恐れがあります。
+              </p>
+              <p>本当に送信しますか？</p>
+            </div>
+            <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+              <button
+                onClick={() => setResendWarn(null)}
+                className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={async () => {
+                  const target = resendWarn
+                  setResendWarn(null)
+                  await executeResend(target)
+                }}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg"
+              >
+                送信する
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ヘッダー */}
