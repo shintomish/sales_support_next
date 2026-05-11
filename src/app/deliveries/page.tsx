@@ -599,7 +599,7 @@ export default function DeliveriesPage() {
   const [engineerMails, setEngineerMails] = useState<EngineerMail[]>([])
   const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
   const [pmSearch, setPmSearch] = useState('')
-  const [sendForm, setSendForm] = useState({ project_mail_id: '', engineer_mail_source_id: '', subject: '【案件ご紹介】', body: applyTemplate(TEMPLATE_PROJECT, null) })
+  const [sendForm, setSendForm] = useState({ project_mail_id: '', engineer_mail_source_id: '', source_email: '', subject: '【案件ご紹介】', body: applyTemplate(TEMPLATE_PROJECT, null) })
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null)
   const [mailBodyText, setMailBodyText] = useState('')
@@ -740,6 +740,7 @@ export default function DeliveriesPage() {
         setSendForm({
           project_mail_id: initProjectMailId,
           engineer_mail_source_id: '',
+          source_email: '',
           subject: `【案件ご紹介】${emailSubject}`,
           body: updatedBody,
         })
@@ -780,6 +781,7 @@ export default function DeliveriesPage() {
         setSendForm({
           project_mail_id: '',
           engineer_mail_source_id: initEngineerMailId,
+          source_email: '',
           subject: `【技術者ご紹介】${emailSubject}`,
           body: updatedBody,
         })
@@ -1006,7 +1008,7 @@ export default function DeliveriesPage() {
           pollRef.current = null
           setTimeout(() => {
             setSendProgress(null)
-            setSendForm({ project_mail_id: '', engineer_mail_source_id: '', subject: '【案件ご紹介】', body: applyTemplate(TEMPLATE_PROJECT, null) })
+            setSendForm({ project_mail_id: '', engineer_mail_source_id: '', source_email: '', subject: '【案件ご紹介】', body: applyTemplate(TEMPLATE_PROJECT, null) })
             setDeliveryType('project')
             setAttachments([])
             setPmSearch('')
@@ -1029,10 +1031,24 @@ export default function DeliveriesPage() {
 
   const unresolvedPlaceholders = findUnresolvedPlaceholders((sendForm.subject ?? '') + '\n' + (sendForm.body ?? ''))
 
+  // 紐づき案件/技術者を選んでいない時のみ、入手元アドレス欄を表示・送信する
+  const isLinked = !!(sendForm.project_mail_id || sendForm.engineer_mail_source_id)
+  // 簡易メール形式チェック（バックエンドでも `email` ルールで検証）
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  const sourceEmailInvalid = !isLinked && sendForm.source_email !== '' && !EMAIL_RE.test(sendForm.source_email)
+
   const handleSend = async () => {
     if (!sendForm.subject || !sendForm.body) return
     if (unresolvedPlaceholders.length > 0) {
       alert(`未置換のプレースホルダがあります:\n${unresolvedPlaceholders.join(' / ')}\n\nメール署名設定（/settings/email-template）を確認してください。`)
+      return
+    }
+    if (!isLinked && !sendForm.source_email) {
+      alert('入手元アドレスを入力してください。\n（案件・技術者を紐づける場合は不要です）')
+      return
+    }
+    if (sourceEmailInvalid) {
+      alert('入手元アドレスのメール形式が正しくありません。')
       return
     }
     if (!confirm(`配信先リスト全員（有効件数）にメールを送信します。よろしいですか？`)) return
@@ -1046,6 +1062,8 @@ export default function DeliveriesPage() {
         formData.append('project_mail_id', sendForm.project_mail_id)
       if (deliveryType === 'engineer' && sendForm.engineer_mail_source_id)
         formData.append('engineer_mail_source_id', sendForm.engineer_mail_source_id)
+      if (!isLinked && sendForm.source_email)
+        formData.append('source_email', sendForm.source_email)
       attachments.forEach(file => formData.append('attachments[]', file))
 
       const res = await axios.post('/api/v1/delivery-campaigns', formData, {
@@ -2095,6 +2113,32 @@ export default function DeliveriesPage() {
               )}
             </div>
 
+            {/* 入手元アドレス（紐づき案件/技術者を選んでいない時のみ表示） */}
+            {!isLinked && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  入手元アドレス <span className="text-red-500">*</span>
+                  <span className="text-gray-400 font-normal ml-1 text-xs">
+                    （この案件を入手した元請けのメールアドレス。再送信時の重複防止に使用）
+                  </span>
+                </label>
+                <input
+                  type="email"
+                  value={sendForm.source_email}
+                  onChange={e => setSendForm(f => ({ ...f, source_email: e.target.value }))}
+                  placeholder="例: sales@example.co.jp"
+                  className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                    sourceEmailInvalid
+                      ? 'border-red-400 focus:ring-red-300'
+                      : 'border-gray-300 focus:ring-blue-300'
+                  }`}
+                />
+                {sourceEmailInvalid && (
+                  <p className="text-xs text-red-600 mt-1">メール形式が正しくありません</p>
+                )}
+              </div>
+            )}
+
             {/* 元メール本文 */}
             {mailBodyText && (
               <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -2202,7 +2246,7 @@ export default function DeliveriesPage() {
             <div className="flex items-center gap-4 pt-2">
               <button
                 onClick={handleSend}
-                disabled={sending || !!sendProgress || !sendForm.subject || !sendForm.body || unresolvedPlaceholders.length > 0}
+                disabled={sending || !!sendProgress || !sendForm.subject || !sendForm.body || unresolvedPlaceholders.length > 0 || (!isLinked && (!sendForm.source_email || sourceEmailInvalid))}
                 className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-6 py-2.5 rounded"
               >
                 {sending ? '送信準備中...' : '配信先リストへ一括送信'}
