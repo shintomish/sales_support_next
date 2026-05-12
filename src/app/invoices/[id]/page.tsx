@@ -258,42 +258,55 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  // 送付状モーダル: 同封物ごとに チェック / 数量 / 単位 を持つ
+  type CoverItem = { name: string; checked: boolean; count: number; unit: string };
   const [coverModalOpen, setCoverModalOpen] = useState(false);
-  // doc_type ごとに既定でチェックする項目を切り替える
-  const [coverItems, setCoverItems] = useState({
-    invoice: true, timesheet: false, transport: false,    // 請求書
-    estimate: true,                                       // 見積書
-    purchase_order: true, acknowledgement: true,          // 注文書
-  });
-  const [coverCustomItem, setCoverCustomItem] = useState('');
+  const [coverItems, setCoverItems] = useState<CoverItem[]>([]);
+  const [coverCustomItem, setCoverCustomItem] = useState<CoverItem>({ name: '', checked: true, count: 1, unit: '通' });
 
-  const buildCoverItemNames = (): string[] => {
-    const names: string[] = [];
-    if (invoice?.doc_type === 'estimate') {
-      if (coverItems.estimate) names.push('御見積書');
-    } else if (invoice?.doc_type === 'purchase_order') {
-      if (coverItems.purchase_order) names.push('御注文書');
-      if (coverItems.acknowledgement) names.push('御注文請書');
-    } else {
-      if (coverItems.invoice)   names.push('御請求書');
-      if (coverItems.timesheet) names.push('勤務表');
-      if (coverItems.transport) names.push('交通費明細書');
-    }
-    const custom = coverCustomItem.trim();
-    if (custom) names.push(custom);
-    return names;
+  // モーダルを開いた時に doc_type の既定項目をセット
+  useEffect(() => {
+    if (!coverModalOpen || !invoice) return;
+    const defaults: CoverItem[] = invoice.doc_type === 'estimate'
+      ? [{ name: '御見積書', checked: true, count: 1, unit: '通' }]
+      : invoice.doc_type === 'purchase_order'
+      ? [
+          { name: '御注文書',   checked: true, count: 1, unit: '通' },
+          { name: '御注文請書', checked: true, count: 1, unit: '通' },
+        ]
+      : [
+          { name: '御請求書',       checked: true,  count: 1, unit: '通' },
+          { name: '勤務表',         checked: false, count: 1, unit: '通' },
+          { name: '交通費明細書',   checked: false, count: 1, unit: '通' },
+        ];
+    setCoverItems(defaults);
+    setCoverCustomItem({ name: '', checked: true, count: 1, unit: '通' });
+  }, [coverModalOpen, invoice]);
+
+  const updateCoverItem = (i: number, patch: Partial<CoverItem>) => {
+    setCoverItems((prev) => prev.map((it, idx) => idx === i ? { ...it, ...patch } : it));
   };
 
   const openCoverLetter = async () => {
-    const names = buildCoverItemNames();
-    if (names.length === 0) {
+    const items: { name: string; count: number; unit: string }[] = [];
+    coverItems.forEach((it) => {
+      if (it.checked && it.name.trim()) {
+        items.push({ name: it.name.trim(), count: Math.max(1, it.count || 1), unit: (it.unit || '通').trim() || '通' });
+      }
+    });
+    if (coverCustomItem.name.trim()) {
+      items.push({
+        name: coverCustomItem.name.trim(),
+        count: Math.max(1, coverCustomItem.count || 1),
+        unit: (coverCustomItem.unit || '通').trim() || '通',
+      });
+    }
+    if (items.length === 0) {
       alert('同封物を1つ以上選択してください'); return;
     }
     setBusy(true);
     try {
-      const params = new URLSearchParams();
-      names.forEach((n) => params.append('items[]', n));
-      const res = await apiClient.get(`/api/v1/invoices/${id}/cover-letter?${params}`, { responseType: 'blob' });
+      const res = await apiClient.post(`/api/v1/invoices/${id}/cover-letter`, { items }, { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       window.open(url, '_blank');
       setCoverModalOpen(false);
@@ -311,7 +324,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     if (!envelopeModalOpen || !invoice) return;
     const defaults = invoice.doc_type === 'estimate' ? ['見積書在中']
-                   : invoice.doc_type === 'purchase_order' ? ['注文書・請書在中']
+                   : invoice.doc_type === 'purchase_order' ? ['注文書在中']
                    : ['請求書在中'];
     setEnvelopeZaichuLabels(defaults);
   }, [envelopeModalOpen, invoice]);
@@ -1087,7 +1100,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             <p className="text-xs text-gray-500 mb-3">複数選択可。すべて未選択の場合は朱印なし。</p>
             <div className="space-y-2 mb-5">
               {(invoice.doc_type === 'estimate' ? ['見積書在中']
-                : invoice.doc_type === 'purchase_order' ? ['注文書在中', '注文書・請書在中']
+                : invoice.doc_type === 'purchase_order' ? ['注文書在中']
                 : ['請求書在中']
               ).map((label) => (
                 <label key={label} className="flex items-center gap-2 text-sm">
@@ -1111,54 +1124,38 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       {/* 送付状モーダル */}
       {coverModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setCoverModalOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-4">送付状 - 同封物の選択</h2>
-            <div className="space-y-2 mb-5">
-              {invoice.doc_type === 'estimate' && (
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={coverItems.estimate}
-                    onChange={(e) => setCoverItems(p => ({ ...p, estimate: e.target.checked }))} />
-                  御見積書
-                </label>
-              )}
-              {invoice.doc_type === 'purchase_order' && (
-                <>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-1">送付状 - 同封物の選択</h2>
+            <p className="text-xs text-gray-500 mb-3">チェックを外すと PDF から除外されます。「他」に名称を入力すれば追加可能（数量・単位はそれぞれ既定 1 / 通）。</p>
+            <div className="grid grid-cols-[1fr_72px_72px] gap-2 text-xs font-semibold text-gray-600 mb-1 px-1">
+              <div>品 名</div><div className="text-center">数量</div><div className="text-center">単位</div>
+            </div>
+            <div className="space-y-2 mb-3">
+              {coverItems.map((it, i) => (
+                <div key={`${it.name}-${i}`} className="grid grid-cols-[1fr_72px_72px] gap-2 items-center">
                   <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={coverItems.purchase_order}
-                      onChange={(e) => setCoverItems(p => ({ ...p, purchase_order: e.target.checked }))} />
-                    御注文書
+                    <input type="checkbox" checked={it.checked}
+                      onChange={(e) => updateCoverItem(i, { checked: e.target.checked })} />
+                    {it.name}
                   </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={coverItems.acknowledgement}
-                      onChange={(e) => setCoverItems(p => ({ ...p, acknowledgement: e.target.checked }))} />
-                    御注文請書
-                  </label>
-                </>
-              )}
-              {invoice.doc_type === 'invoice' && (
-                <>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={coverItems.invoice}
-                      onChange={(e) => setCoverItems(p => ({ ...p, invoice: e.target.checked }))} />
-                    御請求書
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={coverItems.timesheet}
-                      onChange={(e) => setCoverItems(p => ({ ...p, timesheet: e.target.checked }))} />
-                    勤務表
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={coverItems.transport}
-                      onChange={(e) => setCoverItems(p => ({ ...p, transport: e.target.checked }))} />
-                    交通費明細書
-                  </label>
-                </>
-              )}
-              <div className="pt-2 border-t border-gray-100">
-                <label className="block text-xs font-semibold text-gray-700 mb-1">他（入力値）</label>
-                <Input type="text" value={coverCustomItem}
-                  onChange={(e) => setCoverCustomItem(e.target.value)}
-                  placeholder="例: 会社案内 / カタログ / 名刺 など" />
+                  <Input type="number" min={1} value={it.count}
+                    onChange={(e) => updateCoverItem(i, { count: Number(e.target.value) })}
+                    className="text-right" disabled={!it.checked} />
+                  <Input type="text" value={it.unit}
+                    onChange={(e) => updateCoverItem(i, { unit: e.target.value })}
+                    className="text-center" disabled={!it.checked} />
+                </div>
+              ))}
+              <div className="grid grid-cols-[1fr_72px_72px] gap-2 items-center pt-2 border-t border-gray-100">
+                <Input type="text" value={coverCustomItem.name}
+                  onChange={(e) => setCoverCustomItem(p => ({ ...p, name: e.target.value }))}
+                  placeholder="他（例: 会社案内）" />
+                <Input type="number" min={1} value={coverCustomItem.count}
+                  onChange={(e) => setCoverCustomItem(p => ({ ...p, count: Number(e.target.value) }))}
+                  className="text-right" disabled={!coverCustomItem.name.trim()} />
+                <Input type="text" value={coverCustomItem.unit}
+                  onChange={(e) => setCoverCustomItem(p => ({ ...p, unit: e.target.value }))}
+                  className="text-center" disabled={!coverCustomItem.name.trim()} />
               </div>
             </div>
             <div className="flex justify-end gap-2">
