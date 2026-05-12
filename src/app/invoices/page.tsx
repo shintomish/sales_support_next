@@ -183,7 +183,7 @@ export default function InvoicesPage() {
           <p className="text-xs text-gray-400 mt-1">案件×月の請求書を発行・編集・PDF 出力</p>
         </div>
         <Link href="/billing-summaries">
-          <Button variant="outline">← 請求集計から発行</Button>
+          <Button variant="outline">← 請求書作成から発行</Button>
         </Link>
       </div>
 
