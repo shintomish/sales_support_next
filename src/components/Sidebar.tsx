@@ -33,6 +33,26 @@ export default function Sidebar() {
   const overdueTasks   = notifData?.overdue_tasks ?? [];
   const pendingApprovalCount = notifData?.pending_approvals_count ?? 0;
   const rejectedInvoiceCount = notifData?.rejected_invoices_count ?? 0;
+
+  // 一般メンバー向け通知 (admin には FE 側でも非表示にする二重防御)
+  const isAdminUser = user?.role === 'super_admin' || user?.role === 'tenant_admin';
+  const rawRecentlyApproved = notifData?.recently_approved ?? [];
+  const recentlyApproved = isAdminUser ? [] : rawRecentlyApproved;
+  const recentlyApprovedCount = isAdminUser ? 0 : (notifData?.recently_approved_count ?? 0);
+
+  // doc_type 別カウント（請求書/注文書 メニューバッジに反映）
+  const pendingApprovals = notifData?.pending_approvals ?? [];
+  const rejectedInvoices = notifData?.rejected_invoices ?? [];
+
+  const invoiceBadgeCount =
+    pendingApprovals.filter(r => r.doc_type === 'invoice').length
+    + rejectedInvoices.filter(r => r.doc_type === 'invoice').length
+    + recentlyApproved.filter(r => r.doc_type === 'invoice').length;
+
+  const purchaseOrderBadgeCount =
+    pendingApprovals.filter(r => r.doc_type === 'purchase_order').length
+    + rejectedInvoices.filter(r => r.doc_type === 'purchase_order').length
+    + recentlyApproved.filter(r => r.doc_type === 'purchase_order').length;
   const { unreadCount: unreadEmails } = useUnreadEmailCount();
 
   const sesEnabled = !!user?.tenant?.ses_enabled;
@@ -67,11 +87,11 @@ export default function Sidebar() {
         { label: '見積書送信履歴',  path: '/estimate-send-histories',       icon: '📤' },
         // ── 注文書（doc_type=purchase_order）─────────────
         { label: '注文書作成',      path: '/purchase-orders?create=1',      icon: '🧾' },
-        { label: '注文書一覧',      path: '/purchase-orders',               icon: '📦' },
+        { label: '注文書一覧',      path: '/purchase-orders',               icon: '📦', badge: purchaseOrderBadgeCount },
         { label: '注文書送信履歴',  path: '/purchase-order-send-histories', icon: '📤' },
         // ── 請求書 ─────────────────────────────────────────
         { label: '請求書作成',      path: '/billing-summaries',             icon: '💴' },
-        { label: '請求書一覧',      path: '/invoices',                      icon: '📄', badge: pendingApprovalCount + rejectedInvoiceCount },
+        { label: '請求書一覧',      path: '/invoices',                      icon: '📄', badge: invoiceBadgeCount },
         { label: '請求書送信履歴',  path: '/invoice-send-histories',        icon: '📤' },
       ],
     },
@@ -271,12 +291,22 @@ export default function Sidebar() {
                 <p className="text-xs text-amber-300">{pendingApprovalCount}件が承認待ち</p>
               </div>
             </div>
-            <button
-              onClick={() => router.push('/invoices?approval_status=pending')}
-              className="mt-2 w-full text-xs text-amber-200 hover:text-white transition-colors text-left"
-            >
-              確認する →
-            </button>
+            {pendingApprovals.filter(r => r.doc_type === 'invoice').length > 0 && (
+              <button
+                onClick={() => router.push('/invoices?approval_status=pending')}
+                className="mt-2 w-full text-xs text-amber-200 hover:text-white transition-colors text-left"
+              >
+                請求書 {pendingApprovals.filter(r => r.doc_type === 'invoice').length}件 →
+              </button>
+            )}
+            {pendingApprovals.filter(r => r.doc_type === 'purchase_order').length > 0 && (
+              <button
+                onClick={() => router.push('/purchase-orders?approval_status=pending')}
+                className="mt-1 w-full text-xs text-amber-200 hover:text-white transition-colors text-left"
+              >
+                注文書 {pendingApprovals.filter(r => r.doc_type === 'purchase_order').length}件 →
+              </button>
+            )}
           </div>
         )}
 
@@ -290,12 +320,51 @@ export default function Sidebar() {
                 <p className="text-xs text-red-400">{rejectedInvoiceCount}件が差戻されました</p>
               </div>
             </div>
-            <button
-              onClick={() => router.push('/invoices?approval_status=rejected')}
-              className="mt-2 w-full text-xs text-red-300 hover:text-white transition-colors text-left"
-            >
-              確認する →
-            </button>
+            {rejectedInvoices.filter(r => r.doc_type === 'invoice').length > 0 && (
+              <button
+                onClick={() => router.push('/invoices?approval_status=rejected')}
+                className="mt-2 w-full text-xs text-red-300 hover:text-white transition-colors text-left"
+              >
+                請求書 {rejectedInvoices.filter(r => r.doc_type === 'invoice').length}件 →
+              </button>
+            )}
+            {rejectedInvoices.filter(r => r.doc_type === 'purchase_order').length > 0 && (
+              <button
+                onClick={() => router.push('/purchase-orders?approval_status=rejected')}
+                className="mt-1 w-full text-xs text-red-300 hover:text-white transition-colors text-left"
+              >
+                注文書 {rejectedInvoices.filter(r => r.doc_type === 'purchase_order').length}件 →
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* 直近承認サマリー（一般メンバー向け、7日以内に承認された自身の申請） */}
+        {recentlyApprovedCount > 0 && (
+          <div className="mx-4 mb-3 px-3 py-2.5 rounded-lg bg-green-900/40 border border-green-700/50">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">✅</span>
+              <div>
+                <p className="text-xs text-green-300 font-semibold">承認されました</p>
+                <p className="text-xs text-green-400">{recentlyApprovedCount}件 (直近7日)</p>
+              </div>
+            </div>
+            {recentlyApproved.filter(r => r.doc_type === 'invoice').length > 0 && (
+              <button
+                onClick={() => router.push('/invoices?approval_status=approved')}
+                className="mt-2 w-full text-xs text-green-300 hover:text-white transition-colors text-left"
+              >
+                請求書 {recentlyApproved.filter(r => r.doc_type === 'invoice').length}件 →
+              </button>
+            )}
+            {recentlyApproved.filter(r => r.doc_type === 'purchase_order').length > 0 && (
+              <button
+                onClick={() => router.push('/purchase-orders?approval_status=approved')}
+                className="mt-1 w-full text-xs text-green-300 hover:text-white transition-colors text-left"
+              >
+                注文書 {recentlyApproved.filter(r => r.doc_type === 'purchase_order').length}件 →
+              </button>
+            )}
           </div>
         )}
 

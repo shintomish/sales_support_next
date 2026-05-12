@@ -152,6 +152,7 @@ export default function EstimatesPage() {
             per_page: 200,
             sort_by: 'customer_name',
             sort_order: 'asc',
+            user_id: 'all', // 発行モーダルは事務全員のデータを対象
           },
         });
         if (!cancelled) {

@@ -30,6 +30,15 @@ export interface RejectedInvoice {
   updated_at: string | null;
 }
 
+export interface RecentlyApproved {
+  id: number;
+  invoice_number: string;
+  doc_type: 'invoice' | 'estimate' | 'purchase_order';
+  total: number;
+  customer: { company_name: string } | null;
+  approved_at: string | null;
+}
+
 export interface NotificationData {
   overdue_tasks: OverdueTask[];
   overdue_tasks_count: number;
@@ -37,6 +46,8 @@ export interface NotificationData {
   pending_approvals_count?: number;
   rejected_invoices?: RejectedInvoice[];
   rejected_invoices_count?: number;
+  recently_approved?: RecentlyApproved[];
+  recently_approved_count?: number;
 }
 
 export function useNotifications() {

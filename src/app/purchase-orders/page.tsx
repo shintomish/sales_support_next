@@ -175,6 +175,7 @@ export default function PurchaseOrdersPage() {
             per_page: 200,
             sort_by: 'affiliation',
             sort_order: 'asc',
+            user_id: 'all', // 発行モーダルは事務全員のデータを対象
           },
         });
         if (!cancelled) {

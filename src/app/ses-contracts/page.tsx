@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/authStore';
-import UserFilter, { defaultUserFilter } from '@/components/UserFilter';
+import UserFilter from '@/components/UserFilter';
 import SortableHeader from '@/components/SortableHeader';
 import type { ApiError } from '@/lib/error-helpers';
 
@@ -302,8 +302,8 @@ function SesContractsPage() {
   const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const { user } = useAuthStore();
+  // SES台帳は事務全員が参照する共有データのため、ロールに関わらず全件表示をデフォルトとする
   const [userFilter, setUserFilter] = useState<string>('all');
-  useEffect(() => { setUserFilter(defaultUserFilter(user)); }, [user]);
   const [page, setPage]               = useState(1);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);

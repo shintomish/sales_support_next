@@ -590,8 +590,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   };
 
   const handleApprove = async () => {
-    if (!confirm('この請求書を承認します。よろしいですか？')) return;
+    const docLabel = invoice?.doc_type === 'estimate' ? '見積書'
+                   : invoice?.doc_type === 'purchase_order' ? '注文書'
+                   : '請求書';
+    if (!confirm(`この${docLabel}を承認します。電子印付き PDF を再生成します。よろしいですか？`)) return;
     setBusy(true);
+    setPdfBusyMsg('承認処理中… (電子印付き PDF を再生成中)');
     try {
       const res = await apiClient.post<Invoice>(`/api/v1/invoices/${id}/approve`);
       setInvoice(res.data);
@@ -601,6 +605,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       alert(msg);
     } finally {
       setBusy(false);
+      setPdfBusyMsg(null);
     }
   };
 
@@ -898,8 +903,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             </>
           )}
 
-          <Button variant="outline" onClick={remove} disabled={busy}
-            className="text-red-600 border-red-200 hover:bg-red-50 ml-auto">
+          <Button variant="outline" onClick={remove}
+            disabled={busy || invoice.approved}
+            title={invoice.approved ? '承認済の書類は削除できません' : undefined}
+            className="text-red-600 border-red-200 hover:bg-red-50 ml-auto disabled:opacity-50">
             削除
           </Button>
         </div>
