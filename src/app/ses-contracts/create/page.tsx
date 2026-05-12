@@ -46,6 +46,7 @@ interface FormData {
   vendor_deduction_hours: string;
   vendor_overtime_unit_price: string;
   vendor_overtime_hours: string;
+  vendor_settlement_unit_minutes: string;
   vendor_payment_site: string;
   contract_start: string;
   contract_period_start: string;
@@ -65,7 +66,7 @@ const initialForm: FormData = {
   client_overtime_unit_price: '', client_overtime_hours: '',
   settlement_unit_minutes: '', payment_site: '', order_number: '',
   vendor_deduction_unit_price: '', vendor_deduction_hours: '',
-  vendor_overtime_unit_price: '', vendor_overtime_hours: '', vendor_payment_site: '',
+  vendor_overtime_unit_price: '', vendor_overtime_hours: '', vendor_settlement_unit_minutes: '', vendor_payment_site: '',
   contract_start: '', contract_period_start: '', contract_period_end: '',
   affiliation_period_end: '', notes: '',
 };
@@ -244,6 +245,7 @@ export default function SesContractCreatePage() {
               <div><label className={labelCls}>控除時間</label><Input type="number" value={form.vendor_deduction_hours} onChange={set('vendor_deduction_hours')} placeholder="140" /></div>
               <div><label className={labelCls}>超過単価</label><Input type="number" value={form.vendor_overtime_unit_price} onChange={set('vendor_overtime_unit_price')} placeholder="0" /></div>
               <div><label className={labelCls}>超過時間</label><Input type="number" value={form.vendor_overtime_hours} onChange={set('vendor_overtime_hours')} placeholder="180" /></div>
+              <div><label className={labelCls}>精算単位（分）</label><Input type="number" value={form.vendor_settlement_unit_minutes} onChange={set('vendor_settlement_unit_minutes')} placeholder="15" /></div>
               <div><label className={labelCls}>支払サイト（日）</label><Input type="number" value={form.vendor_payment_site} onChange={set('vendor_payment_site')} placeholder="45" /></div>
             </CardContent>
           </Card>

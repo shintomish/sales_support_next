@@ -45,6 +45,7 @@ interface SesContract {
   vendor_deduction_hours: number | null;
   vendor_overtime_unit_price: number | null;
   vendor_overtime_hours: number | null;
+  vendor_settlement_unit_minutes: number | null;
   vendor_payment_site: number | null;
   contract_start: string | null;
   contract_period_start: string | null;
