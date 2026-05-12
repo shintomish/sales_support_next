@@ -66,18 +66,35 @@ export default function EstimatesPage() {
   const [sortOrder, setSortOrder]       = useState<'asc' | 'desc'>('desc');
 
   // 新規見積モーダル（?create=1 で自動オープン）
+  // モード: 通常 = SES台帳の契約終了≥当月から案件選択 / 例外 = 売上先のみ指定
+  type EstimateMode = 'normal' | 'exception';
+  type SesDealOption = {
+    id: number; customer_name: string | null; engineer_name: string | null;
+    project_name: string | null; contract_period_end: string | null;
+  };
   const [createOpen, setCreateOpen]     = useState(initialCreate);
+  const [createMode, setCreateMode]     = useState<EstimateMode>('normal');
   const [creating, setCreating]         = useState(false);
   const [customers, setCustomers]       = useState<CustomerLookup[]>([]);
   const [custSearch, setCustSearch]     = useState('');
   const [custLoading, setCustLoading]   = useState(false);
+  const [sesDeals, setSesDeals]         = useState<SesDealOption[]>([]);
+  const [sesLoading, setSesLoading]     = useState(false);
+  const [sesSearch, setSesSearch]       = useState('');
   const [form, setForm] = useState({
+    deal_id:          '' as string | number,
     customer_id:      '' as string | number,
     subject_name:     '',
     valid_until_text: '30日間',
     issued_date:      new Date().toISOString().slice(0, 10),
     notes:            '',
   });
+
+  // 月初 YYYY-MM-DD（SES台帳 contract_period_end フィルタ用）
+  const currentMonthStart = (): string => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -96,20 +113,18 @@ export default function EstimatesPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // モーダルを開いたら顧客リストをロード（検索変更時も）
+  // 例外モード: 顧客リストをロード
   useEffect(() => {
-    if (!createOpen) return;
+    if (!createOpen || createMode !== 'exception') return;
     let cancelled = false;
     setCustLoading(true);
     const t = setTimeout(async () => {
       try {
         const res = await apiClient.get<{ data: CustomerLookup[] }>('/api/v1/customers', {
-          // 見積書は売上先(is_customer=true)向け。両方フラグの顧客も含まれる
           params: { search: custSearch || undefined, page: 1, per_page: 500, type: 'customer' },
         });
         if (!cancelled) {
           const list = res.data.data ?? [];
-          // 株式会社/有限会社/合同会社 などの法人格を除去した名前で五十音/英字ソート
           const sortKey = (n: string) => n
             .replace(/^(株式会社|有限会社|合同会社|一般社団法人|公益財団法人)\s*/u, '')
             .replace(/\s*(株式会社|有限会社|合同会社|一般社団法人|公益財団法人)\s*$/u, '');
@@ -121,24 +136,51 @@ export default function EstimatesPage() {
       }
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [createOpen, custSearch]);
+  }, [createOpen, createMode, custSearch]);
+
+  // 通常モード: SES台帳 案件リストをロード（契約終了≥当月）
+  useEffect(() => {
+    if (!createOpen || createMode !== 'normal') return;
+    let cancelled = false;
+    setSesLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await apiClient.get<{ data: SesDealOption[] }>('/api/v1/ses-contracts', {
+          params: {
+            search: sesSearch || undefined,
+            contract_period_end_from: currentMonthStart(),
+            per_page: 200,
+            sort_by: 'contract_period_end',
+            sort_order: 'asc',
+          },
+        });
+        if (!cancelled) setSesDeals((res.data.data ?? []) as SesDealOption[]);
+      } finally {
+        if (!cancelled) setSesLoading(false);
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [createOpen, createMode, sesSearch]);
 
 
   const handleCreate = async () => {
-    if (!form.customer_id) { alert('顧客を選択してください'); return; }
+    if (createMode === 'normal' && !form.deal_id) { alert('SES台帳から案件を選択してください'); return; }
+    if (createMode === 'exception' && !form.customer_id) { alert('取引先を選択してください'); return; }
     setCreating(true);
     try {
-      const res = await apiClient.post('/api/v1/estimates', {
-        customer_id:      Number(form.customer_id),
+      const payload: Record<string, unknown> = {
         subject_name:     form.subject_name || null,
         valid_until_text: form.valid_until_text || null,
         issued_date:      form.issued_date || null,
         notes:            form.notes || null,
-      });
+      };
+      if (createMode === 'normal') payload.deal_id = Number(form.deal_id);
+      else payload.customer_id = Number(form.customer_id);
+
+      const res = await apiClient.post('/api/v1/estimates', payload);
       setCreateOpen(false);
-      setForm({ customer_id: '', subject_name: '', valid_until_text: '30日間', issued_date: new Date().toISOString().slice(0, 10), notes: '' });
-      setCustSearch('');
-      // 作成した見積の編集ページへ遷移
+      setForm({ deal_id: '', customer_id: '', subject_name: '', valid_until_text: '30日間', issued_date: new Date().toISOString().slice(0, 10), notes: '' });
+      setCustSearch(''); setSesSearch('');
       window.location.href = `/estimates/${res.data.id}`;
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
@@ -272,74 +314,100 @@ export default function EstimatesPage() {
       {/* 新規見積発行モーダル */}
       {createOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setCreateOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-gray-800 mb-4">新規見積発行</h2>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-gray-800 mb-2">新規見積発行</h2>
+
+            {/* モード切替 */}
+            <div className="flex gap-4 text-sm mb-3 border-b border-gray-200 pb-2">
+              <label className="flex items-center gap-2">
+                <input type="radio" name="estimate-mode" checked={createMode === 'normal'}
+                  onChange={() => setCreateMode('normal')} />
+                <span><strong>通常</strong>（SES台帳の案件から発行）</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="radio" name="estimate-mode" checked={createMode === 'exception'}
+                  onChange={() => setCreateMode('exception')} />
+                <span><strong>例外</strong>（売上先のみ指定・新規見積）</span>
+              </label>
+            </div>
+
             <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">顧客 <span className="text-rose-600">*</span></label>
-                <Input
-                  type="text"
-                  placeholder="会社名で検索…"
-                  value={custSearch}
-                  onChange={(e) => setCustSearch(e.target.value)}
-                  className="mb-2"
-                />
-                <select
-                  value={form.customer_id}
-                  onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
-                  size={6}
-                >
-                  {custLoading && <option disabled>読み込み中…</option>}
-                  {!custLoading && customers.length === 0 && <option disabled>該当なし</option>}
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.company_name}{c.invoice_code ? ` [${c.invoice_code}]` : ' （※顧客コード未設定）'}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {createMode === 'normal' && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">SES台帳の案件 <span className="text-rose-600">*</span></label>
+                  <p className="text-[10px] text-gray-500 mb-1">契約終了が当月以降の案件を表示。「顧客名 + 技術者名 + 案件名」</p>
+                  <Input type="text" placeholder="顧客名・技術者名・案件名で検索…"
+                    value={sesSearch} onChange={(e) => setSesSearch(e.target.value)} className="mb-2" />
+                  <select
+                    value={form.deal_id}
+                    onChange={(e) => setForm({ ...form, deal_id: e.target.value })}
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
+                    size={7}
+                  >
+                    {sesLoading && <option disabled>読み込み中…</option>}
+                    {!sesLoading && sesDeals.length === 0 && <option disabled>該当する案件がありません（契約終了≥当月）</option>}
+                    {sesDeals.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {(d.customer_name ?? '—')} + {(d.engineer_name ?? '—')} ／ {(d.project_name ?? '—')}
+                        {d.contract_period_end ? ` （〜${d.contract_period_end}）` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {createMode === 'exception' && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">取引先（売上先）<span className="text-rose-600">*</span></label>
+                  <Input type="text" placeholder="会社名で検索…"
+                    value={custSearch} onChange={(e) => setCustSearch(e.target.value)} className="mb-2" />
+                  <select
+                    value={form.customer_id}
+                    onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
+                    size={6}
+                  >
+                    {custLoading && <option disabled>読み込み中…</option>}
+                    {!custLoading && customers.length === 0 && <option disabled>該当なし</option>}
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.company_name}{c.invoice_code ? ` [${c.invoice_code}]` : ' （※顧客コード未設定）'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">件名</label>
-                <Input
-                  type="text"
-                  placeholder="例: システム開発業務委託"
+                <Input type="text"
+                  placeholder={createMode === 'normal' ? '空欄なら案件タイトルが入ります' : '例: システム開発業務委託'}
                   value={form.subject_name}
-                  onChange={(e) => setForm({ ...form, subject_name: e.target.value })}
-                />
+                  onChange={(e) => setForm({ ...form, subject_name: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">発行日</label>
-                  <Input
-                    type="date"
-                    value={form.issued_date}
-                    onChange={(e) => setForm({ ...form, issued_date: e.target.value })}
-                  />
+                  <Input type="date" value={form.issued_date}
+                    onChange={(e) => setForm({ ...form, issued_date: e.target.value })} />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">有効期間</label>
-                  <Input
-                    type="text"
-                    placeholder="30日間"
-                    value={form.valid_until_text}
-                    onChange={(e) => setForm({ ...form, valid_until_text: e.target.value })}
-                  />
+                  <Input type="text" placeholder="30日間" value={form.valid_until_text}
+                    onChange={(e) => setForm({ ...form, valid_until_text: e.target.value })} />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">備考</label>
-                <textarea
-                  value={form.notes}
+                <textarea value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  rows={3}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
-                />
+                  rows={2} className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm" />
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>キャンセル</Button>
-              <Button onClick={handleCreate} disabled={creating || !form.customer_id}>
+              <Button onClick={handleCreate}
+                disabled={creating || (createMode === 'normal' ? !form.deal_id : !form.customer_id)}>
                 {creating ? '作成中…' : '作成'}
               </Button>
             </div>
