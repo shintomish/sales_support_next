@@ -150,11 +150,25 @@ export default function EstimatesPage() {
             search: sesSearch || undefined,
             contract_period_end_from: currentMonthStart(),
             per_page: 200,
-            sort_by: 'contract_period_end',
+            sort_by: 'customer_name',
             sort_order: 'asc',
           },
         });
-        if (!cancelled) setSesDeals((res.data.data ?? []) as SesDealOption[]);
+        if (!cancelled) {
+          const list = (res.data.data ?? []) as SesDealOption[];
+          // 第1ソート: 契約終了 昇順 (null は末尾)
+          // 第2ソート: 取引先名 五十音 (株式会社等の法人格は除いた読み)
+          const sortKey = (n: string | null) => (n ?? '')
+            .replace(/^(株式会社|有限会社|合同会社|一般社団法人|公益財団法人)\s*/u, '')
+            .replace(/\s*(株式会社|有限会社|合同会社|一般社団法人|公益財団法人)\s*$/u, '');
+          list.sort((a, b) => {
+            const ea = a.contract_period_end ?? '9999-99-99';
+            const eb = b.contract_period_end ?? '9999-99-99';
+            if (ea !== eb) return ea < eb ? -1 : 1;
+            return sortKey(a.customer_name).localeCompare(sortKey(b.customer_name), 'ja');
+          });
+          setSesDeals(list);
+        }
       } finally {
         if (!cancelled) setSesLoading(false);
       }
@@ -335,24 +349,45 @@ export default function EstimatesPage() {
               {createMode === 'normal' && (
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">SES台帳の案件 <span className="text-rose-600">*</span></label>
-                  <p className="text-[10px] text-gray-500 mb-1">契約終了が当月以降の案件を表示。「顧客名 + 技術者名 + 案件名」</p>
+                  <p className="text-[10px] text-gray-500 mb-1">契約終了が当月以降の案件を表示・取引先名（株式会社除く）で五十音ソート</p>
                   <Input type="text" placeholder="顧客名・技術者名・案件名で検索…"
                     value={sesSearch} onChange={(e) => setSesSearch(e.target.value)} className="mb-2" />
-                  <select
-                    value={form.deal_id}
-                    onChange={(e) => setForm({ ...form, deal_id: e.target.value })}
-                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
-                    size={7}
-                  >
-                    {sesLoading && <option disabled>読み込み中…</option>}
-                    {!sesLoading && sesDeals.length === 0 && <option disabled>該当する案件がありません（契約終了≥当月）</option>}
-                    {sesDeals.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {(d.customer_name ?? '—')} + {(d.engineer_name ?? '—')} ／ {(d.project_name ?? '—')}
-                        {d.contract_period_end ? ` （〜${d.contract_period_end}）` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="border border-gray-200 rounded-md max-h-64 overflow-y-auto overflow-x-hidden bg-white">
+                    <table className="w-full text-xs table-fixed">
+                      <thead className="bg-gray-50 sticky top-0 text-gray-600">
+                        <tr>
+                          <th className="text-left px-2 py-1.5 font-semibold w-[30%]">取引先</th>
+                          <th className="text-left px-2 py-1.5 font-semibold w-[18%]">技術者</th>
+                          <th className="text-left px-2 py-1.5 font-semibold w-[34%]">案件名</th>
+                          <th className="text-left px-2 py-1.5 font-semibold w-[18%]">契約終了</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sesLoading && (
+                          <tr><td colSpan={4} className="text-center py-4 text-gray-400">読み込み中…</td></tr>
+                        )}
+                        {!sesLoading && sesDeals.length === 0 && (
+                          <tr><td colSpan={4} className="text-center py-4 text-gray-400">該当する案件がありません（契約終了≥当月）</td></tr>
+                        )}
+                        {sesDeals.map((d) => (
+                          <tr key={d.id}
+                              onClick={() => setForm({
+                                ...form,
+                                deal_id: String(d.id),
+                                subject_name: d.project_name ?? form.subject_name,
+                              })}
+                              className={`cursor-pointer hover:bg-blue-50 border-t border-gray-100 ${
+                                String(form.deal_id) === String(d.id) ? 'bg-blue-100' : ''
+                              }`}>
+                            <td className="px-2 py-1 truncate" title={d.customer_name ?? ''}>{d.customer_name ?? '—'}</td>
+                            <td className="px-2 py-1 truncate" title={d.engineer_name ?? ''}>{d.engineer_name ?? '—'}</td>
+                            <td className="px-2 py-1 truncate" title={d.project_name ?? ''}>{d.project_name ?? '—'}</td>
+                            <td className="px-2 py-1 text-gray-500 truncate">{d.contract_period_end?.slice(0, 10) ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
