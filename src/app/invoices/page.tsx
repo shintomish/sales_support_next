@@ -67,7 +67,7 @@ const previousMonth = (): string => {
 
 const yen = (n: string | number) => `¥${Number(n).toLocaleString()}`;
 
-type SortField = 'invoice_number' | 'year_month' | 'customer' | 'deal' | 'issued_date' | 'total' | 'status';
+type SortField = 'invoice_number' | 'order_number' | 'year_month' | 'customer' | 'deal' | 'issued_date' | 'total' | 'status' | 'approval';
 
 export default function InvoicesPage() {
   const user = useAuthStore((s) => s.user);
@@ -156,12 +156,14 @@ export default function InvoicesPage() {
     const key = (r: InvoiceListItem): string | number => {
       switch (sortBy) {
         case 'invoice_number': return r.invoice_number;
+        case 'order_number':   return r.order_number ?? '';
         case 'year_month':     return r.year_month;
         case 'customer':       return r.customer_name_snapshot ?? r.customer?.company_name ?? '';
         case 'deal':           return r.deal?.title ?? '';
         case 'issued_date':    return r.issued_date ?? '';
         case 'total':          return Number(r.total);
         case 'status':         return r.status;
+        case 'approval':       return r.approval_status;
       }
     };
     arr.sort((a, b) => {
@@ -228,15 +230,15 @@ export default function InvoicesPage() {
           <table className="table-fixed w-full text-sm">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
-                <th className="text-left px-2 py-3 font-semibold w-[170px]">請求番号</th>
-                <th className="text-left px-2 py-3 font-semibold w-[130px]">注文番号</th>
+                <SortableHeader label="請求番号" field="invoice_number" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[170px]" />
+                <SortableHeader label="注文番号" field="order_number"   sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[130px]" />
                 <th className="text-left px-2 py-3 font-semibold w-[70px]">対象月</th>
-                <SortableHeader label="取引先"   field="customer" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[150px]" />
-                <SortableHeader label="案件"     field="deal"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[170px]" />
-                <th className="text-left px-2 py-3 font-semibold w-[90px]">請求日</th>
-                <SortableHeader label="税込合計" field="total"    sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[110px]" />
-                <th className="text-center px-2 py-3 font-semibold w-[80px]">状態</th>
-                <th className="text-center px-2 py-3 font-semibold w-[100px]">承認</th>
+                <SortableHeader label="取引先"   field="customer"       sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[150px]" />
+                <SortableHeader label="件名"     field="deal"           sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[170px]" />
+                <SortableHeader label="請求日"   field="issued_date"    sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[90px]" />
+                <SortableHeader label="税込合計" field="total"          sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[110px]" />
+                <SortableHeader label="状態"     field="status"         sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-center w-[80px]" />
+                <SortableHeader label="承認"     field="approval"       sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-center w-[100px]" />
                 <th className="px-2 py-3 text-center font-semibold w-[70px]">PDF</th>
                 <th className="px-2 py-3 text-center font-semibold w-[70px]">操作</th>
               </tr>

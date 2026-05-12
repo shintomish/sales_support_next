@@ -237,24 +237,43 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  // PDF 生成中の段階メッセージ。null = 非表示、文字列 = オーバーレイ表示
+  const [pdfBusyMsg, setPdfBusyMsg] = useState<string | null>(null);
+  // PDF 生成完了後、ブラウザのポップアップブロックで自動オープンできなかった場合に
+  // ユーザーが手動で開ける URL リスト
+  const [pdfReadyUrls, setPdfReadyUrls] = useState<{ label: string; url: string }[]>([]);
+
+  const tryOpenUrl = (url: string): boolean => {
+    const w = window.open(url, '_blank');
+    return !!w && !w.closed;
+  };
+
   const generatePdf = async () => {
     if (!confirm('編集中の内容を保存してPDFを生成し、ステータスを「発行済」に変更します。よろしいですか？')) return;
     setBusy(true);
+    setPdfReadyUrls([]);
+    setPdfBusyMsg('編集内容を保存中…');
     try {
-      // 編集中の内容を先にDBへ保存（トースト抑止のため save() ではなく直接呼ぶ）
       await apiClient.put<Invoice>(`/api/v1/invoices/${id}`, buildPayload());
+      setPdfBusyMsg('PDF を生成中… (最大10秒程度かかります)');
       const res = await apiClient.post<{ pdf_url: string; acknowledgement_pdf_url?: string; invoice: Invoice }>(`/api/v1/invoices/${id}/pdf`);
       setInvoice(res.data.invoice);
-      window.open(res.data.pdf_url, '_blank');
-      // 注文書(purchase_order)の場合は請書PDFも生成されているので別タブで開く
+      setPdfBusyMsg(null);
+      const labelMain = invoice?.doc_type === 'estimate' ? '見積書 PDF'
+                      : invoice?.doc_type === 'purchase_order' ? '注文書 PDF'
+                      : '請求書 PDF';
+      const blocked: { label: string; url: string }[] = [];
+      if (!tryOpenUrl(res.data.pdf_url)) blocked.push({ label: labelMain, url: res.data.pdf_url });
       if (res.data.acknowledgement_pdf_url) {
-        window.open(res.data.acknowledgement_pdf_url, '_blank');
+        if (!tryOpenUrl(res.data.acknowledgement_pdf_url)) blocked.push({ label: '注文請書 PDF', url: res.data.acknowledgement_pdf_url });
       }
+      if (blocked.length > 0) setPdfReadyUrls(blocked);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'PDF生成に失敗しました';
       alert(msg);
     } finally {
       setBusy(false);
+      setPdfBusyMsg(null);
     }
   };
 
@@ -305,15 +324,18 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       alert('同封物を1つ以上選択してください'); return;
     }
     setBusy(true);
+    setPdfReadyUrls([]);
+    setPdfBusyMsg('送付状 PDF を生成中…');
     try {
       const res = await apiClient.post(`/api/v1/invoices/${id}/cover-letter`, { items }, { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-      window.open(url, '_blank');
+      setPdfBusyMsg(null);
       setCoverModalOpen(false);
+      if (!tryOpenUrl(url)) setPdfReadyUrls([{ label: '送付状 PDF', url }]);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '送付状の生成に失敗しました';
       alert(msg);
-    } finally { setBusy(false); }
+    } finally { setBusy(false); setPdfBusyMsg(null); }
   };
 
   const [envelopeModalOpen, setEnvelopeModalOpen] = useState(false);
@@ -337,17 +359,20 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
   const openEnvelope = async () => {
     setBusy(true);
+    setPdfReadyUrls([]);
+    setPdfBusyMsg('封筒 PDF を生成中…');
     try {
       const params = new URLSearchParams();
       envelopeZaichuLabels.forEach((l) => params.append('zaichu_labels[]', l));
       const res = await apiClient.get(`/api/v1/invoices/${id}/envelope?${params}`, { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-      window.open(url, '_blank');
+      setPdfBusyMsg(null);
       setEnvelopeModalOpen(false);
+      if (!tryOpenUrl(url)) setPdfReadyUrls([{ label: '封筒 PDF', url }]);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '封筒の生成に失敗しました';
       alert(msg);
-    } finally { setBusy(false); }
+    } finally { setBusy(false); setPdfBusyMsg(null); }
   };
 
   // 郵送記録モーダル
@@ -1164,6 +1189,36 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 {busy ? '生成中...' : 'PDF を開く'}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF 生成中オーバーレイ - 進捗メッセージを表示してユーザーの不安を解消 */}
+      {pdfBusyMsg && (
+        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl px-6 py-5 flex flex-col items-center gap-3 max-w-sm">
+            <div className="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+            <p className="text-sm font-medium text-gray-800">{pdfBusyMsg}</p>
+            <p className="text-[11px] text-gray-500">PDF生成サーバーが Chromium を起動するため時間がかかります</p>
+          </div>
+        </div>
+      )}
+
+      {/* ポップアップブロックされた PDF を手動で開く UI */}
+      {pdfReadyUrls.length > 0 && (
+        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-4" onClick={() => setPdfReadyUrls([])}>
+          <div className="bg-white rounded-lg shadow-xl px-6 py-5 flex flex-col items-stretch gap-3 max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-gray-800">PDF 生成完了</h3>
+            <p className="text-xs text-gray-500">ブラウザのポップアップブロックで自動表示できませんでした。以下のリンクから開いてください。</p>
+            <div className="flex flex-col gap-2">
+              {pdfReadyUrls.map((p) => (
+                <a key={p.url} href={p.url} target="_blank" rel="noreferrer"
+                   className="px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200 text-blue-700 text-sm text-center">
+                  📄 {p.label} を開く
+                </a>
+              ))}
+            </div>
+            <Button variant="outline" onClick={() => setPdfReadyUrls([])}>閉じる</Button>
           </div>
         </div>
       )}

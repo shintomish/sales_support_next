@@ -51,7 +51,7 @@ const currentMonth = (): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
-type SortField = 'invoice_number' | 'customer' | 'year_month' | 'issued_date' | 'total' | 'status';
+type SortField = 'invoice_number' | 'customer' | 'subject' | 'year_month' | 'issued_date' | 'total' | 'status';
 
 export default function EstimatesPage() {
   const searchParams = useSearchParams();
@@ -219,6 +219,7 @@ export default function EstimatesPage() {
       switch (sortBy) {
         case 'invoice_number': return r.invoice_number;
         case 'customer':       return r.customer_name_snapshot ?? r.customer?.company_name ?? '';
+        case 'subject':        return r.subject_name ?? '';
         case 'year_month':     return r.year_month;
         case 'issued_date':    return r.issued_date ?? '';
         case 'total':          return Number(r.total);
@@ -277,22 +278,21 @@ export default function EstimatesPage() {
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
                 <SortableHeader label="見積番号"   field="invoice_number" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[200px]" />
-                <SortableHeader label="対象月"     field="year_month"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[80px]" />
+                <th className="text-left px-2 py-3 font-semibold w-[80px]">対象月</th>
                 <SortableHeader label="取引先"     field="customer"       sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[180px]" />
-                <th className="text-left px-2 py-3 font-semibold">件名</th>
-                <SortableHeader label="発行日"     field="issued_date"    sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
-                <th className="text-left px-2 py-3 font-semibold w-[90px]">有効期間</th>
+                <SortableHeader label="件名"       field="subject"        sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3" />
+                <SortableHeader label="見積日"     field="issued_date"    sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
                 <SortableHeader label="税込合計"   field="total"          sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[110px]" />
-                <th className="text-center px-2 py-3 font-semibold w-[80px]">状態</th>
+                <SortableHeader label="状態"       field="status"         sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-center w-[80px]" />
                 <th className="px-2 py-3 text-center font-semibold w-[70px]">PDF</th>
                 <th className="px-2 py-3 text-center font-semibold w-[70px]">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
               ) : sortedItems.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">見積書がありません</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">見積書がありません</td></tr>
               ) : sortedItems.map((r, idx) => (
                 <tr key={r.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
                   <td className="px-2 py-3 font-mono text-xs truncate">{r.invoice_number}</td>
@@ -300,7 +300,6 @@ export default function EstimatesPage() {
                   <td className="px-2 py-3 text-gray-800 truncate" title={r.customer_name_snapshot ?? r.customer?.company_name ?? ''}>{r.customer_name_snapshot ?? r.customer?.company_name ?? '-'}</td>
                   <td className="px-2 py-3 truncate" title={r.subject_name ?? ''}>{r.subject_name ?? '-'}</td>
                   <td className="px-2 py-3 text-gray-600">{r.issued_date}</td>
-                  <td className="px-2 py-3 text-gray-600 text-xs">{r.valid_until_text ?? '-'}</td>
                   <td className="px-2 py-3 text-right tabular-nums font-semibold">{yen(r.total)}</td>
                   <td className="px-2 py-3 text-center">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${

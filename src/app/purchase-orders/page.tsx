@@ -71,7 +71,7 @@ const currentMonth = (): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
-type SortField = 'invoice_number' | 'customer' | 'year_month' | 'issued_date' | 'total' | 'status';
+type SortField = 'invoice_number' | 'customer' | 'subject' | 'year_month' | 'issued_date' | 'total' | 'status' | 'approval';
 
 export default function PurchaseOrdersPage() {
   const user = useAuthStore((s) => s.user);
@@ -91,17 +91,32 @@ export default function PurchaseOrdersPage() {
   const [sortOrder, setSortOrder]       = useState<'asc' | 'desc'>('desc');
 
   // 新規注文書モーダル（?create=1 で自動オープン）
+  type PoMode = 'normal' | 'exception';
+  type SesDealOption = {
+    id: number; affiliation: string | null; engineer_name: string | null;
+    project_name: string | null; contract_period_end: string | null;
+  };
   const [createOpen, setCreateOpen]     = useState(initialCreate);
+  const [createMode, setCreateMode]     = useState<PoMode>('normal');
   const [creating, setCreating]         = useState(false);
   const [customers, setCustomers]       = useState<CustomerLookup[]>([]);
   const [custSearch, setCustSearch]     = useState('');
   const [custLoading, setCustLoading]   = useState(false);
+  const [sesDeals, setSesDeals]         = useState<SesDealOption[]>([]);
+  const [sesLoading, setSesLoading]     = useState(false);
+  const [sesSearch, setSesSearch]       = useState('');
   const [form, setForm] = useState({
+    deal_id:      '' as string | number,
     customer_id:  '' as string | number,
     subject_name: '',
     issued_date:  new Date().toISOString().slice(0, 10),
     notes:        '',
   });
+
+  const currentMonthStart = (): string => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -121,20 +136,18 @@ export default function PurchaseOrdersPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // モーダルを開いたら顧客リストをロード（検索変更時も）
+  // 例外モード: 仕入先リストをロード
   useEffect(() => {
-    if (!createOpen) return;
+    if (!createOpen || createMode !== 'exception') return;
     let cancelled = false;
     setCustLoading(true);
     const t = setTimeout(async () => {
       try {
         const res = await apiClient.get<{ data: CustomerLookup[] }>('/api/v1/customers', {
-          // 注文書/注文請書は仕入先(is_supplier=true)向け。両方フラグの顧客も含まれる
           params: { search: custSearch || undefined, page: 1, per_page: 500, type: 'supplier' },
         });
         if (!cancelled) {
           const list = res.data.data ?? [];
-          // 株式会社/有限会社/合同会社 などの法人格を除去した名前で五十音/英字ソート
           const sortKey = (n: string) => n
             .replace(/^(株式会社|有限会社|合同会社|一般社団法人|公益財団法人)\s*/u, '')
             .replace(/\s*(株式会社|有限会社|合同会社|一般社団法人|公益財団法人)\s*$/u, '');
@@ -146,7 +159,45 @@ export default function PurchaseOrdersPage() {
       }
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [createOpen, custSearch]);
+  }, [createOpen, createMode, custSearch]);
+
+  // 通常モード: SES台帳 案件リストをロード（契約終了≥当月）
+  useEffect(() => {
+    if (!createOpen || createMode !== 'normal') return;
+    let cancelled = false;
+    setSesLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await apiClient.get<{ data: SesDealOption[] }>('/api/v1/ses-contracts', {
+          params: {
+            search: sesSearch || undefined,
+            contract_period_end_from: currentMonthStart(),
+            per_page: 200,
+            sort_by: 'affiliation',
+            sort_order: 'asc',
+          },
+        });
+        if (!cancelled) {
+          const list = (res.data.data ?? []) as SesDealOption[];
+          const sortKey = (n: string | null) => (n ?? '')
+            .replace(/^(株式会社|有限会社|合同会社|一般社団法人|公益財団法人)\s*/u, '')
+            .replace(/\s*(株式会社|有限会社|合同会社|一般社団法人|公益財団法人)\s*$/u, '');
+          // 第1=契約終了 ASC、第2=所属会社 五十音
+          list.sort((a, b) => {
+            const ea = a.contract_period_end ?? '9999-99-99';
+            const eb = b.contract_period_end ?? '9999-99-99';
+            if (ea !== eb) return ea < eb ? -1 : 1;
+            return sortKey(a.affiliation).localeCompare(sortKey(b.affiliation), 'ja');
+          });
+          // 所属会社が空のものは注文書発行不可なので除外表示
+          setSesDeals(list.filter(d => (d.affiliation ?? '').trim() !== ''));
+        }
+      } finally {
+        if (!cancelled) setSesLoading(false);
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [createOpen, createMode, sesSearch]);
 
   const handleSubmit = async (id: number) => {
     if (!confirm('承認申請しますか？')) return;
@@ -186,18 +237,22 @@ export default function PurchaseOrdersPage() {
   };
 
   const handleCreate = async () => {
-    if (!form.customer_id) { alert('顧客を選択してください'); return; }
+    if (createMode === 'normal' && !form.deal_id) { alert('SES台帳から案件を選択してください'); return; }
+    if (createMode === 'exception' && !form.customer_id) { alert('取引先（仕入先）を選択してください'); return; }
     setCreating(true);
     try {
-      const res = await apiClient.post('/api/v1/purchase-orders', {
-        customer_id:  Number(form.customer_id),
+      const payload: Record<string, unknown> = {
         subject_name: form.subject_name || null,
         issued_date:  form.issued_date || null,
         notes:        form.notes || null,
-      });
+      };
+      if (createMode === 'normal') payload.deal_id = Number(form.deal_id);
+      else payload.customer_id = Number(form.customer_id);
+
+      const res = await apiClient.post('/api/v1/purchase-orders', payload);
       setCreateOpen(false);
-      setForm({ customer_id: '', subject_name: '', issued_date: new Date().toISOString().slice(0, 10), notes: '' });
-      setCustSearch('');
+      setForm({ deal_id: '', customer_id: '', subject_name: '', issued_date: new Date().toISOString().slice(0, 10), notes: '' });
+      setCustSearch(''); setSesSearch('');
       // 作成した注文書の編集ページへ遷移
       window.location.href = `/purchase-orders/${res.data.id}`;
     } catch (err: unknown) {
@@ -223,10 +278,12 @@ export default function PurchaseOrdersPage() {
       switch (sortBy) {
         case 'invoice_number': return r.invoice_number;
         case 'customer':       return r.customer_name_snapshot ?? r.customer?.company_name ?? '';
+        case 'subject':        return r.subject_name ?? '';
         case 'year_month':     return r.year_month;
         case 'issued_date':    return r.issued_date ?? '';
         case 'total':          return Number(r.total);
         case 'status':         return r.status;
+        case 'approval':       return r.approval_status;
       }
     };
     arr.sort((a, b) => {
@@ -291,28 +348,26 @@ export default function PurchaseOrdersPage() {
           <table className="table-fixed w-full text-sm">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
-                <SortableHeader label="注文番号"   field="invoice_number" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[200px]" />
-                <th className="text-left px-2 py-3 font-semibold w-[200px]">請書番号</th>
-                <SortableHeader label="対象月"     field="year_month"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[80px]" />
-                <SortableHeader label="取引先"     field="customer"       sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[180px]" />
-                <th className="text-left px-2 py-3 font-semibold">件名</th>
-                <SortableHeader label="発行日"     field="issued_date"    sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px]" />
+                <SortableHeader label="注文番号"   field="invoice_number" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[180px]" />
+                <th className="text-left px-2 py-3 font-semibold w-[70px]">対象月</th>
+                <SortableHeader label="取引先"     field="customer"       sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[160px]" />
+                <SortableHeader label="件名"       field="subject"        sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3" />
+                <SortableHeader label="注文日"     field="issued_date"    sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[90px]" />
                 <SortableHeader label="税込合計"   field="total"          sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[110px]" />
-                <th className="text-center px-2 py-3 font-semibold w-[80px]">状態</th>
-                <th className="text-center px-2 py-3 font-semibold w-[100px]">承認</th>
-                <th className="px-2 py-3 text-center font-semibold w-[100px]">PDF</th>
-                <th className="px-2 py-3 text-center font-semibold w-[70px]">操作</th>
+                <SortableHeader label="状態"       field="status"         sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-center w-[70px]" />
+                <SortableHeader label="承認"       field="approval"       sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-center w-[90px]" />
+                <th className="px-2 py-3 text-center font-semibold w-[90px]">PDF</th>
+                <th className="px-2 py-3 text-center font-semibold w-[60px]">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">読み込み中...</td></tr>
               ) : sortedItems.length === 0 ? (
-                <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">注文書がありません</td></tr>
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">注文書がありません</td></tr>
               ) : sortedItems.map((r, idx) => (
                 <tr key={r.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
-                  <td className="px-2 py-3 font-mono text-xs truncate">{r.invoice_number}</td>
-                  <td className="px-2 py-3 font-mono text-xs text-gray-600 truncate">{r.acknowledgement_no ?? '-'}</td>
+                  <td className="px-2 py-3 font-mono text-xs truncate" title={`注文 ${r.invoice_number}${r.acknowledgement_no ? ` / 請書 ${r.acknowledgement_no}` : ''}`}>{r.invoice_number}</td>
                   <td className="px-2 py-3 text-gray-600 truncate">{r.year_month}</td>
                   <td className="px-2 py-3 text-gray-800 truncate" title={r.customer_name_snapshot ?? r.customer?.company_name ?? ''}>{r.customer_name_snapshot ?? r.customer?.company_name ?? '-'}</td>
                   <td className="px-2 py-3 truncate" title={r.subject_name ?? ''}>{r.subject_name ?? '-'}</td>
@@ -382,64 +437,115 @@ export default function PurchaseOrdersPage() {
       {/* 新規注文書発行モーダル */}
       {createOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setCreateOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-gray-800 mb-4">新規注文発行</h2>
-            <p className="text-xs text-gray-500 mb-4">注文書発行時に注文請書(OCF番号)も同時に採番されます。PDFは注文書の発行ボタンを押すと両方生成されます。</p>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-gray-800 mb-2">新規注文発行</h2>
+            <p className="text-xs text-gray-500 mb-3">注文書発行時に注文請書(OCF番号)も同時に採番されます。PDFは注文書の発行ボタンを押すと両方生成されます。</p>
+
+            {/* モード切替 */}
+            <div className="flex gap-4 text-sm mb-3 border-b border-gray-200 pb-2">
+              <label className="flex items-center gap-2">
+                <input type="radio" name="po-mode" checked={createMode === 'normal'}
+                  onChange={() => setCreateMode('normal')} />
+                <span><strong>通常</strong>（SES台帳の案件から発行）</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="radio" name="po-mode" checked={createMode === 'exception'}
+                  onChange={() => setCreateMode('exception')} />
+                <span><strong>例外</strong>（仕入先のみ指定・新規注文）</span>
+              </label>
+            </div>
+
             <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">取引先 <span className="text-rose-600">*</span></label>
-                <Input
-                  type="text"
-                  placeholder="会社名で検索…"
-                  value={custSearch}
-                  onChange={(e) => setCustSearch(e.target.value)}
-                  className="mb-2"
-                />
-                <select
-                  value={form.customer_id}
-                  onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
-                  size={6}
-                >
-                  {custLoading && <option disabled>読み込み中…</option>}
-                  {!custLoading && customers.length === 0 && <option disabled>該当なし</option>}
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.company_name}{c.invoice_code ? ` [${c.invoice_code}]` : ' （※顧客コード未設定）'}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {createMode === 'normal' && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">SES台帳の案件 <span className="text-rose-600">*</span></label>
+                  <p className="text-[10px] text-gray-500 mb-1">契約終了が当月以降・所属会社（仕入先）が登録されている案件のみ表示。第1ソート=契約終了 昇順、第2=所属会社 五十音</p>
+                  <Input type="text" placeholder="所属会社・技術者名・案件名で検索…"
+                    value={sesSearch} onChange={(e) => setSesSearch(e.target.value)} className="mb-2" />
+                  <div className="border border-gray-200 rounded-md max-h-64 overflow-y-auto overflow-x-hidden bg-white">
+                    <table className="w-full text-xs table-fixed">
+                      <thead className="bg-gray-50 sticky top-0 text-gray-600">
+                        <tr>
+                          <th className="text-left px-2 py-1.5 font-semibold w-[30%]">所属会社</th>
+                          <th className="text-left px-2 py-1.5 font-semibold w-[18%]">技術者</th>
+                          <th className="text-left px-2 py-1.5 font-semibold w-[34%]">案件名</th>
+                          <th className="text-left px-2 py-1.5 font-semibold w-[18%]">契約終了</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sesLoading && (
+                          <tr><td colSpan={4} className="text-center py-4 text-gray-400">読み込み中…</td></tr>
+                        )}
+                        {!sesLoading && sesDeals.length === 0 && (
+                          <tr><td colSpan={4} className="text-center py-4 text-gray-400">該当する案件がありません（契約終了≥当月・所属会社あり）</td></tr>
+                        )}
+                        {sesDeals.map((d) => (
+                          <tr key={d.id}
+                              onClick={() => setForm({
+                                ...form,
+                                deal_id: String(d.id),
+                                subject_name: d.project_name ?? form.subject_name,
+                              })}
+                              className={`cursor-pointer hover:bg-blue-50 border-t border-gray-100 ${
+                                String(form.deal_id) === String(d.id) ? 'bg-blue-100' : ''
+                              }`}>
+                            <td className="px-2 py-1 truncate" title={d.affiliation ?? ''}>{d.affiliation ?? '—'}</td>
+                            <td className="px-2 py-1 truncate" title={d.engineer_name ?? ''}>{d.engineer_name ?? '—'}</td>
+                            <td className="px-2 py-1 truncate" title={d.project_name ?? ''}>{d.project_name ?? '—'}</td>
+                            <td className="px-2 py-1 text-gray-500 truncate">{d.contract_period_end?.slice(0, 10) ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {createMode === 'exception' && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">取引先（仕入先）<span className="text-rose-600">*</span></label>
+                  <Input type="text" placeholder="会社名で検索…"
+                    value={custSearch} onChange={(e) => setCustSearch(e.target.value)} className="mb-2" />
+                  <select
+                    value={form.customer_id}
+                    onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
+                    size={6}
+                  >
+                    {custLoading && <option disabled>読み込み中…</option>}
+                    {!custLoading && customers.length === 0 && <option disabled>該当なし</option>}
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.company_name}{c.invoice_code ? ` [${c.invoice_code}]` : ' （※顧客コード未設定）'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">件名</label>
-                <Input
-                  type="text"
-                  placeholder="例: 環境整備対応"
+                <Input type="text"
+                  placeholder={createMode === 'normal' ? '空欄なら案件タイトルが入ります' : '例: 環境整備対応'}
                   value={form.subject_name}
-                  onChange={(e) => setForm({ ...form, subject_name: e.target.value })}
-                />
+                  onChange={(e) => setForm({ ...form, subject_name: e.target.value })} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">発行日</label>
-                <Input
-                  type="date"
-                  value={form.issued_date}
-                  onChange={(e) => setForm({ ...form, issued_date: e.target.value })}
-                />
+                <Input type="date" value={form.issued_date}
+                  onChange={(e) => setForm({ ...form, issued_date: e.target.value })} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">備考</label>
-                <textarea
-                  value={form.notes}
+                <textarea value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  rows={3}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
-                />
+                  rows={2} className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm" />
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>キャンセル</Button>
-              <Button onClick={handleCreate} disabled={creating || !form.customer_id}>
+              <Button onClick={handleCreate}
+                disabled={creating || (createMode === 'normal' ? !form.deal_id : !form.customer_id)}>
                 {creating ? '作成中…' : '作成'}
               </Button>
             </div>
