@@ -17,6 +17,12 @@ interface IssuerSettings {
   invoice_issuer_square_seal_path: string | null;
   invoice_issuer_url: string | null;
   invoice_issuer_invoice_number: string | null;
+  invoice_email_subject_template: string | null;
+  invoice_email_body_template: string | null;
+  estimate_email_subject_template: string | null;
+  estimate_email_body_template: string | null;
+  purchase_order_email_subject_template: string | null;
+  purchase_order_email_body_template: string | null;
   invoice_issuer_bank_name: string | null;
   invoice_issuer_bank_branch: string | null;
   invoice_issuer_bank_account_type: string | null;
@@ -31,9 +37,29 @@ const EMPTY: IssuerSettings = {
   invoice_issuer_square_seal_path: '',
   invoice_issuer_url: '',
   invoice_issuer_invoice_number: '',
+  invoice_email_subject_template: '', invoice_email_body_template: '',
+  estimate_email_subject_template: '', estimate_email_body_template: '',
+  purchase_order_email_subject_template: '', purchase_order_email_body_template: '',
   invoice_issuer_bank_name: '', invoice_issuer_bank_branch: '',
   invoice_issuer_bank_account_type: '', invoice_issuer_bank_account_number: '',
   invoice_issuer_bank_account_holder: '',
+};
+
+type DocType = 'invoice' | 'estimate' | 'purchase_order';
+const DOC_LABEL: Record<DocType, string> = {
+  invoice: '請求書',
+  estimate: '見積書',
+  purchase_order: '注文書',
+};
+const SUBJECT_FIELD: Record<DocType, keyof IssuerSettings> = {
+  invoice:        'invoice_email_subject_template',
+  estimate:       'estimate_email_subject_template',
+  purchase_order: 'purchase_order_email_subject_template',
+};
+const BODY_FIELD: Record<DocType, keyof IssuerSettings> = {
+  invoice:        'invoice_email_body_template',
+  estimate:       'estimate_email_body_template',
+  purchase_order: 'purchase_order_email_body_template',
 };
 
 type SealType = 'round' | 'square';
@@ -51,6 +77,9 @@ const TEXT_KEYS: (keyof IssuerSettings)[] = [
   'invoice_issuer_name', 'invoice_issuer_postal_code', 'invoice_issuer_address',
   'invoice_issuer_tel', 'invoice_issuer_fax', 'invoice_issuer_url',
   'invoice_issuer_invoice_number',
+  'invoice_email_subject_template', 'invoice_email_body_template',
+  'estimate_email_subject_template', 'estimate_email_body_template',
+  'purchase_order_email_subject_template', 'purchase_order_email_body_template',
   'invoice_issuer_bank_name', 'invoice_issuer_bank_branch',
   'invoice_issuer_bank_account_type', 'invoice_issuer_bank_account_number',
   'invoice_issuer_bank_account_holder',
@@ -61,6 +90,7 @@ export default function InvoiceIssuerSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy]       = useState(false);
   const [toast, setToast]     = useState<string | null>(null);
+  const [mailTab, setMailTab] = useState<DocType>('invoice');
   const fileInputRef          = useRef<HTMLInputElement>(null);
   const roundSealInputRef     = useRef<HTMLInputElement>(null);
   const squareSealInputRef    = useRef<HTMLInputElement>(null);
@@ -259,6 +289,48 @@ export default function InvoiceIssuerSettingsPage() {
               onRemove={() => removeSeal('square')}
               note="見積書 PDF に押印"
             />
+          </div>
+        </div>
+
+        {/* メール送信テンプレート — doc_type 別 3 セット */}
+        <div className="border-t border-gray-100 pt-4 mt-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-1">メール送信テンプレート</h2>
+          <p className="text-xs text-gray-400 mb-3">
+            帳票をメール送信する時の既定の件名・本文。プレースホルダ: <code className="text-[11px]">{'{invoice_number}'} {'{customer_name}'} {'{year_month_text}'} {'{total}'} {'{due_date}'} {'{issuer_name}'} {'{user_name}'}</code>
+          </p>
+          <div className="flex gap-1 mb-3 border-b border-gray-100">
+            {(['invoice', 'estimate', 'purchase_order'] as DocType[]).map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setMailTab(d)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-t border-b-2 -mb-px ${
+                  mailTab === d
+                    ? 'border-blue-500 text-blue-700 bg-blue-50'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {DOC_LABEL[d]}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-3">
+            <Field label="件名">
+              <Input
+                value={form[SUBJECT_FIELD[mailTab]] ?? ''}
+                onChange={(e) => set(SUBJECT_FIELD[mailTab])(e.target.value)}
+                placeholder="未入力の場合は既定の件名が使われます"
+              />
+            </Field>
+            <Field label="本文">
+              <textarea
+                value={form[BODY_FIELD[mailTab]] ?? ''}
+                onChange={(e) => set(BODY_FIELD[mailTab])(e.target.value)}
+                rows={10}
+                placeholder="未入力の場合は既定の本文が使われます"
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white font-mono"
+              />
+            </Field>
           </div>
         </div>
 
