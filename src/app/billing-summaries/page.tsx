@@ -484,34 +484,47 @@ function RefinitivImportModal({
   const [yearMonth, setYearMonth] = useState<string>(defaultYearMonth);
   const [issuing, setIssuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dealOptions, setDealOptions] = useState<DealOption[]>([]);
-  const [dealSearch, setDealSearch] = useState<string>('リフィニティブ');
+  const [allRefinitivDeals, setAllRefinitivDeals] = useState<DealOption[]>([]);
+  const [dealSearch, setDealSearch] = useState<string>('');
   const [loadingDeals, setLoadingDeals] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
-  // モーダルを開いた時 / 検索語が変わった時に SES契約を取得
+  // モーダルを開いた時にリフィニティブ・ジャパンの SES案件 を全件取得（以降は client-side で絞り込み）
   useEffect(() => {
     if (!open) {
       setFile(null); setParsed(null); setDealId(null); setError(null);
-      setYearMonth(defaultYearMonth);
+      setYearMonth(defaultYearMonth); setDealSearch('');
       return;
     }
     setLoadingDeals(true);
     apiClient.get<{ data: Array<{ id: number; project_name: string | null; customer_name: string | null; engineer_name: string | null }> }>(
       '/api/v1/ses-contracts',
-      { params: { search: dealSearch || undefined, per_page: 100, user_id: 'all', sort_by: 'customer_name', sort_order: 'asc' } },
+      { params: { search: 'リフィニティブ', per_page: 200, user_id: 'all', sort_by: 'customer_name', sort_order: 'asc' } },
     ).then((res) => {
       const rows = res.data?.data ?? [];
-      setDealOptions(rows.map((r) => ({
-        deal_id: r.id,
-        deal_title: r.project_name ?? '(無題)',
-        customer_name: r.customer_name ?? '',
-        engineer_name: r.engineer_name ?? null,
-      })));
+      // 顧客=リフィニティブ・ジャパン に限定（タイトル/技術者名に「リフィニティブ」が含まれる他顧客の案件を除外）
+      const refinitivOnly = rows
+        .filter((r) => (r.customer_name ?? '').includes('リフィニティブ・ジャパン'))
+        .map((r) => ({
+          deal_id: r.id,
+          deal_title: r.project_name ?? '(無題)',
+          customer_name: r.customer_name ?? '',
+          engineer_name: r.engineer_name ?? null,
+        }));
+      setAllRefinitivDeals(refinitivOnly);
     }).catch(() => {
-      setDealOptions([]);
+      setAllRefinitivDeals([]);
     }).finally(() => setLoadingDeals(false));
-  }, [open, defaultYearMonth, dealSearch]);
+  }, [open, defaultYearMonth]);
+
+  // 案件検索: タイトル / 技術者名 で追加フィルタ
+  const dealOptions = dealSearch.trim()
+    ? allRefinitivDeals.filter((d) => {
+        const q = dealSearch.trim().toLowerCase();
+        return d.deal_title.toLowerCase().includes(q)
+            || (d.engineer_name ?? '').toLowerCase().includes(q);
+      })
+    : allRefinitivDeals;
 
   const handleParse = async () => {
     if (!file) return;
@@ -703,7 +716,7 @@ function RefinitivImportModal({
                     <Input
                       value={dealSearch}
                       onChange={(e) => setDealSearch(e.target.value)}
-                      placeholder="例: リフィニティブ / JBIC / 技術者名"
+                      placeholder="例: JBIC / 技術者名（リフィニティブ案件内で絞り込み）"
                     />
                   </div>
                   <div>
