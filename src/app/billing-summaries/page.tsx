@@ -272,12 +272,6 @@ export default function BillingSummariesPage() {
         open={refModalOpen}
         onClose={() => setRefModalOpen(false)}
         defaultYearMonth={yearMonth}
-        dealOptions={(sortedItems as DealRow[]).filter((r) => group === 'deal' && r.invoice_id === null).map((r) => ({
-          deal_id: r.deal_id,
-          deal_title: r.deal_title,
-          customer_name: r.customer_name ?? '',
-          invoice_code: r.invoice_code,
-        }))}
         onIssued={(invoiceId) => {
           setRefModalOpen(false);
           router.push(`/invoices/${invoiceId}`);
@@ -476,12 +470,11 @@ const EMPTY_PARSED: ParsedPo = {
 };
 
 function RefinitivImportModal({
-  open, onClose, defaultYearMonth, dealOptions, onIssued,
+  open, onClose, defaultYearMonth, onIssued,
 }: {
   open: boolean;
   onClose: () => void;
   defaultYearMonth: string;
-  dealOptions: DealOption[];
   onIssued: (invoiceId: number) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
@@ -491,13 +484,32 @@ function RefinitivImportModal({
   const [yearMonth, setYearMonth] = useState<string>(defaultYearMonth);
   const [issuing, setIssuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dealOptions, setDealOptions] = useState<DealOption[]>([]);
+  const [dealSearch, setDealSearch] = useState<string>('Refinitiv');
+  const [loadingDeals, setLoadingDeals] = useState(false);
 
+  // モーダルを開いた時 / 検索語が変わった時に SES契約を取得
   useEffect(() => {
     if (!open) {
       setFile(null); setParsed(null); setDealId(null); setError(null);
       setYearMonth(defaultYearMonth);
+      return;
     }
-  }, [open, defaultYearMonth]);
+    setLoadingDeals(true);
+    apiClient.get<{ data: Array<{ id: number; title: string; customer?: { company_name?: string; invoice_code?: string } }> }>(
+      `/api/v1/ses-contracts?search=${encodeURIComponent(dealSearch)}&per_page=100`
+    ).then((res) => {
+      const rows = Array.isArray(res.data) ? res.data : (res.data.data ?? []);
+      setDealOptions(rows.map((r) => ({
+        deal_id: r.id,
+        deal_title: r.title,
+        customer_name: r.customer?.company_name ?? '',
+        invoice_code: r.customer?.invoice_code ?? null,
+      })));
+    }).catch(() => {
+      setDealOptions([]);
+    }).finally(() => setLoadingDeals(false));
+  }, [open, defaultYearMonth, dealSearch]);
 
   const handleParse = async () => {
     if (!file) return;
@@ -639,26 +651,37 @@ function RefinitivImportModal({
               </div>
 
               {/* SES案件 + 年月 */}
-              <div className="border-t border-gray-100 pt-3 mt-4 grid grid-cols-3 gap-3">
-                <div className="col-span-2">
+              <div className="border-t border-gray-100 pt-3 mt-4 space-y-2">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">案件検索</label>
+                    <Input
+                      value={dealSearch}
+                      onChange={(e) => setDealSearch(e.target.value)}
+                      placeholder="取引先名・案件名・技術者名"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">対象月 *</label>
+                    <Input value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} placeholder="YYYY-MM" />
+                  </div>
+                </div>
+                <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">対象 SES案件 *</label>
                   <select
                     value={dealId ?? ''}
                     onChange={(e) => setDealId(e.target.value ? Number(e.target.value) : null)}
                     className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
+                    disabled={loadingDeals}
                   >
-                    <option value="">SES案件を選択</option>
+                    <option value="">{loadingDeals ? '読み込み中...' : `SES案件を選択 (${dealOptions.length}件)`}</option>
                     {dealOptions.map((d) => (
                       <option key={d.deal_id} value={d.deal_id}>
                         [{d.invoice_code ?? '-'}] {d.customer_name} / {d.deal_title}
                       </option>
                     ))}
                   </select>
-                  <p className="text-[11px] text-gray-400 mt-1">対象月の未発行 案件のみ表示。表示されない場合は対象月を切替えてください。</p>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">対象月 *</label>
-                  <Input value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} placeholder="YYYY-MM" />
+                  <p className="text-[11px] text-gray-400 mt-1">SES台帳から検索語にマッチする案件を表示（勤務表の有無は問わず）。</p>
                 </div>
               </div>
             </div>
