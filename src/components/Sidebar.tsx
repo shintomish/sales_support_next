@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useUnreadEmailCount } from '@/hooks/useUnreadEmailCount';
 import NotificationToast from '@/components/NotificationToast';
+import apiClient from '@/lib/axios';
 
 type SubItem = {
   label: string;
@@ -28,7 +29,23 @@ export default function Sidebar() {
   const logout   = useAuthStore((state) => state.logout);
   const user     = useAuthStore((state) => state.user);
 
-  const { data: notifData } = useNotifications();
+  const { data: notifData, refetch: refetchNotifications } = useNotifications();
+
+  // バッジクリック時に該当 doc_type の通知を既読化して、サーバ側で「誰がいつ消したか」を記録
+  const markNotificationsRead = async (
+    type: 'approved' | 'rejected',
+    docType: 'invoice' | 'purchase_order',
+    targetPath: string,
+  ) => {
+    try {
+      await apiClient.post('/api/v1/notifications/mark-read', { type, doc_type: docType });
+    } catch {
+      // 既読化失敗してもナビゲートは継続
+    } finally {
+      router.push(targetPath);
+      refetchNotifications();
+    }
+  };
   const overdueCount   = notifData?.overdue_tasks_count ?? 0;
   const overdueTasks   = notifData?.overdue_tasks ?? [];
   const pendingApprovalCount = notifData?.pending_approvals_count ?? 0;
@@ -322,7 +339,7 @@ export default function Sidebar() {
             </div>
             {rejectedInvoices.filter(r => r.doc_type === 'invoice').length > 0 && (
               <button
-                onClick={() => router.push('/invoices?approval_status=rejected')}
+                onClick={() => markNotificationsRead('rejected', 'invoice', '/invoices?approval_status=rejected')}
                 className="mt-2 w-full text-xs text-red-300 hover:text-white transition-colors text-left"
               >
                 請求書 {rejectedInvoices.filter(r => r.doc_type === 'invoice').length}件 →
@@ -330,7 +347,7 @@ export default function Sidebar() {
             )}
             {rejectedInvoices.filter(r => r.doc_type === 'purchase_order').length > 0 && (
               <button
-                onClick={() => router.push('/purchase-orders?approval_status=rejected')}
+                onClick={() => markNotificationsRead('rejected', 'purchase_order', '/purchase-orders?approval_status=rejected')}
                 className="mt-1 w-full text-xs text-red-300 hover:text-white transition-colors text-left"
               >
                 注文書 {rejectedInvoices.filter(r => r.doc_type === 'purchase_order').length}件 →
@@ -351,7 +368,7 @@ export default function Sidebar() {
             </div>
             {recentlyApproved.filter(r => r.doc_type === 'invoice').length > 0 && (
               <button
-                onClick={() => router.push('/invoices?approval_status=approved')}
+                onClick={() => markNotificationsRead('approved', 'invoice', '/invoices?approval_status=approved')}
                 className="mt-2 w-full text-xs text-green-300 hover:text-white transition-colors text-left"
               >
                 請求書 {recentlyApproved.filter(r => r.doc_type === 'invoice').length}件 →
@@ -359,7 +376,7 @@ export default function Sidebar() {
             )}
             {recentlyApproved.filter(r => r.doc_type === 'purchase_order').length > 0 && (
               <button
-                onClick={() => router.push('/purchase-orders?approval_status=approved')}
+                onClick={() => markNotificationsRead('approved', 'purchase_order', '/purchase-orders?approval_status=approved')}
                 className="mt-1 w-full text-xs text-green-300 hover:text-white transition-colors text-left"
               >
                 注文書 {recentlyApproved.filter(r => r.doc_type === 'purchase_order').length}件 →
