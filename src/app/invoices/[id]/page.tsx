@@ -122,6 +122,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [subjectName,            setSubjectName]            = useState('');
   const [workPeriodText,         setWorkPeriodText]         = useState('');
   const [workLocation,           setWorkLocation]           = useState('');
+  const [engineerNameSnapshot,   setEngineerNameSnapshot]   = useState('');
   const [deliveryItemsText,      setDeliveryItemsText]      = useState('');
   const [transportationNoteText, setTransportationNoteText] = useState('');
   const [deliveryDateText,       setDeliveryDateText]       = useState('');
@@ -142,6 +143,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       setSubjectName(res.data.subject_name ?? '');
       setWorkPeriodText(res.data.work_period_text ?? '');
       setWorkLocation(res.data.work_location ?? '');
+      setEngineerNameSnapshot(res.data.engineer_name_snapshot ?? '');
       setDeliveryItemsText(res.data.delivery_items_text ?? '');
       setTransportationNoteText(res.data.transportation_note_text ?? '');
       setDeliveryDateText(res.data.delivery_date_text ?? '');
@@ -205,6 +207,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       subject_name:             subjectName || null,
       work_period_text:         workPeriodText || null,
       work_location:            workLocation || null,
+      engineer_name_snapshot:   engineerNameSnapshot || null,
       delivery_items_text:      deliveryItemsText || null,
       transportation_note_text: transportationNoteText || null,
       delivery_date_text:       deliveryDateText || null,
@@ -744,6 +747,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           </Field>
           <Field label="作業場所">
             <Input value={workLocation} onChange={(e) => setWorkLocation(e.target.value)} />
+          </Field>
+          <Field label="作業担当者">
+            <Input value={engineerNameSnapshot} onChange={(e) => setEngineerNameSnapshot(e.target.value)}
+              placeholder="未入力の場合はPDFに印字されません" />
           </Field>
           <Field label="納品物">
             <Input value={deliveryItemsText} onChange={(e) => setDeliveryItemsText(e.target.value)}
