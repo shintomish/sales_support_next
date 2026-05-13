@@ -190,8 +190,11 @@ export default function PurchaseOrdersPage() {
             if (ea !== eb) return ea < eb ? -1 : 1;
             return sortKey(a.affiliation).localeCompare(sortKey(b.affiliation), 'ja');
           });
-          // 所属会社が空のものは注文書発行不可なので除外表示
-          setSesDeals(list.filter(d => (d.affiliation ?? '').trim() !== ''));
+          // 所属会社が空 or '社員'（自社所属）は注文書発行不要なので除外
+          setSesDeals(list.filter(d => {
+            const aff = (d.affiliation ?? '').trim();
+            return aff !== '' && aff !== '社員';
+          }));
         }
       } finally {
         if (!cancelled) setSesLoading(false);
@@ -460,7 +463,7 @@ export default function PurchaseOrdersPage() {
               {createMode === 'normal' && (
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">SES台帳の案件 <span className="text-rose-600">*</span></label>
-                  <p className="text-[10px] text-gray-500 mb-1">契約終了が当月以降・所属会社（仕入先）が登録されている案件のみ表示。第1ソート=契約終了 昇順、第2=所属会社 五十音</p>
+                  <p className="text-[10px] text-gray-500 mb-1">契約終了が当月以降・所属会社（仕入先）が登録されている案件のみ表示（自社所属「社員」は除外）。第1ソート=契約終了 昇順、第2=所属会社 五十音</p>
                   <Input type="text" placeholder="所属会社・技術者名・案件名で検索…"
                     value={sesSearch} onChange={(e) => setSesSearch(e.target.value)} className="mb-2" />
                   <div className="border border-gray-200 rounded-md max-h-64 overflow-y-auto overflow-x-hidden bg-white">
@@ -478,7 +481,7 @@ export default function PurchaseOrdersPage() {
                           <tr><td colSpan={4} className="text-center py-4 text-gray-400">読み込み中…</td></tr>
                         )}
                         {!sesLoading && sesDeals.length === 0 && (
-                          <tr><td colSpan={4} className="text-center py-4 text-gray-400">該当する案件がありません（契約終了≥当月・所属会社あり）</td></tr>
+                          <tr><td colSpan={4} className="text-center py-4 text-gray-400">該当する案件がありません（契約終了≥当月・所属会社あり・社員除く）</td></tr>
                         )}
                         {sesDeals.map((d) => (
                           <tr key={d.id}
