@@ -31,11 +31,14 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   login: async (email, password) => {
     // Supabase Authでログイン
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
 
-    // LaravelからユーザープロフィールをJWT付きで取得
-    const res = await apiClient.get('/api/v1/me');
+    // signInWithPassword 直後は getSession() がまだ新セッションを返さない
+    // race condition があるため、取得直後の access_token を明示的に付与する
+    const res = await apiClient.get('/api/v1/me', {
+      headers: { Authorization: `Bearer ${data.session?.access_token}` },
+    });
     set({ user: res.data });
   },
 
