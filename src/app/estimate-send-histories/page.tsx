@@ -44,6 +44,11 @@ const recentMonths = (): string[] => {
   return arr;
 };
 
+const currentMonth = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
 type SortField = 'invoice_number' | 'customer_name' | 'subject' | 'to' | 'sent_at' | 'sent_by';
 
 const yen = (n: string | number | null | undefined) => n == null ? '-' : `¥${Number(n).toLocaleString()}`;
@@ -55,7 +60,7 @@ const fmtDateTime = (s: string | null) => {
 export default function EstimateSendHistoriesPage() {
   const [items,   setItems]   = useState<HistoryRow[]>([]);
   const [total,   setTotal]   = useState(0);
-  const [yearMonth, setYearMonth] = useState<string>('');
+  const [yearMonth, setYearMonth] = useState<string>(currentMonth());
   const [status,  setStatus]  = useState<'' | 'sent' | 'failed'>('');
   const [method,  setMethod]  = useState<'' | 'mail' | 'post'>('');
   const [q,       setQ]       = useState('');
