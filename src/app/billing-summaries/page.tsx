@@ -77,6 +77,7 @@ export default function BillingSummariesPage() {
   const [loading,   setLoading]   = useState(false);
   const [issuingId,  setIssuingId]  = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [refModalOpen, setRefModalOpen] = useState(false);
   const [deletingWrId, setDeletingWrId] = useState<number | null>(null);
   const [sortBy,    setSortBy]    = useState<string>('customer');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -248,6 +249,15 @@ export default function BillingSummariesPage() {
             {loading ? '更新中...' : '更新'}
           </Button>
           <Button
+            onClick={() => setRefModalOpen(true)}
+            disabled={loading}
+            variant="outline"
+            className="border-amber-300 text-amber-700 hover:bg-amber-50"
+            title="Refinitiv 注文書 PDF から請求書ドラフトを作成"
+          >
+            📋 Refinitiv注文書から請求書発行
+          </Button>
+          <Button
             onClick={downloadCsv}
             disabled={loading || sortedItems.length === 0}
             className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
@@ -257,6 +267,22 @@ export default function BillingSummariesPage() {
           </Button>
         </div>
       </div>
+
+      <RefinitivImportModal
+        open={refModalOpen}
+        onClose={() => setRefModalOpen(false)}
+        defaultYearMonth={yearMonth}
+        dealOptions={(sortedItems as DealRow[]).filter((r) => group === 'deal' && r.invoice_id === null).map((r) => ({
+          deal_id: r.deal_id,
+          deal_title: r.deal_title,
+          customer_name: r.customer_name ?? '',
+          invoice_code: r.invoice_code,
+        }))}
+        onIssued={(invoiceId) => {
+          setRefModalOpen(false);
+          router.push(`/invoices/${invoiceId}`);
+        }}
+      />
 
       {/* テーブル */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -410,6 +436,244 @@ export default function BillingSummariesPage() {
               </tfoot>
             )}
           </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Refinitiv 注文書 PDF 取込モーダル ----------
+
+interface DealOption {
+  deal_id: number;
+  deal_title: string;
+  customer_name: string;
+  invoice_code: string | null;
+}
+
+interface ParsedPo {
+  po_number: string | null;
+  total_amount: number | null;
+  description: string | null;
+  requested_delivery_date: string | null;
+  amount_based_receipt: string | null;
+  purchase_request_line: string | null;
+  requester: string | null;
+  request_number: string | null;
+  plant_id: string | null;
+  plant_name: string | null;
+  tr_plant_id: string | null;
+  ship_to_address_name: string | null;
+  classification_domain: string | null;
+  classification_code: string | null;
+}
+
+const EMPTY_PARSED: ParsedPo = {
+  po_number: '', total_amount: null, description: '', requested_delivery_date: '',
+  amount_based_receipt: '', purchase_request_line: '', requester: '', request_number: '',
+  plant_id: '', plant_name: '', tr_plant_id: '', ship_to_address_name: '',
+  classification_domain: '', classification_code: '',
+};
+
+function RefinitivImportModal({
+  open, onClose, defaultYearMonth, dealOptions, onIssued,
+}: {
+  open: boolean;
+  onClose: () => void;
+  defaultYearMonth: string;
+  dealOptions: DealOption[];
+  onIssued: (invoiceId: number) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [parsing, setParsing] = useState(false);
+  const [parsed, setParsed] = useState<ParsedPo | null>(null);
+  const [dealId, setDealId] = useState<number | null>(null);
+  const [yearMonth, setYearMonth] = useState<string>(defaultYearMonth);
+  const [issuing, setIssuing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setFile(null); setParsed(null); setDealId(null); setError(null);
+      setYearMonth(defaultYearMonth);
+    }
+  }, [open, defaultYearMonth]);
+
+  const handleParse = async () => {
+    if (!file) return;
+    setParsing(true); setError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await apiClient.post<ParsedPo>('/api/v1/invoices/refinitiv/parse', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setParsed({ ...EMPTY_PARSED, ...res.data });
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'PDFの解析に失敗しました';
+      setError(msg);
+    } finally { setParsing(false); }
+  };
+
+  const handleIssue = async () => {
+    if (!parsed || !dealId || !parsed.po_number) {
+      setError('SES契約 と PO番号 は必須です');
+      return;
+    }
+    setIssuing(true); setError(null);
+    try {
+      const vendor_metadata: Record<string, unknown> = {};
+      (Object.keys(parsed) as (keyof ParsedPo)[]).forEach((k) => {
+        if (parsed[k] !== null && parsed[k] !== '') vendor_metadata[k] = parsed[k];
+      });
+      const res = await apiClient.post<{ id: number }>('/api/v1/invoices/refinitiv/issue', {
+        deal_id: dealId,
+        year_month: yearMonth,
+        po_number: parsed.po_number,
+        vendor_metadata,
+      });
+      onIssued(res.data.id);
+    } catch (err: unknown) {
+      const data = (err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } })?.response?.data;
+      const msg = data?.message ?? Object.values(data?.errors ?? {})[0]?.[0] ?? '請求書発行に失敗しました';
+      setError(msg);
+    } finally { setIssuing(false); }
+  };
+
+  const updateField = <K extends keyof ParsedPo>(k: K, v: ParsedPo[K]) => {
+    setParsed((p) => p ? { ...p, [k]: v } : p);
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold mb-1">📋 Refinitiv 注文書から請求書発行</h2>
+        <p className="text-xs text-gray-500 mb-4">SAP Business Network 経由で受領した注文書 PDF を取り込み、対象 SES案件 から請求書ドラフトを作成します。</p>
+
+        {error && (
+          <div className="mb-3 p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
+        )}
+
+        <div className="space-y-4">
+          {/* PDF アップロード */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">注文書 PDF</label>
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="text-sm"
+              disabled={parsing || issuing}
+            />
+            <div className="mt-2">
+              <Button
+                onClick={handleParse}
+                disabled={!file || parsing || issuing}
+                variant="outline"
+                className="text-sm"
+              >
+                {parsing ? '解析中...' : 'PDFを解析'}
+              </Button>
+            </div>
+          </div>
+
+          {/* 抽出結果プレビュー */}
+          {parsed && (
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-xs font-semibold text-gray-700 mb-2">抽出結果（必要なら編集してください）</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">PO Number *</label>
+                  <Input value={parsed.po_number ?? ''} onChange={(e) => updateField('po_number', e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">希望納入日 (YYYY-MM-DD)</label>
+                  <Input value={parsed.requested_delivery_date ?? ''} onChange={(e) => updateField('requested_delivery_date', e.target.value)} />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[11px] text-gray-500 mb-0.5">明細説明</label>
+                  <Input value={parsed.description ?? ''} onChange={(e) => updateField('description', e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">金額による受入</label>
+                  <Input value={parsed.amount_based_receipt ?? ''} onChange={(e) => updateField('amount_based_receipt', e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">購入申請明細番号</label>
+                  <Input value={parsed.purchase_request_line ?? ''} onChange={(e) => updateField('purchase_request_line', e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">申請者</label>
+                  <Input value={parsed.requester ?? ''} onChange={(e) => updateField('requester', e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">申請番号</label>
+                  <Input value={parsed.request_number ?? ''} onChange={(e) => updateField('request_number', e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">Plant.ID</label>
+                  <Input value={parsed.plant_id ?? ''} onChange={(e) => updateField('plant_id', e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">Plant.Name</label>
+                  <Input value={parsed.plant_name ?? ''} onChange={(e) => updateField('plant_name', e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">TR_PlantID</label>
+                  <Input value={parsed.tr_plant_id ?? ''} onChange={(e) => updateField('tr_plant_id', e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">Ship ToAddressName</label>
+                  <Input value={parsed.ship_to_address_name ?? ''} onChange={(e) => updateField('ship_to_address_name', e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">分類ドメイン</label>
+                  <Input value={parsed.classification_domain ?? ''} onChange={(e) => updateField('classification_domain', e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">分類コード</label>
+                  <Input value={parsed.classification_code ?? ''} onChange={(e) => updateField('classification_code', e.target.value)} />
+                </div>
+              </div>
+
+              {/* SES案件 + 年月 */}
+              <div className="border-t border-gray-100 pt-3 mt-4 grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">対象 SES案件 *</label>
+                  <select
+                    value={dealId ?? ''}
+                    onChange={(e) => setDealId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
+                  >
+                    <option value="">SES案件を選択</option>
+                    {dealOptions.map((d) => (
+                      <option key={d.deal_id} value={d.deal_id}>
+                        [{d.invoice_code ?? '-'}] {d.customer_name} / {d.deal_title}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-gray-400 mt-1">対象月の未発行 案件のみ表示。表示されない場合は対象月を切替えてください。</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">対象月 *</label>
+                  <Input value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} placeholder="YYYY-MM" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <Button variant="outline" onClick={onClose} disabled={parsing || issuing}>キャンセル</Button>
+          <Button
+            onClick={handleIssue}
+            disabled={!parsed || !dealId || !parsed.po_number || issuing}
+            className="bg-amber-600 hover:bg-amber-700 text-white"
+          >
+            {issuing ? '発行中…' : '請求書ドラフトを作成'}
+          </Button>
         </div>
       </div>
     </div>
