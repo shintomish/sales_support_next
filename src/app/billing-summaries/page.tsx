@@ -498,7 +498,8 @@ function RefinitivImportModal({
     }
     setLoadingDeals(true);
     apiClient.get<{ data: Array<{ id: number; project_name: string | null; customer_name: string | null; engineer_name: string | null }> }>(
-      `/api/v1/ses-contracts?search=${encodeURIComponent(dealSearch)}&per_page=100`
+      '/api/v1/ses-contracts',
+      { params: { search: dealSearch || undefined, per_page: 100, user_id: 'all', sort_by: 'customer_name', sort_order: 'asc' } },
     ).then((res) => {
       const rows = res.data?.data ?? [];
       setDealOptions(rows.map((r) => ({
