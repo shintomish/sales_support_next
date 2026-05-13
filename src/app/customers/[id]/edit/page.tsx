@@ -34,6 +34,7 @@ export default function CustomerEditPage() {
   const [notes, setNotes]           = useState('');
   const [isSupplier, setIsSupplier] = useState(false);
   const [isCustomer, setIsCustomer] = useState(true);
+  const [quotationLanguage, setQuotationLanguage] = useState(false);
   const [primaryContactId, setPrimaryContactId] = useState<string>('');
   const [secondaryContactIds, setSecondaryContactIds] = useState<string[]>(['', '', '', '']);
   const [contacts, setContacts]     = useState<ContactItem[]>([]);
@@ -67,6 +68,7 @@ export default function CustomerEditPage() {
       setNotes(c.notes ?? '');
       setIsSupplier(!!c.is_supplier);
       setIsCustomer(!!c.is_customer);
+      setQuotationLanguage(!!c.quotation_language);
       setPrimaryContactId(c.primary_contact_id?.toString() ?? '');
       const sec = (c.secondary_contact_ids ?? []) as number[];
       setSecondaryContactIds([
@@ -118,6 +120,7 @@ export default function CustomerEditPage() {
         notes,
         is_supplier: isSupplier,
         is_customer: isCustomer,
+        quotation_language: quotationLanguage,
         primary_contact_id: primaryContactId || null,
         secondary_contact_ids: secondaryContactIds.filter(Boolean).map((s) => Number(s)),
       });
@@ -184,6 +187,12 @@ export default function CustomerEditPage() {
                 onChange={e => { setIsSupplier(e.target.checked); setIsDirty(true); }}
                 className="w-4 h-4 rounded border-gray-300 text-orange-500" />
               <span className="text-sm font-medium text-gray-700">仕入先</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" checked={quotationLanguage}
+                onChange={e => { setQuotationLanguage(e.target.checked); setIsDirty(true); }}
+                className="w-4 h-4 rounded border-gray-300 text-emerald-600" />
+              <span className="text-sm font-medium text-gray-700">英文見積対応</span>
             </label>
           </div>
 

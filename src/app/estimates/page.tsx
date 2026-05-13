@@ -74,6 +74,8 @@ export default function EstimatesPage() {
   };
   const [createOpen, setCreateOpen]     = useState(initialCreate);
   const [createMode, setCreateMode]     = useState<EstimateMode>('normal');
+  const [isEnglish, setIsEnglish]       = useState(false);     // 英文見積モード（normal時のみ意味あり）
+  const [titleTranslating, setTitleTranslating] = useState(false);
   const [creating, setCreating]         = useState(false);
   const [customers, setCustomers]       = useState<CustomerLookup[]>([]);
   const [custSearch, setCustSearch]     = useState('');
@@ -153,6 +155,7 @@ export default function EstimatesPage() {
             sort_by: 'customer_name',
             sort_order: 'asc',
             user_id: 'all', // 発行モーダルは事務全員のデータを対象
+            ...(isEnglish ? { quotation_language: 1 } : {}),
           },
         });
         if (!cancelled) {
@@ -175,7 +178,7 @@ export default function EstimatesPage() {
       }
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [createOpen, createMode, sesSearch]);
+  }, [createOpen, createMode, sesSearch, isEnglish]);
 
 
   const handleCreate = async () => {
@@ -188,6 +191,7 @@ export default function EstimatesPage() {
         valid_until_text: form.valid_until_text || null,
         issued_date:      form.issued_date || null,
         notes:            form.notes || null,
+        language:         (isEnglish && createMode === 'normal') ? 'en' : 'ja',
       };
       if (createMode === 'normal') payload.deal_id = Number(form.deal_id);
       else payload.customer_id = Number(form.customer_id);
@@ -332,17 +336,28 @@ export default function EstimatesPage() {
             <h2 className="text-lg font-bold text-gray-800 mb-2">新規見積発行</h2>
 
             {/* モード切替 */}
-            <div className="flex gap-4 text-sm mb-3 border-b border-gray-200 pb-2">
+            <div className="flex gap-4 text-sm mb-3 border-b border-gray-200 pb-2 items-center">
               <label className="flex items-center gap-2">
                 <input type="radio" name="estimate-mode" checked={createMode === 'normal'}
-                  onChange={() => setCreateMode('normal')} />
+                  onChange={() => { setCreateMode('normal'); }} />
                 <span><strong>通常</strong>（SES台帳の案件から発行）</span>
               </label>
               <label className="flex items-center gap-2">
                 <input type="radio" name="estimate-mode" checked={createMode === 'exception'}
-                  onChange={() => setCreateMode('exception')} />
+                  onChange={() => { setCreateMode('exception'); setIsEnglish(false); }} />
                 <span><strong>例外</strong>（売上先のみ指定・新規見積）</span>
               </label>
+              {createMode === 'normal' && (
+                <label className="flex items-center gap-2 ml-auto">
+                  <input type="checkbox" checked={isEnglish}
+                    onChange={(e) => {
+                      setIsEnglish(e.target.checked);
+                      // 切替時、案件選択を一旦クリアして候補を絞り直す
+                      setForm(p => ({ ...p, deal_id: '', subject_name: '' }));
+                    }} />
+                  <span><strong>英文</strong></span>
+                </label>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -371,11 +386,28 @@ export default function EstimatesPage() {
                         )}
                         {sesDeals.map((d) => (
                           <tr key={d.id}
-                              onClick={() => setForm({
-                                ...form,
-                                deal_id: String(d.id),
-                                subject_name: d.project_name ?? form.subject_name,
-                              })}
+                              onClick={async () => {
+                                const newSubject = d.project_name ?? form.subject_name;
+                                // 一旦は和文タイトルをセット（英文ON時は直後に英訳で上書き）
+                                setForm(p => ({
+                                  ...p,
+                                  deal_id: String(d.id),
+                                  subject_name: newSubject,
+                                }));
+                                if (isEnglish && newSubject) {
+                                  setTitleTranslating(true);
+                                  try {
+                                    const r = await apiClient.post<{ en_title: string }>(
+                                      '/api/v1/estimates/translate-title',
+                                      { ja_title: newSubject }
+                                    );
+                                    const en = r.data.en_title ?? '';
+                                    if (en) setForm(p => ({ ...p, subject_name: en }));
+                                  } catch { /* 翻訳失敗時は和文のまま */ } finally {
+                                    setTitleTranslating(false);
+                                  }
+                                }
+                              }}
                               className={`cursor-pointer hover:bg-blue-50 border-t border-gray-100 ${
                                 String(form.deal_id) === String(d.id) ? 'bg-blue-100' : ''
                               }`}>
@@ -414,9 +446,16 @@ export default function EstimatesPage() {
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">件名</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  件名{isEnglish && <span className="text-emerald-600 font-normal ml-2">（英文）</span>}
+                  {titleTranslating && <span className="text-gray-400 font-normal ml-2">翻訳中…</span>}
+                </label>
                 <Input type="text"
-                  placeholder={createMode === 'normal' ? '空欄なら案件タイトルが入ります' : '例: システム開発業務委託'}
+                  placeholder={
+                    isEnglish ? '案件選択で自動英訳されます（手修正可）'
+                    : createMode === 'normal' ? '空欄なら案件タイトルが入ります'
+                    : '例: システム開発業務委託'
+                  }
                   value={form.subject_name}
                   onChange={(e) => setForm({ ...form, subject_name: e.target.value })} />
               </div>
