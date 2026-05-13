@@ -12,6 +12,7 @@ import type { ApiError } from '@/lib/error-helpers';
 
 const FIELDS = [
   { name: 'company_name',   label: '会社名',       type: 'text',   required: true,  placeholder: '例：株式会社サンプル',          span: 1 },
+  { name: 'company_name_en', label: '英文社名',    type: 'text',   required: false, placeholder: '例：Refinitiv Japan K.K.（英文見積書の宛先で使用）', span: 1 },
   { name: 'invoice_code',   label: '顧客コード',   type: 'text',   required: false, placeholder: '例：REFI（請求書 INV-[コード]-… / 見積書 EST-[コード]-… で使用）', span: 1 },
   { name: 'industry',       label: '業種',         type: 'text',   required: false, placeholder: '例：製造業、IT・通信',          span: 1 },
   { name: 'employee_count', label: '従業員数',     type: 'number', required: false, placeholder: '例：100',                      span: 1 },
@@ -52,6 +53,7 @@ export default function CustomerEditPage() {
       const c = res.data.data ?? res.data;
       setForm({
         company_name:        c.company_name             ?? '',
+        company_name_en:     c.company_name_en          ?? '',
         invoice_code:        c.invoice_code             ?? '',
         industry:            c.industry                 ?? '',
         employee_count:      c.employee_count?.toString() ?? '',
