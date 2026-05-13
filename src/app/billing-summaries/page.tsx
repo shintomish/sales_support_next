@@ -485,7 +485,7 @@ function RefinitivImportModal({
   const [issuing, setIssuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dealOptions, setDealOptions] = useState<DealOption[]>([]);
-  const [dealSearch, setDealSearch] = useState<string>('');
+  const [dealSearch, setDealSearch] = useState<string>('リフィニティブ');
   const [loadingDeals, setLoadingDeals] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
