@@ -17,6 +17,11 @@ interface IssuerSettings {
   invoice_issuer_square_seal_path: string | null;
   invoice_issuer_url: string | null;
   invoice_issuer_invoice_number: string | null;
+  invoice_issuer_name_en: string | null;
+  invoice_issuer_address_en: string | null;
+  invoice_issuer_email: string | null;
+  invoice_issuer_bank_details_en: string | null;
+  invoice_issuer_bank_account_holder_en: string | null;
   invoice_email_subject_template: string | null;
   invoice_email_body_template: string | null;
   estimate_email_subject_template: string | null;
@@ -37,6 +42,8 @@ const EMPTY: IssuerSettings = {
   invoice_issuer_square_seal_path: '',
   invoice_issuer_url: '',
   invoice_issuer_invoice_number: '',
+  invoice_issuer_name_en: '', invoice_issuer_address_en: '', invoice_issuer_email: '',
+  invoice_issuer_bank_details_en: '', invoice_issuer_bank_account_holder_en: '',
   invoice_email_subject_template: '', invoice_email_body_template: '',
   estimate_email_subject_template: '', estimate_email_body_template: '',
   purchase_order_email_subject_template: '', purchase_order_email_body_template: '',
@@ -77,6 +84,8 @@ const TEXT_KEYS: (keyof IssuerSettings)[] = [
   'invoice_issuer_name', 'invoice_issuer_postal_code', 'invoice_issuer_address',
   'invoice_issuer_tel', 'invoice_issuer_fax', 'invoice_issuer_url',
   'invoice_issuer_invoice_number',
+  'invoice_issuer_name_en', 'invoice_issuer_address_en', 'invoice_issuer_email',
+  'invoice_issuer_bank_details_en', 'invoice_issuer_bank_account_holder_en',
   'invoice_email_subject_template', 'invoice_email_body_template',
   'estimate_email_subject_template', 'estimate_email_body_template',
   'purchase_order_email_subject_template', 'purchase_order_email_body_template',
@@ -232,6 +241,36 @@ export default function InvoiceIssuerSettingsPage() {
           <Input value={form.invoice_issuer_invoice_number ?? ''} onChange={(e) => set('invoice_issuer_invoice_number')(e.target.value)}
             placeholder="T1234567890123" />
         </Field>
+
+        {/* 英文情報 (Refinitiv等の英文請求書用) */}
+        <div className="border-t border-gray-100 pt-4 mt-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-1">英文情報 (Refinitiv 等)</h2>
+          <p className="text-xs text-gray-400 mb-3">Refinitiv 注文書取込フロー等で発行される英文請求書 PDF に使われます。未入力なら日本語版を流用します。</p>
+          <div className="space-y-3">
+            <Field label="英文社名">
+              <Input value={form.invoice_issuer_name_en ?? ''} onChange={(e) => set('invoice_issuer_name_en')(e.target.value)}
+                placeholder="AIZEN SOLUTION" />
+            </Field>
+            <Field label="英文住所（複数行可）">
+              <textarea value={form.invoice_issuer_address_en ?? ''} onChange={(e) => set('invoice_issuer_address_en')(e.target.value)}
+                rows={4} placeholder={`332-0017 Japan\nCOSMO KAWAGUCHI SAKAECHO 2F\n3 12 11 SAKAECHO KAWAGUCHISHI\nSAITAMA PREF, Saitama-ken`}
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white font-mono" />
+            </Field>
+            <Field label="発行元メールアドレス">
+              <Input value={form.invoice_issuer_email ?? ''} onChange={(e) => set('invoice_issuer_email')(e.target.value)}
+                placeholder="H-ISHIZAKI@AIZEN-SOL.CO.JP" />
+            </Field>
+            <Field label="英文 Bank Details">
+              <textarea value={form.invoice_issuer_bank_details_en ?? ''} onChange={(e) => set('invoice_issuer_bank_details_en')(e.target.value)}
+                rows={2} placeholder="Mizuho Bank,Ltd(0001) Kawaguchi Branch(300)(Ordinary Account)2549572"
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white font-mono" />
+            </Field>
+            <Field label="英文 Bank Account Name">
+              <Input value={form.invoice_issuer_bank_account_holder_en ?? ''} onChange={(e) => set('invoice_issuer_bank_account_holder_en')(e.target.value)}
+                placeholder="カ)アイゼン・ソリューション AIZEN SOLUTION" />
+            </Field>
+          </div>
+        </div>
 
         {/* ロゴ */}
         <div className="border-t border-gray-100 pt-4 mt-4">
