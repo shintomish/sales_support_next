@@ -11,7 +11,12 @@ const apiClient = axios.create({
 });
 
 // リクエストのたびにSupabaseセッションからJWTを自動セット
+// ただし呼び出し側で Authorization を明示指定済みの場合は上書きしない
+// （signInWithPassword 直後の getSession() が古いセッションを返す race condition 対策）
 apiClient.interceptors.request.use(async (config) => {
+  if (config.headers['Authorization']) {
+    return config;
+  }
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.access_token) {
     config.headers['Authorization'] = `Bearer ${session.access_token}`;
