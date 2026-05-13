@@ -442,7 +442,7 @@ interface DealOption {
   deal_id: number;
   deal_title: string;
   customer_name: string;
-  invoice_code: string | null;
+  engineer_name: string | null;
 }
 
 interface ParsedPo {
@@ -485,8 +485,9 @@ function RefinitivImportModal({
   const [issuing, setIssuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dealOptions, setDealOptions] = useState<DealOption[]>([]);
-  const [dealSearch, setDealSearch] = useState<string>('Refinitiv');
+  const [dealSearch, setDealSearch] = useState<string>('');
   const [loadingDeals, setLoadingDeals] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   // モーダルを開いた時 / 検索語が変わった時に SES契約を取得
   useEffect(() => {
@@ -496,15 +497,15 @@ function RefinitivImportModal({
       return;
     }
     setLoadingDeals(true);
-    apiClient.get<{ data: Array<{ id: number; title: string; customer?: { company_name?: string; invoice_code?: string } }> }>(
+    apiClient.get<{ data: Array<{ id: number; project_name: string | null; customer_name: string | null; engineer_name: string | null }> }>(
       `/api/v1/ses-contracts?search=${encodeURIComponent(dealSearch)}&per_page=100`
     ).then((res) => {
-      const rows = Array.isArray(res.data) ? res.data : (res.data.data ?? []);
+      const rows = res.data?.data ?? [];
       setDealOptions(rows.map((r) => ({
         deal_id: r.id,
-        deal_title: r.title,
-        customer_name: r.customer?.company_name ?? '',
-        invoice_code: r.customer?.invoice_code ?? null,
+        deal_title: r.project_name ?? '(無題)',
+        customer_name: r.customer_name ?? '',
+        engineer_name: r.engineer_name ?? null,
       })));
     }).catch(() => {
       setDealOptions([]);
@@ -569,16 +570,59 @@ function RefinitivImportModal({
         )}
 
         <div className="space-y-4">
-          {/* PDF アップロード */}
+          {/* PDF アップロード（D&D + ファイル選択） */}
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">注文書 PDF</label>
-            <input
-              type="file"
-              accept="application/pdf"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="text-sm"
-              disabled={parsing || issuing}
-            />
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const dropped = e.dataTransfer.files?.[0];
+                if (dropped && dropped.type === 'application/pdf') {
+                  setFile(dropped);
+                  setParsed(null);
+                  setError(null);
+                } else if (dropped) {
+                  setError('PDFファイルをドロップしてください');
+                }
+              }}
+              onClick={() => !(parsing || issuing) && document.getElementById('refinitiv-pdf-input')?.click()}
+              className={`border-2 border-dashed rounded-md px-4 py-6 text-center text-sm cursor-pointer transition-colors ${
+                dragOver
+                  ? 'border-amber-400 bg-amber-50 text-amber-700'
+                  : file
+                    ? 'border-green-400 bg-green-50 text-green-700'
+                    : 'border-gray-300 text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              {file ? (
+                <>
+                  <div className="font-semibold">📄 {file.name}</div>
+                  <div className="text-[11px] text-gray-500 mt-1">{Math.ceil(file.size / 1024)}KB / 別のPDFをドロップまたはクリックで差し替え</div>
+                </>
+              ) : (
+                <>
+                  <div>📎 ここに注文書PDFをドラッグ&ドロップ</div>
+                  <div className="text-[11px] mt-1">またはクリックしてファイル選択（10MBまで）</div>
+                </>
+              )}
+              <input
+                id="refinitiv-pdf-input"
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  setFile(f);
+                  setParsed(null);
+                  setError(null);
+                  e.target.value = '';
+                }}
+                className="hidden"
+                disabled={parsing || issuing}
+              />
+            </div>
             <div className="mt-2">
               <Button
                 onClick={handleParse}
@@ -654,11 +698,11 @@ function RefinitivImportModal({
               <div className="border-t border-gray-100 pt-3 mt-4 space-y-2">
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">案件検索</label>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">案件検索（任意）</label>
                     <Input
                       value={dealSearch}
                       onChange={(e) => setDealSearch(e.target.value)}
-                      placeholder="取引先名・案件名・技術者名"
+                      placeholder="例: リフィニティブ / JBIC / 技術者名"
                     />
                   </div>
                   <div>
@@ -677,7 +721,7 @@ function RefinitivImportModal({
                     <option value="">{loadingDeals ? '読み込み中...' : `SES案件を選択 (${dealOptions.length}件)`}</option>
                     {dealOptions.map((d) => (
                       <option key={d.deal_id} value={d.deal_id}>
-                        [{d.invoice_code ?? '-'}] {d.customer_name} / {d.deal_title}
+                        {d.customer_name} / {d.deal_title}{d.engineer_name ? ` (${d.engineer_name})` : ''}
                       </option>
                     ))}
                   </select>
