@@ -405,8 +405,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         setPostNote(latest.note ?? '');
         setPostTo(latest.to_recipients ?? []);
         const items = latest.attachments_meta ?? [];
+        const docName = invoice?.doc_type === 'estimate' ? '見積書' : invoice?.doc_type === 'purchase_order' ? '注文書' : '請求書';
         setPostItems({
-          invoice:   items.includes('請求書'),
+          invoice:   items.includes(docName),
           cover:     items.includes('送付状'),
           timesheet: items.includes('勤務表'),
           transport: items.includes('交通費明細書'),
@@ -415,7 +416,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         setPostSentAt(new Date().toISOString().slice(0, 10));
         setPostNote('');
         setPostTo([]);
-        setPostItems({ invoice: false, cover: false, timesheet: false, transport: false });
+        setPostItems({ invoice: true, cover: false, timesheet: false, transport: false });
       }
       setPostModalOpen(true);
     } catch {
@@ -430,11 +431,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const recordPost = async () => {
     setBusy(true);
     try {
+      const docName = invoice?.doc_type === 'estimate' ? '見積書' : invoice?.doc_type === 'purchase_order' ? '注文書' : '請求書';
       const items = [
-        postItems.invoice   ? '請求書'         : null,
-        postItems.cover     ? '送付状'         : null,
-        postItems.timesheet ? '勤務表'         : null,
-        postItems.transport ? '交通費明細書'   : null,
+        postItems.invoice   ? docName           : null,
+        postItems.cover     ? '送付状'           : null,
+        postItems.timesheet ? '勤務表'           : null,
+        postItems.transport ? '交通費明細書'     : null,
       ].filter(Boolean);
       await apiClient.post(`/api/v1/invoices/${id}/record-post`, {
         sent_at:       postSentAt,
@@ -879,13 +881,17 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             ✉️ 長3封筒 PDF
           </Button>
           <Button variant="outline" onClick={openMailModal}
-            disabled={busy || !invoice.approved}
-            title={invoice.approved ? '請求書をメール送信' : '承認済みのみメール送信できます'}>
+            disabled={busy || (invoice.doc_type !== 'estimate' && !invoice.approved)}
+            title={invoice.doc_type === 'estimate'
+              ? '見積書をメール送信'
+              : (invoice.approved ? '帳票をメール送信' : '承認済みのみメール送信できます')}>
             📧 メール送信
           </Button>
           <Button variant="outline" onClick={openPostModal}
-            disabled={busy || !invoice.approved}
-            title={invoice.approved ? '郵送記録を残す' : '承認済みのみ郵送記録できます'}>
+            disabled={busy || (invoice.doc_type !== 'estimate' && !invoice.approved)}
+            title={invoice.doc_type === 'estimate'
+              ? '見積書の郵送記録を残す'
+              : (invoice.approved ? '郵送記録を残す' : '承認済みのみ郵送記録できます')}>
             📮 郵送記録
           </Button>
 
@@ -958,7 +964,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <p className="text-xs font-semibold text-gray-700 mb-2">同封物</p>
                 <div className="flex flex-wrap gap-2">
                   {([
-                    { key: 'invoice'   as const, label: '請求書' },
+                    { key: 'invoice'   as const, label: invoice.doc_type === 'estimate' ? '見積書' : invoice.doc_type === 'purchase_order' ? '注文書' : '請求書' },
                     { key: 'cover'     as const, label: '送付状' },
                     { key: 'timesheet' as const, label: '勤務表' },
                     { key: 'transport' as const, label: '交通費明細書' },
@@ -1006,7 +1012,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setMailModalOpen(false)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">📧 請求書をメールで送信</h2>
+              <h2 className="text-lg font-bold">📧 {invoice.doc_type === 'estimate' ? '見積書' : invoice.doc_type === 'purchase_order' ? '注文書' : '請求書'}をメールで送信</h2>
               {mailDeliveryMethod && (
                 <span className={`text-xs px-2 py-1 rounded ${
                   mailDeliveryMethod === 'mail' ? 'bg-blue-100 text-blue-700'
@@ -1061,7 +1067,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <p className="text-xs font-semibold text-gray-700 mb-2">添付</p>
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={attachInvoice} onChange={(e) => setAttachInvoice(e.target.checked)} />
-                  請求書 PDF（{invoice.invoice_number}.pdf）
+                  {invoice.doc_type === 'estimate' ? '見積書' : invoice.doc_type === 'purchase_order' ? '注文書' : '請求書'} PDF（{invoice.invoice_number}.pdf）
                 </label>
 
                 {/* 追加ファイル D&D */}
