@@ -1472,10 +1472,10 @@ export default function DeliveriesPage() {
                         sortField={campSortBy}
                         sortOrder={campSortDir}
                         onSort={(f) => handleCampSort(f as CampSortBy)}
-                        className={`px-4 py-3 ${col === 'subject' ? 'w-32' : col === 'project_title' ? 'w-24' : ''}`}
+                        className={`px-4 py-3 ${col === 'subject' ? '' : col === 'project_title' ? 'w-24' : col === 'sent_at' ? 'w-[90px] whitespace-nowrap' : ''}`}
                       />
                       {col === 'sent_at' && (
-                        <th className="px-4 py-3 text-left whitespace-nowrap">再送信日時</th>
+                        <th className="px-4 py-3 text-left w-[90px] whitespace-nowrap">再送信日時</th>
                       )}
                     </Fragment>
                   ))}
@@ -1500,15 +1500,31 @@ export default function DeliveriesPage() {
                         <td className="px-2 py-3 text-center text-gray-400 text-xs">
                           <span className={`inline-block transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                          {camp.sent_at ? new Date(camp.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}
+                        <td className="px-4 py-3 text-gray-600 text-xs leading-tight">
+                          {camp.sent_at ? (() => {
+                            const d = new Date(camp.sent_at)
+                            return (
+                              <>
+                                <div>{d.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
+                                <div className="text-gray-500">{d.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })}</div>
+                              </>
+                            )
+                          })() : '-'}
                         </td>
-                        <td className="px-4 py-3 text-amber-600 whitespace-nowrap text-xs">
-                          {camp.latest_resent_at ? new Date(camp.latest_resent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}
+                        <td className="px-4 py-3 text-amber-600 text-xs leading-tight">
+                          {camp.latest_resent_at ? (() => {
+                            const d = new Date(camp.latest_resent_at)
+                            return (
+                              <>
+                                <div>{d.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
+                                <div className="text-amber-500">{d.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })}</div>
+                              </>
+                            )
+                          })() : '—'}
                         </td>
                         <td className="px-4 py-3 text-gray-800 whitespace-nowrap">{camp.sent_by ?? '-'}</td>
-                        <td className="px-4 py-3 w-32">
-                          <div className="truncate max-w-[120px] text-gray-800" title={camp.subject}>{camp.subject}</div>
+                        <td className="px-4 py-3">
+                          <div className="truncate max-w-[200px] text-gray-800" title={camp.subject}>{camp.subject}</div>
                         </td>
                         <td className="px-4 py-3 w-24">
                           <div className="truncate max-w-[88px] text-gray-500 text-xs" title={camp.project_title ?? camp.engineer_mail_title ?? ''}>{camp.project_title ?? camp.engineer_mail_title ?? '-'}</div>
