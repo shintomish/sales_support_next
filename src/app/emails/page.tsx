@@ -62,9 +62,6 @@ export default function EmailsPage() {
   const [search, setSearch] = useState('')
   const [unreadOnly, setUnreadOnly] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState<'' | 'project' | 'engineer'>('project')
-  const [syncing, setSyncing] = useState(false)
-  const [gmailConnected, setGmailConnected] = useState(false)
-  const [gmailTokenExpired, setGmailTokenExpired] = useState(false)
   const [page, setPage] = useState(1)
   const [syncMessage, setSyncMessage] = useState('')
   const [newEmailCount, setNewEmailCount] = useState(0)
@@ -74,12 +71,9 @@ export default function EmailsPage() {
 
   const fetchEmailsRef = useRef<() => void>(() => {})
 
-  // Gmail接続状態確認
+  // 起動時の URL パラメータ処理（メール直リンク）
   useEffect(() => {
-    axios.get('/api/v1/gmail/status').then(res => setGmailConnected(res.data.connected))
     const params = new URLSearchParams(window.location.search)
-    if (params.get('connected') === '1') { setSyncMessage('Gmail接続が完了しました'); router.replace('/emails') }
-    if (params.get('error')) setSyncMessage('Gmail接続に失敗しました')
     const emailId = params.get('email_id')
     if (emailId) {
       axios.get(`/api/v1/emails/${emailId}`).then(res => {
@@ -136,40 +130,8 @@ export default function EmailsPage() {
     finally { setMarkingAllRead(false) }
   }
 
-  const handleConnect = async () => {
-    const res = await axios.get('/api/v1/gmail/redirect')
-    window.location.href = res.data.url
-  }
-
-  const handleDisconnect = async () => {
-    if (!confirm('Gmail接続を切断します。再接続するまで同期できなくなりますがよろしいですか？')) return
-    try {
-      await axios.delete('/api/v1/gmail/disconnect')
-      setGmailConnected(false)
-      setGmailTokenExpired(false)
-      setSyncMessage('Gmail接続を切断しました。再接続してください。')
-    } catch {
-      setSyncMessage('切断に失敗しました')
-    }
-  }
-
-  const handleSync = async () => {
-    setSyncing(true); setSyncMessage('')
-    try {
-      const res = await axios.post('/api/v1/emails/sync')
-      setGmailTokenExpired(false)
-      setSyncMessage(res.data.message); fetchEmails()
-    } catch (e: unknown) {
-      const data = (e as { response?: { data?: { message?: string; token_expired?: boolean } } })?.response?.data
-      if (data?.token_expired) {
-        setGmailTokenExpired(true)
-        setSyncMessage(data.message ?? 'Gmailトークンが失効しました。再接続してください。')
-      } else {
-        setSyncMessage(data?.message ?? '同期に失敗しました')
-      }
-    }
-    finally { setSyncing(false) }
-  }
+  // 2026-05-14: Kagoya IMAP 一本化により Gmail handleConnect / handleDisconnect / handleSync は削除。
+  // メール取込は Laravel scheduler (sync-kagoya-pop3 / 15分毎) が担当。
 
   // メール選択
   const handleSelectEmail = async (email: Email) => {
@@ -218,28 +180,12 @@ export default function EmailsPage() {
               )}
             </div>
             <div className="flex gap-2">
-              {(!gmailConnected || gmailTokenExpired) ? (
-                <button onClick={handleConnect} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700">
-                  {gmailTokenExpired ? '再接続' : 'Gmail接続'}
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button onClick={handleMarkAllRead} disabled={markingAllRead}
-                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50">
-                    {markingAllRead ? '処理中...' : '全て既読'}
-                  </button>
-                  <button onClick={handleSync} disabled={syncing}
-                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50 flex items-center gap-1.5">
-                    {syncing && <Spinner size={12} />}
-                    {syncing ? '同期中...' : '同期'}
-                  </button>
-                  <button onClick={handleDisconnect}
-                    title="Gmail接続を切断（スコープ変更や別アカウント切替に使用）"
-                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-red-100 hover:text-red-700">
-                    切断
-                  </button>
-                </div>
-              )}
+              {/* 2026-05-14: Kagoya IMAP 一本化に伴い Gmail 接続/同期/切断ボタンを非表示化。
+                  メール取込は Laravel scheduler (sync-kagoya-pop3 / 15分毎) が担当。 */}
+              <button onClick={handleMarkAllRead} disabled={markingAllRead}
+                className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50">
+                {markingAllRead ? '処理中...' : '全て既読'}
+              </button>
             </div>
           </div>
 
@@ -281,7 +227,7 @@ export default function EmailsPage() {
         <div className="flex-1 overflow-y-auto">
           {emails?.data.length === 0 && (
             <div className="p-8 text-center text-sm text-gray-500">
-              {gmailConnected ? 'メールがありません。「同期」を押してください。' : 'Gmailを接続してメールを取得してください。'}
+              メールがありません。
             </div>
           )}
           {emails?.data.map(email => {
@@ -436,22 +382,6 @@ export default function EmailsPage() {
         )}
       </div>
     </div>
-  )
-}
-
-// ── ヘルパーコンポーネント ────────────────────────────────
-
-function Spinner({ size = 14, className = '' }: { size?: number; className?: string }) {
-  return (
-    <svg
-      width={size} height={size}
-      viewBox="0 0 24 24" fill="none"
-      className={`animate-spin ${className}`}
-    >
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-    </svg>
   )
 }
 
