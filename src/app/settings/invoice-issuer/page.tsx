@@ -305,20 +305,11 @@ export default function InvoiceIssuerSettingsPage() {
           </div>
         </div>
 
-        {/* 電子印 — 丸印 / 角印 2 種 */}
+        {/* 電子印 — 角印のみ表示（丸印は 2026-05-14 社長指示により廃止） */}
         <div className="border-t border-gray-100 pt-4 mt-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">電子印</h2>
-          <p className="text-xs text-gray-400 mb-3">PNG / JPG / GIF / WebP（2MB まで）。透過 PNG 推奨。承認済の帳票 PDF に押印されます。</p>
+          <p className="text-xs text-gray-400 mb-3">PNG / JPG / GIF / WebP（2MB まで）。透過 PNG 推奨。見積書 PDF に自動押印されます。請求書・注文書は紙運用（印刷→物理印→スキャンPDF）に統一されたため電子印は使用しません。</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SealBlock
-              type="round"
-              imageUrl={form.invoice_issuer_round_seal_path}
-              inputRef={roundSealInputRef}
-              busy={busy}
-              onPick={(f) => uploadSeal('round', f)}
-              onRemove={() => removeSeal('round')}
-              note="請求書・注文書 PDF に押印"
-            />
             <SealBlock
               type="square"
               imageUrl={form.invoice_issuer_square_seal_path}

@@ -598,9 +598,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     const docLabel = invoice?.doc_type === 'estimate' ? '見積書'
                    : invoice?.doc_type === 'purchase_order' ? '注文書'
                    : '請求書';
-    if (!confirm(`この${docLabel}を承認します。電子印付き PDF を再生成します。よろしいですか？`)) return;
+    if (!confirm(`この${docLabel}を承認します。PDF を再生成します。よろしいですか？`)) return;
     setBusy(true);
-    setPdfBusyMsg('承認処理中… (電子印付き PDF を再生成中)');
+    setPdfBusyMsg('承認処理中… (PDF を再生成中)');
     try {
       const res = await apiClient.post<Invoice>(`/api/v1/invoices/${id}/approve`);
       setInvoice(res.data);

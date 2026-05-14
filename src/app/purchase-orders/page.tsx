@@ -216,7 +216,7 @@ export default function PurchaseOrdersPage() {
   };
 
   const handleApprove = async (id: number) => {
-    if (!confirm('承認すると電子印付き PDF を再生成します。よろしいですか？')) return;
+    if (!confirm('承認すると PDF を再生成します。よろしいですか？')) return;
     setBusyId(id);
     try {
       await apiClient.post(`/api/v1/invoices/${id}/approve`);
