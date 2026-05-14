@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,9 +55,11 @@ type SortField = 'invoice_number' | 'customer' | 'subject' | 'year_month' | 'iss
 
 export default function EstimatesPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const initialCreate   = searchParams.get('create') === '1';
 
   const [items, setItems]               = useState<EstimateListItem[]>([]);
+  const [busyId, setBusyId]             = useState<number | null>(null);
   const [yearMonth, setYearMonth]       = useState<string>(currentMonth());
   const [status, setStatus]             = useState<'' | 'draft' | 'issued'>('');
   const [q, setQ]                       = useState('');
@@ -150,7 +152,8 @@ export default function EstimatesPage() {
         const res = await apiClient.get<{ data: SesDealOption[] }>('/api/v1/ses-contracts', {
           params: {
             search: sesSearch || undefined,
-            contract_period_end_from: currentMonthStart(),
+            // 英文モードは契約終了済みも対象に含める（過去案件の英文見積発行があるため）
+            ...(isEnglish ? {} : { contract_period_end_from: currentMonthStart() }),
             per_page: 200,
             sort_by: 'customer_name',
             sort_order: 'asc',
@@ -216,6 +219,19 @@ export default function EstimatesPage() {
     const f = field as SortField;
     if (sortBy === f) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     else { setSortBy(f); setSortOrder('asc'); }
+  };
+
+  const handleDuplicate = async (id: number) => {
+    if (!confirm('この見積書を当月扱いで複写して下書きを作成します。よろしいですか？')) return;
+    setBusyId(id);
+    try {
+      const res = await apiClient.post<{ id: number }>(`/api/v1/invoices/${id}/duplicate`);
+      router.push(`/estimates/${res.data.id}`);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '複写に失敗しました';
+      alert(msg);
+      setBusyId(null);
+    }
   };
 
   const sortedItems = useMemo(() => {
@@ -290,7 +306,7 @@ export default function EstimatesPage() {
                 <SortableHeader label="税込合計"   field="total"          sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[110px]" />
                 <SortableHeader label="状態"       field="status"         sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-center w-[80px]" />
                 <th className="px-2 py-3 text-center font-semibold w-[70px]">PDF</th>
-                <th className="px-2 py-3 text-center font-semibold w-[70px]">操作</th>
+                <th className="px-2 py-3 text-center font-semibold w-[110px]">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -320,7 +336,15 @@ export default function EstimatesPage() {
                       : <span className="text-gray-300 text-xs">-</span>}
                   </td>
                   <td className="px-2 py-3 text-center">
-                    <Link href={`/estimates/${r.id}`} className="text-xs text-gray-700 hover:underline">詳細</Link>
+                    <div className="flex items-center justify-center gap-2">
+                      <Link href={`/estimates/${r.id}`} className="text-xs text-gray-700 hover:underline">詳細</Link>
+                      <button
+                        onClick={() => handleDuplicate(r.id)}
+                        disabled={busyId === r.id}
+                        className="text-xs text-indigo-600 hover:underline disabled:opacity-50"
+                        title="当月扱いで複写して下書き作成"
+                      >複写</button>
+                    </div>
                   </td>
                 </tr>
               ))}

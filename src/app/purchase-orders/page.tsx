@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -77,6 +77,7 @@ export default function PurchaseOrdersPage() {
   const user = useAuthStore((s) => s.user);
   const canApprove = user?.role === 'tenant_admin' || user?.role === 'super_admin';
   const searchParams = useSearchParams();
+  const router = useRouter();
   const initialApproval = (searchParams.get('approval_status') as ApprovalStatus | null) ?? '';
   const initialCreate   = searchParams.get('create') === '1';
 
@@ -227,6 +228,19 @@ export default function PurchaseOrdersPage() {
     } finally { setBusyId(null); }
   };
 
+  const handleDuplicate = async (id: number) => {
+    if (!confirm('この注文書を当月扱いで複写して下書きを作成します。よろしいですか？')) return;
+    setBusyId(id);
+    try {
+      const res = await apiClient.post<{ id: number }>(`/api/v1/invoices/${id}/duplicate`);
+      router.push(`/purchase-orders/${res.data.id}`);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '複写に失敗しました';
+      alert(msg);
+      setBusyId(null);
+    }
+  };
+
   const handleReject = async (id: number) => {
     const comment = prompt('却下理由を入力してください');
     if (!comment) return;
@@ -361,7 +375,7 @@ export default function PurchaseOrdersPage() {
                 <SortableHeader label="状態"       field="status"         sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-center w-[70px]" />
                 <SortableHeader label="承認"       field="approval"       sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-center w-[90px]" />
                 <th className="px-2 py-3 text-center font-semibold w-[90px]">PDF</th>
-                <th className="px-2 py-3 text-center font-semibold w-[60px]">操作</th>
+                <th className="px-2 py-3 text-center font-semibold w-[110px]">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -429,7 +443,15 @@ export default function PurchaseOrdersPage() {
                     </div>
                   </td>
                   <td className="px-2 py-3 text-center">
-                    <Link href={`/purchase-orders/${r.id}`} className="text-xs text-gray-700 hover:underline">詳細</Link>
+                    <div className="flex items-center justify-center gap-2">
+                      <Link href={`/purchase-orders/${r.id}`} className="text-xs text-gray-700 hover:underline">詳細</Link>
+                      <button
+                        onClick={() => handleDuplicate(r.id)}
+                        disabled={busyId === r.id}
+                        className="text-xs text-indigo-600 hover:underline disabled:opacity-50"
+                        title="当月扱いで複写して下書き作成"
+                      >複写</button>
+                    </div>
                   </td>
                 </tr>
               ))}
