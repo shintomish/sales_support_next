@@ -24,6 +24,7 @@ interface HistoryRow {
   invoice_number: string | null;
   invoice_year_month: string | null;
   invoice_total: string | null;
+  invoice_subject_name: string | null;
   customer_name: string | null;
 }
 
@@ -51,7 +52,7 @@ const previousMonth = (): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
-type SortField = 'invoice_number' | 'customer_name' | 'subject' | 'to' | 'sent_at' | 'sent_by';
+type SortField = 'invoice_number' | 'customer_name' | 'invoice_subject_name' | 'to' | 'sent_at' | 'sent_by';
 
 const yen = (n: string | number | null | undefined) => n == null ? '-' : `¥${Number(n).toLocaleString()}`;
 const fmtDateTime = (s: string | null) => {
@@ -82,7 +83,7 @@ export default function PurchaseOrderSendHistoriesPage() {
       switch (sortBy) {
         case 'invoice_number': return r.invoice_number ?? '';
         case 'customer_name':  return r.customer_name ?? '';
-        case 'subject':        return r.subject ?? '';
+        case 'invoice_subject_name': return r.invoice_subject_name ?? '';
         case 'to':             return (r.to_names ?? r.to_emails ?? []).join(', ');
         case 'sent_at':        return r.sent_at ?? '';
         case 'sent_by':        return r.sent_by_name ?? '';
@@ -165,7 +166,7 @@ export default function PurchaseOrderSendHistoriesPage() {
                 <SortableHeader label="注文番号" field="invoice_number" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[150px]" />
                 <th className="text-left   px-2 py-3 font-semibold w-[70px]">対象月</th>
                 <SortableHeader label="取引先" field="customer_name" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[150px]" />
-                <SortableHeader label="件名"   field="subject"       sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3" />
+                <SortableHeader label="案件名" field="invoice_subject_name" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3" />
                 <SortableHeader label="TO"     field="to"            sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[120px]" />
                 <th className="text-right  px-2 py-3 font-semibold w-[100px]">金額</th>
                 <th className="text-center px-2 py-3 font-semibold w-[80px]">手段</th>
@@ -193,8 +194,8 @@ export default function PurchaseOrderSendHistoriesPage() {
                   <td className="px-2 py-2 text-gray-800 truncate" title={r.customer_name ?? ''}>
                     {r.customer_name ?? '-'}
                   </td>
-                  <td className="px-2 py-2 truncate" title={r.subject ?? ''}>
-                    {r.subject ?? (r.method === 'post' ? <span className="text-gray-400">（郵送）</span> : '-')}
+                  <td className="px-2 py-2 truncate" title={r.invoice_subject_name ?? ''}>
+                    {r.invoice_subject_name ?? '-'}
                   </td>
                   <td className="px-2 py-2 text-gray-600 text-xs truncate" title={r.to_emails?.join(', ')}>
                     {r.to_names && r.to_names.length > 0 ? r.to_names.join(', ') : (r.to_emails?.join(', ') ?? '-')}

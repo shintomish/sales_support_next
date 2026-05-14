@@ -7,6 +7,7 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import SortableHeader from '@/components/SortableHeader';
+import Toast from '@/components/Toast';
 import { useAuthStore } from '@/store/authStore';
 
 type ApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejected';
@@ -90,6 +91,12 @@ export default function PurchaseOrdersPage() {
   const [busyId, setBusyId]             = useState<number | null>(null);
   const [sortBy, setSortBy]             = useState<SortField>('issued_date');
   const [sortOrder, setSortOrder]       = useState<'asc' | 'desc'>('desc');
+  const [toast, setToast]               = useState<string | null>(null);
+  const [toastType, setToastType]       = useState<'success' | 'error'>('success');
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToastType(type);
+    setToast(message);
+  };
 
   // 新規注文書モーダル（?create=1 で自動オープン）
   type PoMode = 'normal' | 'exception';
@@ -210,21 +217,25 @@ export default function PurchaseOrdersPage() {
     try {
       await apiClient.post(`/api/v1/invoices/${id}/submit-approval`);
       fetchData();
+      showToast('承認申請しました', 'success');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '申請に失敗しました';
-      alert(msg);
+      showToast(msg, 'error');
     } finally { setBusyId(null); }
   };
 
   const handleApprove = async (id: number) => {
-    if (!confirm('承認すると PDF を再生成します。よろしいですか？')) return;
+    if (!confirm('この注文書を承認しますか？')) return;
     setBusyId(id);
     try {
       await apiClient.post(`/api/v1/invoices/${id}/approve`);
-      fetchData();
+      // pending フィルタ下だと承認後に行が消えて分かりにくいので「すべて」にリセット
+      if (approvalStatus === 'pending') setApprovalStatus('');
+      else fetchData();
+      showToast('承認しました', 'success');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '承認に失敗しました';
-      alert(msg);
+      showToast(msg, 'error');
     } finally { setBusyId(null); }
   };
 
@@ -247,10 +258,13 @@ export default function PurchaseOrdersPage() {
     setBusyId(id);
     try {
       await apiClient.post(`/api/v1/invoices/${id}/reject`, { comment });
-      fetchData();
+      // pending フィルタ下だと却下後に行が消えて分かりにくいので「すべて」にリセット
+      if (approvalStatus === 'pending') setApprovalStatus('');
+      else fetchData();
+      showToast('却下しました', 'success');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '却下に失敗しました';
-      alert(msg);
+      showToast(msg, 'error');
     } finally { setBusyId(null); }
   };
 
@@ -315,6 +329,7 @@ export default function PurchaseOrdersPage() {
 
   return (
     <div className="h-full flex flex-col p-6 w-full">
+      <Toast message={toast} onClose={() => setToast(null)} type={toastType} />
       <div className="flex-shrink-0 mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">注文書一覧</h1>
