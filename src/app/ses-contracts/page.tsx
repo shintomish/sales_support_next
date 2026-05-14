@@ -77,6 +77,8 @@ interface ImportLog {
   id: number; status: string; total_rows: number;
   created_count: number; updated_count: number;
   skipped_count: number; error_count: number;
+  /** Excel に存在しなくなった既存案件を「期限切れ」に自動更新した件数 */
+  expired_count?: number;
   error_details?: { row: number; reason: string }[];
 }
 
@@ -102,7 +104,7 @@ const STATUS_CONFIG: Record<string, { bg: string; color: string; border: string;
   交渉:       { bg: '#FFF7ED', color: '#C2410C', border: '#FED7AA', headerBg: '#F97316' },
   成約:       { bg: '#F0FDF4', color: '#166534', border: '#86EFAC', headerBg: '#22C55E' },
   失注:       { bg: '#FEF2F2', color: '#991B1B', border: '#FECACA', headerBg: '#EF4444' },
-  期限切れ:   { bg: '#F9FAFB', color: '#6B7280', border: '#E5E7EB', headerBg: '#9CA3AF' },
+  期限切れ:   { bg: '#FFF1F2', color: '#9F1239', border: '#FECDD3', headerBg: '#BE123C' },
 };
 
 const selectCls = 'border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -218,10 +220,11 @@ function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
               result.log?.status === 'completed' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
               <p className="font-semibold text-gray-700">{result.message}</p>
               {result.log && (
-                <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="grid grid-cols-4 gap-2 text-center">
                   {[
                     { label: '新規', value: result.log.created_count, color: 'text-green-600' },
                     { label: '更新', value: result.log.updated_count, color: 'text-blue-600' },
+                    { label: '完了扱い', value: result.log.expired_count ?? 0, color: 'text-gray-500' },
                     { label: 'エラー', value: result.log.error_count, color: 'text-red-500' },
                   ].map(item => (
                     <div key={item.label} className="bg-white rounded-lg p-2">
@@ -301,6 +304,7 @@ function SesContractsPage() {
   const [search, setSearch]           = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [includeExpired, setIncludeExpired] = useState(false);
   const { user } = useAuthStore();
   // SES台帳は事務全員が参照する共有データのため、ロールに関わらず全件表示をデフォルトとする
   const [userFilter, setUserFilter] = useState<string>('all');
@@ -319,8 +323,8 @@ function SesContractsPage() {
     try {
       setError(null);
       const [res, allRes, sumRes] = await Promise.all([
-        apiClient.get('/api/v1/ses-contracts', { params: { search, status: statusFilter, page, per_page: 50, user_id: userFilter, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined } }),
-        apiClient.get('/api/v1/ses-contracts', { params: { page: 1, per_page: 200 } }),
+        apiClient.get('/api/v1/ses-contracts', { params: { search, status: statusFilter, include_expired: includeExpired ? 1 : 0, page, per_page: 50, user_id: userFilter, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined } }),
+        apiClient.get('/api/v1/ses-contracts', { params: { include_expired: includeExpired ? 1 : 0, page: 1, per_page: 200 } }),
         apiClient.get('/api/v1/ses-contracts/summary'),
       ]);
       setContracts(res.data.data);
@@ -332,7 +336,7 @@ function SesContractsPage() {
       if ((err as ApiError).response?.status === 401) router.push('/login');
       else setError('SES台帳の取得に失敗しました');
     } finally { setLoading(false); }
-  }, [search, statusFilter, page, userFilter, sortField, sortOrder, router]);
+  }, [search, statusFilter, includeExpired, page, userFilter, sortField, sortOrder, router]);
 
   // テキスト入力のデバウンス（300ms）
   useEffect(() => {
@@ -426,10 +430,16 @@ function SesContractsPage() {
                   <option value="">全ステータス</option>
                   {SES_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
+                <label className="inline-flex items-center gap-1.5 text-xs text-gray-600 whitespace-nowrap cursor-pointer">
+                  <input type="checkbox" checked={includeExpired}
+                    onChange={e => { setIncludeExpired(e.target.checked); setPage(1); }}
+                    className="w-3.5 h-3.5 rounded border-gray-300" />
+                  期限切れも表示
+                </label>
                 <UserFilter value={userFilter} onChange={v => { setUserFilter(v); setPage(1); }} className={selectCls} />
-                {(search || statusFilter) && (
+                {(search || statusFilter || includeExpired) && (
                   <Button variant="ghost" size="sm"
-                    onClick={() => { setSearch(''); setSearchInput(''); setStatusFilter(''); setPage(1); }}
+                    onClick={() => { setSearch(''); setSearchInput(''); setStatusFilter(''); setIncludeExpired(false); setPage(1); }}
                     className="text-gray-400 hover:text-gray-600">✕ クリア</Button>
                 )}
                 <div className="ml-auto flex rounded-lg border border-gray-200 overflow-hidden bg-gray-50 p-0.5 gap-0.5">
