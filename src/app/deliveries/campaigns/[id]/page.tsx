@@ -334,7 +334,7 @@ export default function CampaignDetailPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen max-w-7xl mx-auto px-3 md:px-6 py-3 md:py-4 gap-2 md:gap-3">
+    <div className="flex flex-col h-screen px-3 md:px-6 py-3 md:py-4 gap-2 md:gap-3">
       {/* 再送信ドメイン一致警告モーダル */}
       {resendWarn && (
         <div

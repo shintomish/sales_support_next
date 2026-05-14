@@ -23,11 +23,25 @@ type Entry =
   | { type: 'item'; label: string; path: string; icon: string; badge?: number; sesOnly?: boolean }
   | { type: 'group'; key: string; label: string; icon: string; sesOnly?: boolean; items: SubItem[] };
 
+const LS_SIDEBAR_COLLAPSED = 'sidebar_collapsed';
+
 export default function Sidebar() {
   const router   = useRouter();
   const pathname = usePathname();
   const logout   = useAuthStore((state) => state.logout);
   const user     = useAuthStore((state) => state.user);
+
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const s = localStorage.getItem(LS_SIDEBAR_COLLAPSED);
+    if (s !== null) setCollapsed(s === '1');
+  }, []);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LS_SIDEBAR_COLLAPSED, collapsed ? '1' : '0');
+    }
+  }, [collapsed]);
 
   const { data: notifData, refetch: refetchNotifications } = useNotifications();
 
@@ -209,18 +223,29 @@ export default function Sidebar() {
       <button
         key={it.path}
         onClick={() => router.push(it.path)}
-        className={`w-full text-left px-4 py-2 rounded-md text-sm transition-colors flex items-center gap-3 ${
+        title={collapsed ? it.label : undefined}
+        className={`relative w-full text-left rounded-md text-sm transition-colors flex items-center ${
+          collapsed ? 'justify-center px-2 py-2' : 'gap-3 px-4 py-2'
+        } ${
           active
             ? 'bg-gray-700 text-white border-l-2 border-blue-400'
             : 'text-gray-300 hover:bg-gray-700 hover:text-white'
         }`}
       >
         <span className="flex-shrink-0">{it.icon}</span>
-        <span className="flex-1 min-w-0 whitespace-nowrap truncate">{it.label}</span>
+        {!collapsed && (
+          <span className="flex-1 min-w-0 whitespace-nowrap truncate">{it.label}</span>
+        )}
         {it.badge != null && it.badge > 0 && (
-          <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center tabular-nums">
-            {it.badge}
-          </span>
+          collapsed ? (
+            <span className="absolute top-0 right-0 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center tabular-nums">
+              {it.badge}
+            </span>
+          ) : (
+            <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center tabular-nums">
+              {it.badge}
+            </span>
+          )
         )}
       </button>
     );
@@ -228,6 +253,14 @@ export default function Sidebar() {
 
   // グループの描画（クリックで開閉）
   const renderGroup = (g: Extract<Entry, { type: 'group' }>) => {
+    // 折りたたみ時はグループヘッダーを省略し、サブ項目をアイコン縦並びで直接表示
+    if (collapsed) {
+      return (
+        <div key={g.key} className="space-y-1">
+          {g.items.map((it) => renderItem(it))}
+        </div>
+      );
+    }
     const isOpen   = openGroups.has(g.key);
     const sumBadge = g.items.reduce((acc, it) => acc + (it.badge ?? 0), 0);
     return (
@@ -259,28 +292,45 @@ export default function Sidebar() {
       {/* トースト通知 */}
       <NotificationToast tasks={overdueTasks} />
 
-      <aside className="w-64 h-screen sticky top-0 bg-gray-900 text-white flex flex-col">
-        {/* ロゴ */}
-        <div className="p-6 border-b border-gray-700">
-          <h1 className="text-lg font-bold">営業支援システム</h1>
-          <p className="text-xs text-blue-400 mt-1 tracking-widest">SALES SUPPORT SYSTEM</p>
+      <aside className={`${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 h-screen sticky top-0 bg-gray-900 text-white flex flex-col`}>
+        {/* ロゴ + トグルボタン */}
+        <div className={`${collapsed ? 'p-3' : 'p-6'} border-b border-gray-700 flex items-center justify-between gap-2`}>
+          {!collapsed && (
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold">営業支援システム</h1>
+              <p className="text-xs text-blue-400 mt-1 tracking-widest">SALES SUPPORT SYSTEM</p>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? 'サイドバーを展開' : 'サイドバーを折りたたむ'}
+            title={collapsed ? '展開' : '折りたたむ'}
+            className="flex-shrink-0 w-8 h-8 rounded-md text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center justify-center text-sm"
+          >
+            {collapsed ? '▶' : '◀'}
+          </button>
         </div>
 
         {/* メニュー */}
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          <p className="text-xs text-gray-500 px-2 mb-2 tracking-widest">メインメニュー</p>
+        <nav className={`flex-1 ${collapsed ? 'p-2' : 'p-4'} space-y-1 overflow-y-auto`}>
+          {!collapsed && (
+            <p className="text-xs text-gray-500 px-2 mb-2 tracking-widest">メインメニュー</p>
+          )}
           {visibleMenu.map((e) => (e.type === 'item' ? renderItem(e) : renderGroup(e)))}
 
           {showAdmin && (
             <>
-              <p className="text-xs text-gray-500 px-2 mt-6 mb-2 tracking-widest">管理</p>
+              {!collapsed && (
+                <p className="text-xs text-gray-500 px-2 mt-6 mb-2 tracking-widest">管理</p>
+              )}
               {renderGroup(adminGroup)}
             </>
           )}
         </nav>
 
         {/* 期限切れサマリー */}
-        {overdueCount > 0 && (
+        {!collapsed && overdueCount > 0 && (
           <div className="mx-4 mb-3 px-3 py-2.5 rounded-lg bg-red-900/40 border border-red-700/50">
             <div className="flex items-center gap-2">
               <span className="text-sm">🔴</span>
@@ -299,7 +349,7 @@ export default function Sidebar() {
         )}
 
         {/* 承認待ちサマリー（テナント管理者以上のみ） */}
-        {pendingApprovalCount > 0 && (
+        {!collapsed && pendingApprovalCount > 0 && (
           <div className="mx-4 mb-3 px-3 py-2.5 rounded-lg bg-amber-900/40 border border-amber-700/50">
             <div className="flex items-center gap-2">
               <span className="text-sm">📝</span>
@@ -328,7 +378,7 @@ export default function Sidebar() {
         )}
 
         {/* 却下サマリー（一般メンバー向け） */}
-        {rejectedInvoiceCount > 0 && (
+        {!collapsed && rejectedInvoiceCount > 0 && (
           <div className="mx-4 mb-3 px-3 py-2.5 rounded-lg bg-red-900/40 border border-red-700/50">
             <div className="flex items-center gap-2">
               <span className="text-sm">⚠</span>
@@ -357,7 +407,7 @@ export default function Sidebar() {
         )}
 
         {/* 直近承認サマリー（一般メンバー向け、7日以内に承認された自身の申請） */}
-        {recentlyApprovedCount > 0 && (
+        {!collapsed && recentlyApprovedCount > 0 && (
           <div className="mx-4 mb-3 px-3 py-2.5 rounded-lg bg-green-900/40 border border-green-700/50">
             <div className="flex items-center gap-2">
               <span className="text-sm">✅</span>
@@ -386,8 +436,8 @@ export default function Sidebar() {
         )}
 
         {/* ログアウト */}
-        <div className="p-4 border-t border-gray-700">
-          {user && (
+        <div className={`${collapsed ? 'p-2' : 'p-4'} border-t border-gray-700`}>
+          {user && !collapsed && (
             <div className="flex items-center gap-3 mb-3 px-2">
               <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
                 {user.name.charAt(0)}
@@ -398,9 +448,20 @@ export default function Sidebar() {
               </div>
             </div>
           )}
-          <Button variant="outline" className="w-full text-gray-900" onClick={handleLogout}>
-            ↩ ログアウト
-          </Button>
+          {collapsed ? (
+            <button
+              type="button"
+              onClick={handleLogout}
+              title={user ? `${user.name} / ログアウト` : 'ログアウト'}
+              className="w-full h-9 rounded-md text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center justify-center text-base"
+            >
+              ↩
+            </button>
+          ) : (
+            <Button variant="outline" className="w-full text-gray-900" onClick={handleLogout}>
+              ↩ ログアウト
+            </Button>
+          )}
         </div>
       </aside>
     </>

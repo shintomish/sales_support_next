@@ -314,7 +314,7 @@ export default function PurchaseOrdersPage() {
   }, [items, sortBy, sortOrder]);
 
   return (
-    <div className="h-full flex flex-col p-6 max-w-7xl mx-auto w-full">
+    <div className="h-full flex flex-col p-6 w-full">
       <div className="flex-shrink-0 mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">注文書一覧</h1>
@@ -362,7 +362,7 @@ export default function PurchaseOrdersPage() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+        <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
           <table className="table-fixed w-full text-sm">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>

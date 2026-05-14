@@ -1108,7 +1108,7 @@ export default function DeliveriesPage() {
   ]
 
   return (
-    <div className="flex flex-col h-screen max-w-7xl mx-auto">
+    <div className="flex flex-col h-screen">
       <div className="flex-shrink-0 px-6 pt-6">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">配信管理</h1>
       </div>
