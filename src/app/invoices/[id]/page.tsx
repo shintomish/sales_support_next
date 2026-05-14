@@ -775,7 +775,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             <h2 className="text-sm font-semibold text-gray-700">明細（金額計上行）</h2>
             <Button variant="outline" onClick={addLine} disabled={busy}>+ 行追加</Button>
           </div>
-          <p className="text-xs text-gray-400 mb-2">基本月額の摘要は「{`{金額}`}円 【基本月額】」形式で生成されます。</p>
+          <p className="text-xs text-gray-400 mb-2">基本月額行（先頭行）の摘要は「{`{金額}`}円」形式で生成されます。PDF側で「基本月額：」ラベルが自動付与されます。</p>
           <div className="overflow-auto">
             <table className="w-full text-sm border border-gray-200">
               <thead className="bg-gray-50 text-gray-600">
