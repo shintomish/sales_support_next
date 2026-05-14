@@ -286,19 +286,6 @@ function EditDialog({ dealId, yearMonth, existing, contract, onClose, onSaved }:
             <Input type="number" min="0" value={String(form.transportation_fee)}
               onChange={(e) => setForm({...form, transportation_fee: e.target.value})} />
           </Field>
-          <Field label="">
-            <label className="inline-flex items-center gap-2 mt-2">
-              <input type="checkbox" checked={!!form.invoice_exists}
-                onChange={(e) => setForm({...form, invoice_exists: e.target.checked})} />
-              <span className="text-sm">請求書あり</span>
-            </label>
-          </Field>
-          {form.invoice_exists && (
-            <Field label="請求書受領日">
-              <Input type="date" value={form.invoice_received_date}
-                onChange={(e) => setForm({...form, invoice_received_date: e.target.value})} />
-            </Field>
-          )}
         </div>
 
         <Field label="備考">
