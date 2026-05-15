@@ -59,7 +59,7 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <main ref={mainRef} className="flex-1 bg-gray-50 overflow-auto">
+      <main ref={mainRef} className="flex-1 bg-gray-50 overflow-auto pt-14 md:pt-0">
         {children}
       </main>
       <RealtimeToast />
