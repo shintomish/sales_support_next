@@ -548,12 +548,12 @@ export default function PurchaseOrdersPage() {
       {/* 新規注文書発行モーダル */}
       {createOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setCreateOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-gray-800 mb-2">新規注文発行</h2>
             <p className="text-xs text-gray-500 mb-3">注文書発行時に注文請書(OCF番号)も同時に採番されます。PDFは注文書の発行ボタンを押すと両方生成されます。</p>
 
             {/* モード切替 */}
-            <div className="flex gap-4 text-sm mb-3 border-b border-gray-200 pb-2">
+            <div className="flex flex-wrap gap-2 md:gap-4 text-sm mb-3 border-b border-gray-200 pb-2">
               <label className="flex items-center gap-2">
                 <input type="radio" name="po-mode" checked={createMode === 'normal'}
                   onChange={() => setCreateMode('normal')} />

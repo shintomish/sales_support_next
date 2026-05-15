@@ -400,11 +400,11 @@ export default function EstimatesPage() {
       {/* 新規見積発行モーダル */}
       {createOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setCreateOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-gray-800 mb-2">新規見積発行</h2>
 
             {/* モード切替 */}
-            <div className="flex gap-4 text-sm mb-3 border-b border-gray-200 pb-2 items-center">
+            <div className="flex flex-wrap gap-2 md:gap-4 text-sm mb-3 border-b border-gray-200 pb-2 items-center">
               <label className="flex items-center gap-2">
                 <input type="radio" name="estimate-mode" checked={createMode === 'normal'}
                   onChange={() => { setCreateMode('normal'); }} />
@@ -416,7 +416,7 @@ export default function EstimatesPage() {
                 <span><strong>例外</strong>（売上先のみ指定・新規見積）</span>
               </label>
               {createMode === 'normal' && (
-                <label className="flex items-center gap-2 ml-auto">
+                <label className="flex items-center gap-2 md:ml-auto">
                   <input type="checkbox" checked={isEnglish}
                     onChange={(e) => {
                       setIsEnglish(e.target.checked);
@@ -527,7 +527,7 @@ export default function EstimatesPage() {
                   value={form.subject_name}
                   onChange={(e) => setForm({ ...form, subject_name: e.target.value })} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">発行日</label>
                   <Input type="date" value={form.issued_date}

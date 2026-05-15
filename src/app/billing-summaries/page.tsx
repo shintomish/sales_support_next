@@ -575,7 +575,7 @@ function RefinitivImportModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold mb-1">📋 Refinitiv 注文書から請求書発行</h2>
         <p className="text-xs text-gray-500 mb-4">SAP Business Network 経由で受領した注文書 PDF を取り込み、対象 SES案件 から請求書ドラフトを作成します。</p>
 
@@ -653,7 +653,7 @@ function RefinitivImportModal({
           {parsed && (
             <div className="border-t border-gray-100 pt-4">
               <p className="text-xs font-semibold text-gray-700 mb-2">抽出結果（必要なら編集してください）</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] text-gray-500 mb-0.5">PO Number *</label>
                   <Input value={parsed.po_number ?? ''} onChange={(e) => updateField('po_number', e.target.value)} />
@@ -662,7 +662,7 @@ function RefinitivImportModal({
                   <label className="block text-[11px] text-gray-500 mb-0.5">希望納入日 (YYYY-MM-DD)</label>
                   <Input value={parsed.requested_delivery_date ?? ''} onChange={(e) => updateField('requested_delivery_date', e.target.value)} />
                 </div>
-                <div className="col-span-2">
+                <div className="md:col-span-2">
                   <label className="block text-[11px] text-gray-500 mb-0.5">明細説明</label>
                   <Input value={parsed.description ?? ''} onChange={(e) => updateField('description', e.target.value)} />
                 </div>
@@ -710,8 +710,8 @@ function RefinitivImportModal({
 
               {/* SES案件 + 年月 */}
               <div className="border-t border-gray-100 pt-3 mt-4 space-y-2">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-2">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="md:col-span-2">
                     <label className="block text-xs font-semibold text-gray-700 mb-1">案件検索（任意）</label>
                     <Input
                       value={dealSearch}
