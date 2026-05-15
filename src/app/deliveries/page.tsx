@@ -1462,8 +1462,8 @@ export default function DeliveriesPage() {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-            <table className="w-full text-sm">
+            <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+            <table className="w-full text-sm min-w-[1100px]">
               <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
                 <tr>
                   <th className="px-2 py-3 w-8" />
@@ -1599,7 +1599,7 @@ export default function DeliveriesPage() {
                                     <div className="rounded-lg border bg-blue-50 border-blue-100 ml-8 overflow-hidden">
                                       <div
                                         onClick={(e) => { e.stopPropagation(); toggleCampSub(sendKey) }}
-                                        className="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-blue-100/60 flex-wrap"
+                                        className="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-blue-100/60 flex-nowrap whitespace-nowrap"
                                       >
                                         <span className="text-gray-400 text-xs">{sendOpen ? '▼' : '▶'}</span>
                                         <span className="text-xs font-bold text-blue-600">→ 送信</span>
@@ -1650,7 +1650,7 @@ export default function DeliveriesPage() {
                                       <div key={h.id} className="rounded-lg border bg-white border-gray-200 mr-8 overflow-hidden">
                                         <div
                                           onClick={(e) => { e.stopPropagation(); toggleCampSub(replyKey) }}
-                                          className="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-50 flex-wrap"
+                                          className="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-50 flex-nowrap whitespace-nowrap"
                                         >
                                           <span className="text-gray-400 text-xs">{replyOpen ? '▼' : '▶'}</span>
                                           <span className="text-xs font-bold text-red-600">← 受信</span>
