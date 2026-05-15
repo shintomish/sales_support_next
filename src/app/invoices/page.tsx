@@ -255,7 +255,7 @@ export default function InvoicesPage() {
       </div>
 
       {/* mobile: カード一覧 (< md) */}
-      <div className="md:hidden bg-white border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+      <div className="md:hidden flex-1 min-h-0 overflow-y-auto bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
         {loading ? (
           <div className="px-4 py-8 text-center text-gray-400">読み込み中...</div>
         ) : sortedItems.length === 0 ? (

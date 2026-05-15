@@ -207,15 +207,15 @@ export default function SesContractEditPage() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="max-w-4xl mx-auto py-4 md:py-8 px-4 md:px-6">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">SES台帳 編集</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800">SES台帳 編集</h1>
           {form.engineer_name && (
             <p className="text-sm text-gray-400 mt-0.5">{form.engineer_name} / {form.customer_name}</p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button onClick={handleSubmit} disabled={saving}>
             {saving ? '保存中...' : '💾 保存'}
           </Button>
@@ -231,8 +231,8 @@ export default function SesContractEditPage() {
         </div>
       </div>
 
-      {/* タブ */}
-      <div className="flex border-b mb-6">
+      {/* タブ: モバイルでは横スクロール */}
+      <div className="flex border-b mb-6 overflow-x-auto whitespace-nowrap">
         {tabs.map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
             className={`px-4 py-2.5 text-sm font-medium transition-colors ${
@@ -439,7 +439,7 @@ export default function SesContractEditPage() {
         </div>
       )}
 
-      <div className="flex justify-end gap-2 mt-6">
+      <div className="flex flex-wrap justify-end gap-2 mt-6">
         <Button onClick={handleSubmit} disabled={saving}>
           {saving ? '保存中...' : '💾 保存する'}
         </Button>

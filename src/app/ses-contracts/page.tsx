@@ -460,16 +460,16 @@ function SesContractsPage() {
 
               {/* 基本 */}
               {columnGroup === 'basic' && (
-                <>
-                  <div className="flex-shrink-0 border-b bg-gray-50">
-                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1200px'}}>
-                      <colgroup>
-                        <col style={{width:'60px'}} /><col style={{width:'100px'}} /><col style={{width:'80px'}} />
-                        <col style={{width:'80px'}} /><col style={{width:'140px'}} /><col style={{width:'120px'}} />
-                        <col style={{width:'160px'}} /><col style={{width:'90px'}} /><col style={{width:'100px'}} />
-                        <col style={{width:'70px'}} /><col style={{width:'50px'}} />
-                      </colgroup>
-                      <thead><tr>
+                <div className="overflow-auto flex-1">
+                  <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1200px'}}>
+                    <colgroup>
+                      <col style={{width:'60px'}} /><col style={{width:'100px'}} /><col style={{width:'80px'}} />
+                      <col style={{width:'80px'}} /><col style={{width:'140px'}} /><col style={{width:'120px'}} />
+                      <col style={{width:'160px'}} /><col style={{width:'90px'}} /><col style={{width:'100px'}} />
+                      <col style={{width:'70px'}} /><col style={{width:'50px'}} />
+                    </colgroup>
+                    <thead className="sticky top-0 bg-gray-50 z-10 border-b">
+                      <tr>
                         <SortableHeader label="項番" field="project_number" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 first:pl-4 text-xs" />
                         <SortableHeader label="氏名" field="engineer_name" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
                         <SortableHeader label="変更種別" field="change_type" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
@@ -481,18 +481,9 @@ function SesContractsPage() {
                         <SortableHeader label="契約終了" field="contract_period_end" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 text-xs" />
                         <th className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">残日数</th>
                         <th className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">操作</th>
-                      </tr></thead>
-                    </table>
-                  </div>
-                  <div className="overflow-auto flex-1">
-                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1200px'}}>
-                      <colgroup>
-                        <col style={{width:'60px'}} /><col style={{width:'100px'}} /><col style={{width:'80px'}} />
-                        <col style={{width:'80px'}} /><col style={{width:'140px'}} /><col style={{width:'120px'}} />
-                        <col style={{width:'160px'}} /><col style={{width:'90px'}} /><col style={{width:'100px'}} />
-                        <col style={{width:'70px'}} /><col style={{width:'50px'}} />
-                      </colgroup>
-                      <tbody>
+                      </tr>
+                    </thead>
+                    <tbody>
                         {contracts.length === 0 ? (
                           <tr><td colSpan={11} className="py-16 text-center">
                             <div className="flex flex-col items-center gap-3 text-gray-400">
@@ -531,37 +522,27 @@ function SesContractsPage() {
                         })}
                       </tbody>
                     </table>
-                  </div>
-                </>
+                </div>
               )}
 
               {/* 金額 */}
               {columnGroup === 'amount' && (
-                <>
-                  <div className="flex-shrink-0 border-b bg-gray-50">
-                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1100px'}}>
-                      <colgroup>
-                        <col style={{width:'60px'}} /><col style={{width:'90px'}} /><col style={{width:'120px'}} />
-                        <col style={{width:'100px'}} /><col style={{width:'100px'}} /><col style={{width:'100px'}} />
-                        <col style={{width:'130px'}} /><col style={{width:'100px'}} /><col style={{width:'100px'}} />
-                        <col style={{width:'100px'}} /><col style={{width:'100px'}} />
-                      </colgroup>
-                      <thead><tr>
+                <div className="overflow-auto flex-1">
+                  <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1100px'}}>
+                    <colgroup>
+                      <col style={{width:'60px'}} /><col style={{width:'90px'}} /><col style={{width:'120px'}} />
+                      <col style={{width:'100px'}} /><col style={{width:'100px'}} /><col style={{width:'100px'}} />
+                      <col style={{width:'130px'}} /><col style={{width:'100px'}} /><col style={{width:'100px'}} />
+                      <col style={{width:'100px'}} /><col style={{width:'100px'}} />
+                    </colgroup>
+                    <thead className="sticky top-0 bg-gray-50 z-10 border-b">
+                      <tr>
                         {['項番','氏名','顧客','入金','支払+22%','支払+29%','営業支援費支払先','営業支援費','調整金額','利益','利益/29%'].map(h => (
                           <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left first:pl-4 text-xs">{h}</th>
                         ))}
-                      </tr></thead>
-                    </table>
-                  </div>
-                  <div className="overflow-auto flex-1">
-                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1100px'}}>
-                      <colgroup>
-                        <col style={{width:'60px'}} /><col style={{width:'90px'}} /><col style={{width:'120px'}} />
-                        <col style={{width:'100px'}} /><col style={{width:'100px'}} /><col style={{width:'100px'}} />
-                        <col style={{width:'130px'}} /><col style={{width:'100px'}} /><col style={{width:'100px'}} />
-                        <col style={{width:'100px'}} /><col style={{width:'100px'}} />
-                      </colgroup>
-                      <tbody>
+                      </tr>
+                    </thead>
+                    <tbody>
                         {contracts.map((c, idx) => (
                           <tr key={c.id}
                             className={`hover:bg-blue-50/60 cursor-pointer transition-colors border-b last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/30'}`}
@@ -581,39 +562,28 @@ function SesContractsPage() {
                         ))}
                       </tbody>
                     </table>
-                  </div>
-                </>
+                </div>
               )}
 
               {/* 精算条件 */}
               {columnGroup === 'settlement' && (
-                <>
-                  <div className="flex-shrink-0 border-b bg-gray-50">
-                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1100px'}}>
-                      <colgroup>
-                        <col style={{width:'55px'}} /><col style={{width:'90px'}} /><col style={{width:'100px'}} />
-                        <col style={{width:'65px'}} /><col style={{width:'90px'}} /><col style={{width:'65px'}} />
-                        <col style={{width:'70px'}} /><col style={{width:'80px'}} /><col style={{width:'100px'}} />
-                        <col style={{width:'65px'}} /><col style={{width:'90px'}} /><col style={{width:'65px'}} />
-                        <col style={{width:'80px'}} />
-                      </colgroup>
-                      <thead><tr>
+                <div className="overflow-auto flex-1">
+                  <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1100px'}}>
+                    <colgroup>
+                      <col style={{width:'55px'}} /><col style={{width:'90px'}} /><col style={{width:'100px'}} />
+                      <col style={{width:'65px'}} /><col style={{width:'90px'}} /><col style={{width:'65px'}} />
+                      <col style={{width:'70px'}} /><col style={{width:'80px'}} /><col style={{width:'100px'}} />
+                      <col style={{width:'65px'}} /><col style={{width:'90px'}} /><col style={{width:'65px'}} />
+                      <col style={{width:'80px'}} />
+                    </colgroup>
+                    <thead className="sticky top-0 bg-gray-50 z-10 border-b">
+                      <tr>
                         {['項番','氏名','顧客側 控除単価','控除h','超過単価','超過h','精算(分)','入金サイト','仕入側 控除単価','控除h②','超過単価②','超過h②','支払サイト'].map((h, i) => (
                           <th key={i} className="font-semibold text-gray-600 py-3 px-3 text-left first:pl-4 text-xs">{h.replace('②','')}</th>
                         ))}
-                      </tr></thead>
-                    </table>
-                  </div>
-                  <div className="overflow-auto flex-1">
-                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1100px'}}>
-                      <colgroup>
-                        <col style={{width:'55px'}} /><col style={{width:'90px'}} /><col style={{width:'100px'}} />
-                        <col style={{width:'65px'}} /><col style={{width:'90px'}} /><col style={{width:'65px'}} />
-                        <col style={{width:'70px'}} /><col style={{width:'80px'}} /><col style={{width:'100px'}} />
-                        <col style={{width:'65px'}} /><col style={{width:'90px'}} /><col style={{width:'65px'}} />
-                        <col style={{width:'80px'}} />
-                      </colgroup>
-                      <tbody>
+                      </tr>
+                    </thead>
+                    <tbody>
                         {contracts.map((c, idx) => (
                           <tr key={c.id}
                             className={`hover:bg-blue-50/60 cursor-pointer transition-colors border-b last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/30'}`}
@@ -635,24 +605,23 @@ function SesContractsPage() {
                         ))}
                       </tbody>
                     </table>
-                  </div>
-                </>
+                </div>
               )}
 
               {/* 勤務表・SES */}
               {columnGroup === 'work' && (
-                <>
-                  <div className="flex-shrink-0 border-b bg-gray-50">
-                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1000px'}}>
-                      <colgroup>
-                        <col style={{width:'50px'}} /><col style={{width:'80px'}} /><col style={{width:'80px'}} />
-                        <col style={{width:'80px'}} /><col style={{width:'90px'}} /><col style={{width:'90px'}} />
-                        <col style={{width:'80px'}} /><col style={{width:'75px'}} /><col style={{width:'85px'}} />
-                        <col style={{width:'90px'}} /><col style={{width:'90px'}} /><col style={{width:'90px'}} />
-                        <col style={{width:'85px'}} /><col style={{width:'75px'}} /><col style={{width:'65px'}} />
-                        <col style={{width:'auto'}} />
-                      </colgroup>
-                      <thead><tr>
+                <div className="overflow-auto flex-1">
+                  <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1000px'}}>
+                    <colgroup>
+                      <col style={{width:'50px'}} /><col style={{width:'80px'}} /><col style={{width:'80px'}} />
+                      <col style={{width:'80px'}} /><col style={{width:'90px'}} /><col style={{width:'90px'}} />
+                      <col style={{width:'80px'}} /><col style={{width:'75px'}} /><col style={{width:'85px'}} />
+                      <col style={{width:'90px'}} /><col style={{width:'90px'}} /><col style={{width:'90px'}} />
+                      <col style={{width:'85px'}} /><col style={{width:'75px'}} /><col style={{width:'65px'}} />
+                      <col style={{width:'auto'}} />
+                    </colgroup>
+                    <thead className="sticky top-0 bg-gray-50 z-10 border-b">
+                      <tr>
                         <SortableHeader label="項番" field="project_number" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} className="py-3 px-3 first:pl-4 text-xs" />
                         {['氏名','自社担当者','所属担当者','客先担当者','携帯','TEL','FAX','契約開始','契約期間開始'].map(h => (
                           <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">{h}</th>
@@ -661,20 +630,9 @@ function SesContractsPage() {
                         {['期間末(所属)','勤務表受領','交通費','請求書','特記事項'].map(h => (
                           <th key={h} className="font-semibold text-gray-600 py-3 px-3 text-left text-xs">{h}</th>
                         ))}
-                      </tr></thead>
-                    </table>
-                  </div>
-                  <div className="overflow-auto flex-1">
-                    <table className="text-sm whitespace-nowrap" style={{tableLayout:'fixed', width:'100%', minWidth:'1000px'}}>
-                      <colgroup>
-                        <col style={{width:'50px'}} /><col style={{width:'80px'}} /><col style={{width:'80px'}} />
-                        <col style={{width:'80px'}} /><col style={{width:'90px'}} /><col style={{width:'90px'}} />
-                        <col style={{width:'80px'}} /><col style={{width:'75px'}} /><col style={{width:'85px'}} />
-                        <col style={{width:'90px'}} /><col style={{width:'90px'}} /><col style={{width:'90px'}} />
-                        <col style={{width:'85px'}} /><col style={{width:'75px'}} /><col style={{width:'65px'}} />
-                        <col style={{width:'auto'}} />
-                      </colgroup>
-                      <tbody>
+                      </tr>
+                    </thead>
+                    <tbody>
                         {contracts.map((c, idx) => (
                           <tr key={c.id}
                             className={`hover:bg-blue-50/60 cursor-pointer transition-colors border-b last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/30'}`}
@@ -703,8 +661,7 @@ function SesContractsPage() {
                         ))}
                       </tbody>
                     </table>
-                  </div>
-                </>
+                </div>
               )}
 
             </CardContent>

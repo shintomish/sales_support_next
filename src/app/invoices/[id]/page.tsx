@@ -635,7 +635,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div className="h-full flex flex-col p-6 max-w-6xl mx-auto w-full">
+    <div className="h-full flex flex-col p-4 md:p-6 max-w-6xl mx-auto w-full">
       <Toast message={toast} type={toastType} onClose={() => setToast(null)} />
       <div className="flex-shrink-0 mb-4">
         <Link
@@ -648,9 +648,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             : invoice.doc_type === 'purchase_order' ? '← 注文書一覧に戻る'
             : '← 請求書一覧に戻る'}
         </Link>
-        <div className="flex items-center justify-between mt-2">
-          <h1 className="text-2xl font-bold text-gray-800 font-mono">{invoice.invoice_number}</h1>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800 font-mono">{invoice.invoice_number}</h1>
+          <div className="flex flex-wrap items-center gap-2">
             {invoice.status === 'issued'
               ? <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">発行済</span>
               : <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">下書き</span>}
@@ -683,9 +683,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+      <div className="flex-1 min-h-0 overflow-auto bg-white rounded-lg border border-gray-200 p-4 md:p-6 space-y-4 md:space-y-6">
         {/* メタ情報 */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
           <Field label={invoice.doc_type === 'estimate' ? '見積日'
                        : invoice.doc_type === 'purchase_order' ? '注文日'
                        : '請求日'}>
@@ -700,7 +700,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
         {/* 番号類 (estimate は自身の番号のみで表示省略) */}
         {invoice.doc_type !== 'estimate' && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
             {invoice.doc_type === 'purchase_order' && (
               <>
                 <Field label="注文番号">
@@ -725,7 +725,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         )}
 
         {/* 左側ヘッダー (E)(F)(G) */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
           <Field label="納期">
             <Input value={deliveryDateText} onChange={(e) => setDeliveryDateText(e.target.value)} placeholder="御社ご指定日" />
           </Field>
@@ -739,7 +739,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* 明細部メタ (K)(L)(N)(O) */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
           <Field label="件名">
             <Input value={subjectName} onChange={(e) => setSubjectName(e.target.value)} />
           </Field>
@@ -776,8 +776,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             <Button variant="outline" onClick={addLine} disabled={busy}>+ 行追加</Button>
           </div>
           <p className="text-xs text-gray-400 mb-2">基本月額行（先頭行）の摘要は「{`{金額}`}円」形式で生成されます。PDF側で「基本月額：」ラベルが自動付与されます。</p>
-          <div className="overflow-auto">
-            <table className="w-full text-sm border border-gray-200">
+          <div className="overflow-auto border border-gray-200 rounded">
+            <table className="text-sm" style={{ width: '1000px', minWidth: '1000px', tableLayout: 'fixed' }}>
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
                   <th className="text-left px-2 py-2 font-semibold w-2/5">摘要</th>
@@ -928,7 +928,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       {/* 郵送記録モーダル */}
       {postModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setPostModalOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-4">📮 郵送記録</h2>
 
             <div className="space-y-3">
@@ -1010,8 +1010,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       {/* メール送信モーダル */}
       {mailModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setMailModalOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
               <h2 className="text-lg font-bold">📧 {invoice.doc_type === 'estimate' ? '見積書' : invoice.doc_type === 'purchase_order' ? '注文書' : '請求書'}をメールで送信</h2>
               {mailDeliveryMethod && (
                 <span className={`text-xs px-2 py-1 rounded ${
@@ -1140,7 +1140,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       {/* 封筒モーダル */}
       {envelopeModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setEnvelopeModalOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-4">長3封筒 - 朱印選択</h2>
             <p className="text-xs text-gray-500 mb-3">複数選択可。すべて未選択の場合は朱印なし。</p>
             <div className="space-y-2 mb-5">
@@ -1169,7 +1169,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       {/* 送付状モーダル */}
       {coverModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setCoverModalOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-1">送付状 - 同封物の選択</h2>
             <p className="text-xs text-gray-500 mb-3">チェックを外すと PDF から除外されます。「他」に名称を入力すれば追加可能（数量・単位はそれぞれ既定 1 / 通）。</p>
             <div className="grid grid-cols-[1fr_72px_72px] gap-2 text-xs font-semibold text-gray-600 mb-1 px-1">
