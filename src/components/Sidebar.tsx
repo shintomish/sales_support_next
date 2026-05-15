@@ -300,6 +300,18 @@ export default function Sidebar() {
       {/* トースト通知 */}
       <NotificationToast tasks={overdueTasks} />
 
+      {/* ハンバーガーボタン (md 未満のみ、drawer 閉時のみ表示) */}
+      {!mobileOpen && (
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          aria-label="メニューを開く"
+          className="md:hidden fixed top-3 left-3 z-50 w-11 h-11 rounded-md bg-gray-900 text-white shadow-lg flex items-center justify-center text-2xl leading-none hover:bg-gray-800 transition-colors"
+        >
+          ≡
+        </button>
+      )}
+
       {/* mobile drawer backdrop (md 未満のみ表示) */}
       {mobileOpen && (
         <div
