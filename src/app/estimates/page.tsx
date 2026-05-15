@@ -400,7 +400,7 @@ export default function EstimatesPage() {
       {/* 新規見積発行モーダル */}
       {createOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setCreateOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div data-modal-scroll className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-gray-800 mb-2">新規見積発行</h2>
 
             {/* モード切替 */}
@@ -546,12 +546,22 @@ export default function EstimatesPage() {
                   rows={2} className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm" />
               </div>
             </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>キャンセル</Button>
-              <Button onClick={handleCreate}
-                disabled={creating || (createMode === 'normal' ? !form.deal_id : !form.customer_id)}>
-                {creating ? '作成中…' : '作成'}
-              </Button>
+            <div className="sticky bottom-0 -mx-4 md:-mx-6 -mb-4 md:-mb-6 mt-6 px-4 md:px-6 py-3 bg-white border-t border-gray-200 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  const sc = e.currentTarget.closest<HTMLElement>('[data-modal-scroll]');
+                  sc?.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
+              >▲ TOP</button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>キャンセル</Button>
+                <Button onClick={handleCreate}
+                  disabled={creating || (createMode === 'normal' ? !form.deal_id : !form.customer_id)}>
+                  {creating ? '作成中…' : '作成'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

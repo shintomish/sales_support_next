@@ -575,7 +575,7 @@ function RefinitivImportModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div data-modal-scroll className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold mb-1">📋 Refinitiv 注文書から請求書発行</h2>
         <p className="text-xs text-gray-500 mb-4">SAP Business Network 経由で受領した注文書 PDF を取り込み、対象 SES案件 から請求書ドラフトを作成します。</p>
 
@@ -746,15 +746,25 @@ function RefinitivImportModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={onClose} disabled={parsing || issuing}>キャンセル</Button>
-          <Button
-            onClick={handleIssue}
-            disabled={!parsed || !dealId || !parsed.po_number || issuing}
-            className="bg-amber-600 hover:bg-amber-700 text-white"
-          >
-            {issuing ? '発行中…' : '請求書ドラフトを作成'}
-          </Button>
+        <div className="sticky bottom-0 -mx-4 md:-mx-6 -mb-4 md:-mb-6 mt-6 px-4 md:px-6 py-3 bg-white border-t border-gray-200 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              const sc = e.currentTarget.closest<HTMLElement>('[data-modal-scroll]');
+              sc?.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
+          >▲ TOP</button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose} disabled={parsing || issuing}>キャンセル</Button>
+            <Button
+              onClick={handleIssue}
+              disabled={!parsed || !dealId || !parsed.po_number || issuing}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {issuing ? '発行中…' : '請求書ドラフトを作成'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
