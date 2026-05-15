@@ -1361,7 +1361,7 @@ export default function DeliveriesPage() {
 
           {/* ページネーション */}
           {addresses && addresses.last_page > 1 && (
-            <div className="flex flex-wrap items-center justify-center gap-1 md:gap-2 mt-4">
+            <div className="sticky bottom-0 -mx-6 px-6 py-3 bg-white border-t border-gray-200 z-20 flex flex-wrap items-center justify-center gap-1 md:gap-2 mt-4">
               <button
                 disabled={addresses.current_page <= 1}
                 onClick={() => setAddrPage(addresses.current_page - 1)}
@@ -1752,7 +1752,7 @@ export default function DeliveriesPage() {
           </div>
 
           {campaigns && campaigns.last_page > 1 && (
-            <div className="flex flex-wrap items-center justify-center gap-1 md:gap-2 mt-4">
+            <div className="sticky bottom-0 -mx-6 px-6 py-3 bg-white border-t border-gray-200 z-20 flex flex-wrap items-center justify-center gap-1 md:gap-2 mt-4">
               <button
                 disabled={campaigns.current_page <= 1}
                 onClick={() => setCampPage(campaigns.current_page - 1)}
@@ -1975,14 +1975,28 @@ export default function DeliveriesPage() {
 
           {/* ページネーション */}
           {threads && threads.last_page > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <span className="text-xs text-gray-500">{threads.current_page} / {threads.last_page} ページ</span>
-              <div className="flex gap-2">
-                <button disabled={threads.current_page <= 1} onClick={() => setThreadPage(p => p - 1)}
-                  className="text-xs border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">前へ</button>
-                <button disabled={threads.current_page >= threads.last_page} onClick={() => setThreadPage(p => p + 1)}
-                  className="text-xs border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">次へ</button>
-              </div>
+            <div className="sticky bottom-0 -mx-6 px-6 py-3 bg-white border-t border-gray-200 z-20 flex flex-wrap items-center justify-center gap-1 md:gap-2 mt-4">
+              <button
+                disabled={threads.current_page <= 1}
+                onClick={() => setThreadPage(threads.current_page - 1)}
+                className="px-3 py-1 rounded text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40"
+              >‹ 前</button>
+              {Array.from({ length: threads.last_page }, (_, i) => i + 1).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setThreadPage(p)}
+                  className={`px-3 py-1 rounded text-sm ${
+                    p === threads.current_page ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+              <button
+                disabled={threads.current_page >= threads.last_page}
+                onClick={() => setThreadPage(threads.current_page + 1)}
+                className="px-3 py-1 rounded text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40"
+              >次 ›</button>
             </div>
           )}
         </div>
