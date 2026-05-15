@@ -31,7 +31,7 @@ export default function Sidebar() {
   const logout   = useAuthStore((state) => state.logout);
   const user     = useAuthStore((state) => state.user);
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsedRaw, setCollapsed] = useState(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const s = localStorage.getItem(LS_SIDEBAR_COLLAPSED);
@@ -39,9 +39,22 @@ export default function Sidebar() {
   }, []);
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(LS_SIDEBAR_COLLAPSED, collapsed ? '1' : '0');
+      localStorage.setItem(LS_SIDEBAR_COLLAPSED, collapsedRaw ? '1' : '0');
     }
-  }, [collapsed]);
+  }, [collapsedRaw]);
+
+  // md breakpoint (>=768px) 判定 — mobile では collapsed を強制 false にして
+  // renderItem/renderGroup を触らずに drawer をフル表示する
+  const [isMd, setIsMd] = useState(true);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(min-width: 768px)');
+    const update = () => setIsMd(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  const collapsed = isMd ? collapsedRaw : false;
 
   // mobile drawer 開閉 (< md でのみ意味を持つ。永続化しない)
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -342,14 +355,24 @@ export default function Sidebar() {
               <p className="text-xs text-blue-400 mt-1 tracking-widest">SALES SUPPORT SYSTEM</p>
             </div>
           )}
+          {/* PC: collapse トグル (md+ のみ) */}
           <button
             type="button"
             onClick={() => setCollapsed((v) => !v)}
             aria-label={collapsed ? 'サイドバーを展開' : 'サイドバーを折りたたむ'}
             title={collapsed ? '展開' : '折りたたむ'}
-            className="flex-shrink-0 w-8 h-8 rounded-md text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center justify-center text-sm"
+            className="hidden md:flex flex-shrink-0 w-8 h-8 rounded-md text-gray-300 hover:bg-gray-700 hover:text-white transition-colors items-center justify-center text-sm"
           >
             {collapsed ? '▶' : '◀'}
+          </button>
+          {/* mobile: drawer close (< md のみ) */}
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            aria-label="メニューを閉じる"
+            className="md:hidden flex-shrink-0 w-8 h-8 rounded-md text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center justify-center text-sm"
+          >
+            ✕
           </button>
         </div>
 
