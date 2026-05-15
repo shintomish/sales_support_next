@@ -1137,20 +1137,20 @@ export default function DeliveriesPage() {
       {tab === 'addresses' && (
         <div>
           {/* 操作バー */}
-          <div className="flex items-center gap-4 mb-4 sticky top-0 bg-white z-10 py-3">
+          <div className="flex flex-wrap items-center gap-2 md:gap-4 mb-4 sticky top-0 bg-white z-20 py-3">
             <input
               type="text"
               placeholder="メール・名前で検索"
               value={addrSearch}
               onChange={e => { setAddrSearch(e.target.value); setAddrPage(1) }}
-              className="border border-gray-300 rounded px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="border border-gray-300 rounded px-3 py-2 text-sm w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
             <span className="text-sm text-gray-500">
               {addresses
                 ? `全 ${addresses.all_count ?? addresses.total} 件 / 有効 ${addresses.active_count ?? '-'} 件`
                 : ''}
             </span>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="md:ml-auto flex flex-wrap items-center gap-2">
               <button
                 onClick={handleSaveState}
                 disabled={bulkBusy}
@@ -1361,7 +1361,12 @@ export default function DeliveriesPage() {
 
           {/* ページネーション */}
           {addresses && addresses.last_page > 1 && (
-            <div className="flex justify-center gap-2 mt-4">
+            <div className="flex flex-wrap items-center justify-center gap-1 md:gap-2 mt-4">
+              <button
+                disabled={addresses.current_page <= 1}
+                onClick={() => setAddrPage(addresses.current_page - 1)}
+                className="px-3 py-1 rounded text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40"
+              >‹ 前</button>
               {Array.from({ length: addresses.last_page }, (_, i) => i + 1).map(p => (
                 <button
                   key={p}
@@ -1373,6 +1378,11 @@ export default function DeliveriesPage() {
                   {p}
                 </button>
               ))}
+              <button
+                disabled={addresses.current_page >= addresses.last_page}
+                onClick={() => setAddrPage(addresses.current_page + 1)}
+                className="px-3 py-1 rounded text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40"
+              >次 ›</button>
             </div>
           )}
         </div>
@@ -1382,7 +1392,7 @@ export default function DeliveriesPage() {
       {tab === 'campaigns' && (
         <div>
           {/* フィルターバー */}
-          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap gap-3 items-end sticky top-0 z-10">
+          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap gap-3 items-end sticky top-0 z-20">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs text-gray-500 mb-1">件名・案件・受信者で検索</label>
               <input
@@ -1742,7 +1752,12 @@ export default function DeliveriesPage() {
           </div>
 
           {campaigns && campaigns.last_page > 1 && (
-            <div className="flex justify-center gap-2 mt-4">
+            <div className="flex flex-wrap items-center justify-center gap-1 md:gap-2 mt-4">
+              <button
+                disabled={campaigns.current_page <= 1}
+                onClick={() => setCampPage(campaigns.current_page - 1)}
+                className="px-3 py-1 rounded text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40"
+              >‹ 前</button>
               {Array.from({ length: campaigns.last_page }, (_, i) => i + 1).map(p => (
                 <button
                   key={p}
@@ -1754,6 +1769,11 @@ export default function DeliveriesPage() {
                   {p}
                 </button>
               ))}
+              <button
+                disabled={campaigns.current_page >= campaigns.last_page}
+                onClick={() => setCampPage(campaigns.current_page + 1)}
+                className="px-3 py-1 rounded text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40"
+              >次 ›</button>
             </div>
           )}
         </div>
@@ -1763,7 +1783,7 @@ export default function DeliveriesPage() {
       {tab === 'threads' && (
         <div>
           {/* フィルタ */}
-          <div className="flex items-center gap-3 flex-wrap mb-4 sticky top-0 bg-white z-10 py-3">
+          <div className="flex items-center gap-3 flex-wrap mb-4 sticky top-0 bg-white z-20 py-3">
             <select value={threadTypeFilter} onChange={e => { setThreadTypeFilter(e.target.value as '' | 'project' | 'engineer'); setThreadPage(1) }}
               className="text-sm border border-gray-300 rounded-md px-3 py-1.5">
               <option value="">全タイプ</option>
