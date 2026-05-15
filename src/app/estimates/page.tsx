@@ -295,7 +295,7 @@ export default function EstimatesPage() {
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-          <table className="table-fixed w-full text-sm">
+          <table className="table-fixed w-full min-w-[1000px] text-sm">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
                 <SortableHeader label="見積番号"   field="invoice_number" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[200px]" />

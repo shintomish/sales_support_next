@@ -163,8 +163,8 @@ export default function TimesheetsPage() {
 
       {/* テーブル */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(100vh - 320px)' }}>
-          <table className="table-fixed w-full text-sm">
+        <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+          <table className="table-fixed w-full min-w-[900px] text-sm">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
               <tr>
                 <SortableHeader label="取引先"   field="customer" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[140px]" />
