@@ -43,6 +43,9 @@ export default function Sidebar() {
     }
   }, [collapsed]);
 
+  // mobile drawer 開閉 (< md でのみ意味を持つ。永続化しない)
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   const { data: notifData, refetch: refetchNotifications } = useNotifications();
 
   // バッジクリック時に該当 doc_type の通知を既読化して、サーバ側で「誰がいつ消したか」を記録
@@ -207,6 +210,11 @@ export default function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
+  // ページ遷移時：mobile drawer を自動 close (PC では効果なし)
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
   const toggleGroup = (key: string) => {
     setOpenGroups((prev) => {
       const next = new Set(prev);
@@ -292,14 +300,24 @@ export default function Sidebar() {
       {/* トースト通知 */}
       <NotificationToast tasks={overdueTasks} />
 
+      {/* mobile drawer backdrop (md 未満のみ表示) */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          className="md:hidden fixed inset-0 bg-black/50 z-30"
+          aria-hidden="true"
+        />
+      )}
+
       <aside
         className={
-          // md 未満: off-canvas (fixed + -translate-x-full)、Commit 2 で state 制御。
+          // md 未満: off-canvas (fixed)、mobileOpen で開閉。
           // md 以上: 既存挙動完全維持 (sticky + collapsed で w-16/w-64)。
           // 幅は mobile は常に w-64 (collapsed は PC 専用概念)。
           `${collapsed ? 'md:w-16' : 'md:w-64'} w-64 ` +
           `transition-all duration-300 h-screen ` +
-          `fixed inset-y-0 left-0 -translate-x-full z-40 ` +
+          `fixed inset-y-0 left-0 z-40 ` +
+          `${mobileOpen ? 'translate-x-0' : '-translate-x-full'} ` +
           `md:sticky md:top-0 md:translate-x-0 md:z-auto md:inset-auto ` +
           `bg-gray-900 text-white flex flex-col`
         }
