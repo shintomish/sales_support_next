@@ -130,11 +130,11 @@ function SummaryCards({ summary }: { summary: Summary | null }) {
     { label: '月次利益合計', value: fmt(summary.total_profit),    color: 'text-purple-600',  bg: 'bg-purple-50' },
   ];
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 flex-shrink-0">
+    <div className="grid grid-cols-4 gap-2 md:gap-3 mb-2 md:mb-4 flex-shrink-0">
       {cards.map(c => (
-        <div key={c.label} className={`${c.bg} rounded-xl px-4 py-3`}>
-          <p className="text-xs text-gray-500 mb-1">{c.label}</p>
-          <p className={`text-lg font-bold ${c.color}`}>{c.value}</p>
+        <div key={c.label} className={`${c.bg} rounded-xl px-2 py-2 md:px-4 md:py-3`}>
+          <p className="text-[10px] md:text-xs text-gray-500 mb-0.5 md:mb-1 truncate">{c.label}</p>
+          <p className={`text-sm md:text-lg font-bold ${c.color} truncate`}>{c.value}</p>
         </div>
       ))}
     </div>
@@ -418,8 +418,8 @@ function SesContractsPage() {
       {/* リストビュー */}
       {viewMode === 'list' && (
         <>
-          <Card className="mb-3 shadow-sm flex-shrink-0">
-            <CardContent className="py-3 px-4">
+          <Card className="mb-2 md:mb-3 shadow-sm flex-shrink-0">
+            <CardContent className="py-2 px-3 md:py-3 md:px-4">
               <div className="flex gap-2 items-center flex-wrap">
                 <div className="relative flex-1 min-w-48">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
