@@ -1461,7 +1461,8 @@ export default function DeliveriesPage() {
             )}
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg overflow-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+          <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
             <table className="text-sm w-[1100px] min-w-[1100px]">
               <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
                 <tr>
@@ -1747,6 +1748,7 @@ export default function DeliveriesPage() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
 
           {campaigns && campaigns.last_page > 1 && (
