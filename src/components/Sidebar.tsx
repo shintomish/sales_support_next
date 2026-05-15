@@ -292,7 +292,18 @@ export default function Sidebar() {
       {/* トースト通知 */}
       <NotificationToast tasks={overdueTasks} />
 
-      <aside className={`${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 h-screen sticky top-0 bg-gray-900 text-white flex flex-col`}>
+      <aside
+        className={
+          // md 未満: off-canvas (fixed + -translate-x-full)、Commit 2 で state 制御。
+          // md 以上: 既存挙動完全維持 (sticky + collapsed で w-16/w-64)。
+          // 幅は mobile は常に w-64 (collapsed は PC 専用概念)。
+          `${collapsed ? 'md:w-16' : 'md:w-64'} w-64 ` +
+          `transition-all duration-300 h-screen ` +
+          `fixed inset-y-0 left-0 -translate-x-full z-40 ` +
+          `md:sticky md:top-0 md:translate-x-0 md:z-auto md:inset-auto ` +
+          `bg-gray-900 text-white flex flex-col`
+        }
+      >
         {/* ロゴ + トグルボタン */}
         <div className={`${collapsed ? 'p-3' : 'p-6'} border-b border-gray-700 flex items-center justify-between gap-2`}>
           {!collapsed && (
