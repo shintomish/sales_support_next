@@ -376,7 +376,77 @@ export default function PurchaseOrdersPage() {
         </Button>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      {/* mobile: カード一覧 (< md) */}
+      <div className="md:hidden bg-white border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+        {loading ? (
+          <div className="px-4 py-8 text-center text-gray-400">読み込み中...</div>
+        ) : sortedItems.length === 0 ? (
+          <div className="px-4 py-8 text-center text-gray-400">注文書がありません</div>
+        ) : sortedItems.map((r) => (
+          <div key={r.id} className="px-3 py-3 hover:bg-blue-50">
+            <div className="flex items-center justify-between gap-2">
+              <Link href={`/purchase-orders/${r.id}`} className="font-mono text-xs text-blue-700 hover:underline truncate">
+                {r.invoice_number}
+              </Link>
+              <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium ${APPROVAL_BADGE_CLASS[r.approval_status]}`}>
+                {APPROVAL_LABEL[r.approval_status]}
+              </span>
+            </div>
+            <div className="mt-1 text-sm text-gray-800 truncate" title={r.customer_name_snapshot ?? r.customer?.company_name ?? ''}>
+              {r.customer_name_snapshot ?? r.customer?.company_name ?? '-'}
+            </div>
+            <div className="text-xs text-gray-500 truncate" title={r.subject_name ?? ''}>
+              {r.subject_name ?? '-'}
+            </div>
+            <div className="mt-1 flex items-center justify-between text-xs">
+              <span className="text-gray-500">{r.year_month} / 注文日 {r.issued_date}</span>
+              <span className="font-semibold tabular-nums text-gray-900">{yen(r.total)}</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <div className="flex gap-3 flex-wrap">
+                {r.pdf_path && (
+                  <a href={r.pdf_path} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">📄 注文書</a>
+                )}
+                {r.acknowledgement_pdf_path && (
+                  <a href={r.acknowledgement_pdf_path} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">📄 請書</a>
+                )}
+                <Link href={`/purchase-orders/${r.id}`} className="text-xs text-gray-700 hover:underline">詳細</Link>
+                <button
+                  onClick={() => handleDuplicate(r.id)}
+                  disabled={busyId === r.id}
+                  className="text-xs text-indigo-600 hover:underline disabled:opacity-50"
+                >複写</button>
+              </div>
+              <div className="flex gap-2">
+                {(r.approval_status === 'draft' || r.approval_status === 'rejected') && (
+                  <button
+                    onClick={() => handleSubmit(r.id)}
+                    disabled={busyId === r.id}
+                    className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                  >{busyId === r.id ? '処理中…' : '申請'}</button>
+                )}
+                {r.approval_status === 'pending' && canApprove && (
+                  <>
+                    <button
+                      onClick={() => handleApprove(r.id)}
+                      disabled={busyId === r.id}
+                      className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                    >承認</button>
+                    <button
+                      onClick={() => handleReject(r.id)}
+                      disabled={busyId === r.id}
+                      className="text-xs text-rose-600 hover:underline disabled:opacity-50"
+                    >却下</button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* PC: テーブル (md+) */}
+      <div className="hidden md:block bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
           <table className="table-fixed w-full min-w-[1000px] text-sm">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">

@@ -158,7 +158,58 @@ export default function PurchaseOrderSendHistoriesPage() {
         </Button>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      {/* mobile: カード一覧 (< md) */}
+      <div className="md:hidden bg-white border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+        {loading ? (
+          <div className="px-4 py-8 text-center text-gray-400">読み込み中...</div>
+        ) : sortedItems.length === 0 ? (
+          <div className="px-4 py-8 text-center text-gray-400">送信履歴はありません</div>
+        ) : sortedItems.map((r) => (
+          <div key={r.id} className="px-3 py-3 hover:bg-blue-50">
+            <div className="flex items-center justify-between gap-2">
+              {r.invoice_id ? (
+                <Link href={`/purchase-orders/${r.invoice_id}`} className="font-mono text-xs text-blue-700 hover:underline truncate">
+                  {r.invoice_number}
+                </Link>
+              ) : (
+                <span className="font-mono text-xs text-gray-400">-</span>
+              )}
+              <div className="flex gap-1 flex-shrink-0">
+                <span className={`px-1.5 py-0.5 rounded text-[10px] ${r.method === 'mail' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {r.method === 'mail' ? '📧' : '📮'}
+                </span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] ${r.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {r.status === 'sent' ? (r.method === 'post' ? '発送済' : '送信済') : '失敗'}
+                </span>
+              </div>
+            </div>
+            <div className="mt-1 text-sm text-gray-800 truncate" title={r.customer_name ?? ''}>
+              {r.customer_name ?? '-'}
+            </div>
+            <div className="text-xs text-gray-500 truncate" title={r.invoice_subject_name ?? ''}>
+              {r.invoice_subject_name ?? '-'}
+            </div>
+            <div className="text-xs text-gray-500 truncate" title={r.to_emails?.join(', ')}>
+              TO: {r.to_names && r.to_names.length > 0 ? r.to_names.join(', ') : (r.to_emails?.join(', ') ?? '-')}
+            </div>
+            <div className="mt-1 flex items-center justify-between text-xs">
+              <span className="text-gray-500">
+                {r.invoice_year_month ?? '-'} / {fmtDateTime(r.method === 'post' ? r.created_at : r.sent_at)}
+              </span>
+              <span className="font-semibold tabular-nums text-gray-900">{yen(r.invoice_total)}</span>
+            </div>
+            <div className="mt-1 text-xs text-gray-500 flex gap-3">
+              <span>送信者: {r.sent_by_name ?? '-'}</span>
+              {r.attachments_meta && r.attachments_meta.length > 0 && (
+                <span>📎 {r.attachments_meta.length}件</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* PC: テーブル (md+) */}
+      <div className="hidden md:block bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
           <table className="w-full min-w-[1000px] text-sm table-fixed">
             <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
