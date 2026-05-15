@@ -1462,7 +1462,7 @@ export default function DeliveriesPage() {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg overflow-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-            <table className="text-sm" style={{ width: '1100px', minWidth: '1100px', tableLayout: 'fixed' }}>
+            <table className="text-sm" style={{ width: '100%', minWidth: '1100px', tableLayout: 'fixed' }}>
               <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
                 <tr>
                   <th className="px-2 py-3 w-8" />
@@ -1481,10 +1481,10 @@ export default function DeliveriesPage() {
                         sortField={campSortBy}
                         sortOrder={campSortDir}
                         onSort={(f) => handleCampSort(f as CampSortBy)}
-                        className={`px-4 py-3 ${col === 'subject' ? '' : col === 'project_title' ? 'w-24' : col === 'sent_at' ? 'w-[90px] whitespace-nowrap' : ''}`}
+                        className={`px-4 py-3 ${col === 'subject' ? '' : col === 'project_title' ? 'w-24' : col === 'sent_at' ? 'w-[130px] whitespace-nowrap' : ''}`}
                       />
                       {col === 'sent_at' && (
-                        <th className="px-4 py-3 text-left w-[90px] whitespace-nowrap">再送信日時</th>
+                        <th className="px-4 py-3 text-left w-[110px] whitespace-nowrap">再送信日時</th>
                       )}
                     </Fragment>
                   ))}
