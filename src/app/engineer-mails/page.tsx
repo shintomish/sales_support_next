@@ -559,9 +559,9 @@ export default function EngineerMailsPage() {
   // ── 要確認モード ──────────────────────────────────────────
   if (statusFilter === 'review') {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="flex flex-col h-full bg-gray-50">
         {/* ヘッダー */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-10">
+        <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex-shrink-0">
           <div className="flex items-center gap-3 mb-3">
             <h1 className="text-lg font-semibold text-gray-900">要確認技術者メール</h1>
             {items && (
@@ -611,8 +611,8 @@ export default function EngineerMailsPage() {
           {scoreMsg && <p className="text-xs text-teal-700 mt-2 font-medium">{scoreMsg}</p>}
         </div>
 
-        {/* リスト */}
-        <div className="max-w-4xl mx-auto px-6 py-4 space-y-2">
+        {/* リスト (flex-1 でスクロール) */}
+        <div className="flex-1 overflow-y-auto max-w-4xl mx-auto w-full px-4 md:px-6 py-3 md:py-4 space-y-2">
           {items?.data.length === 0 && (
             <div className="text-center py-16 text-gray-400">
               <p className="text-4xl mb-3">✅</p>
@@ -648,8 +648,8 @@ export default function EngineerMailsPage() {
   return (
     <div className="flex h-screen bg-gray-50">
 
-      {/* 左ペイン */}
-      <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
+      {/* 左ペイン (mobile では選択時に非表示) */}
+      <div className={`${selected ? 'hidden md:flex' : 'flex'} w-full md:w-96 bg-white border-r border-gray-200 flex-col`}>
         <div className="p-4 border-b border-gray-200 space-y-3">
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-semibold text-gray-900">技術者メール</h1>
@@ -766,16 +766,23 @@ export default function EngineerMailsPage() {
         )}
       </div>
 
-      {/* 右ペイン */}
-      <div className="flex-1 overflow-y-auto">
+      {/* 右ペイン (mobile では選択時のみ表示) */}
+      <div className={`${selected ? 'flex' : 'hidden md:flex'} flex-1 overflow-y-auto`}>
         {selected ? (
-          <div className="p-6 max-w-3xl mx-auto space-y-5">
+          <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4 md:space-y-5 w-full">
+
+            {/* mobile: 戻るボタン */}
+            <button
+              onClick={() => setSelected(null)}
+              className="md:hidden text-sm text-blue-600 hover:underline">
+              ← 一覧に戻る
+            </button>
 
             {/* ── ヘッダー ── */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               {/* 技術者名 + スコア */}
-              <div className="px-5 py-4 border-b border-gray-100">
-                <div className="flex items-start justify-between gap-3">
+              <div className="px-4 md:px-5 py-3 md:py-4 border-b border-gray-100">
+                <div className="flex flex-wrap items-start justify-between gap-2 md:gap-3">
                   <div className="flex-1 min-w-0">
                     <h2 className="text-base font-bold text-gray-800 leading-snug mb-1">
                       {selected.name || selected.email?.subject || `技術者メール #${selected.id}`}
@@ -863,7 +870,7 @@ export default function EngineerMailsPage() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                   <FormRow label="氏名">
                     <input value={form.name ?? ''} onChange={e => set('name', e.target.value || null)}
                       className="form-input" placeholder="田中 太郎" />
@@ -878,7 +885,7 @@ export default function EngineerMailsPage() {
                   </FormRow>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                   <FormRow label="稼働開始日">
                     <input value={form.available_from ?? ''} onChange={e => set('available_from', e.target.value || null)}
                       className="form-input" placeholder="即日 / 2026-06-01" />
@@ -889,7 +896,7 @@ export default function EngineerMailsPage() {
                   </FormRow>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                   <FormRow label="希望単価（下限）">
                     <div className="flex items-center gap-1">
                       <input
@@ -1189,7 +1196,7 @@ export default function EngineerMailsPage() {
                   {proposalModal.error && (
                     <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{proposalModal.error}</p>
                   )}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">担当者名（宛名）</label>
                       <input
@@ -1336,15 +1343,15 @@ function ReviewRow({
 
   return (
     <div className={`bg-white rounded-xl border transition-all ${expanded ? 'border-yellow-400 shadow-md' : 'border-gray-200 hover:border-gray-300'}`}>
-      {/* サマリー行 */}
-      <div className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none" onClick={onExpand}>
+      {/* サマリー行: mobile は 2 段組 (上=バッジ+アクション / 下=タイトル) */}
+      <div className="flex flex-wrap md:flex-nowrap items-center gap-2 md:gap-3 px-3 md:px-4 py-3 cursor-pointer select-none" onClick={onExpand}>
         {/* スコアバッジ */}
-        <span className={`flex-shrink-0 text-xs font-bold px-2 py-1 rounded-lg w-16 text-center ${rank.cls}`}>
+        <span className={`flex-shrink-0 text-xs font-bold px-2 py-1 rounded-lg w-14 md:w-16 text-center ${rank.cls}`}>
           {rank.label} {item.score}
         </span>
 
         {/* 名前・スキル */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 order-2 md:order-none basis-full md:basis-auto">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-gray-800 truncate">
               {item.name || item.email?.from_name || '(件名なし)'}
@@ -1381,8 +1388,8 @@ function ReviewRow({
           {formatReceivedAt(item.received_at)}
         </span>
 
-        {/* アクションボタン */}
-        <div className="flex gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+        {/* アクションボタン (mobile はラップして右上) */}
+        <div className="flex gap-1.5 flex-shrink-0 ml-auto md:ml-0" onClick={e => e.stopPropagation()}>
           <button
             onClick={() => onQuickStatus(item.id, 'new')}
             className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg hover:bg-teal-700 font-medium whitespace-nowrap">

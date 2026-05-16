@@ -117,13 +117,13 @@ function ContactsPage() {
   const hasFilter = !!(search || customerFilter);
 
   return (
-    <div className="flex flex-col h-screen py-8 px-6 max-w-7xl mx-auto">
+    <div className="flex flex-col h-screen py-4 md:py-8 px-4 md:px-6 max-w-7xl mx-auto">
 
       {/* ── タイトル ── */}
-      <div className="flex justify-between items-center mb-6 flex-shrink-0">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-4 md:mb-6 flex-shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">担当者一覧</h1>
-          {meta && <p className="text-sm text-gray-400 mt-0.5">全 {meta.total} 件{hasFilter && ' （絞り込み中）'}</p>}
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800">担当者一覧</h1>
+          {meta && <p className="text-xs md:text-sm text-gray-400 mt-0.5">全 {meta.total} 件{hasFilter && ' （絞り込み中）'}</p>}
         </div>
         <Button onClick={() => router.push('/contacts/create')} className="gap-1">
           <span className="text-base">＋</span> 新規登録
@@ -151,8 +151,34 @@ function ContactsPage() {
         </CardContent>
       </Card>
 
-      {/* ── テーブル（ボディのみスクロール） ── */}
-      <Card className="shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+      {/* ── mobile: カード一覧 (< md) ── */}
+      <div className="md:hidden flex-1 min-h-0 overflow-y-auto bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+        {contacts.length === 0 ? (
+          <div className="px-4 py-8 text-center text-gray-400">
+            {hasFilter ? '条件に一致する担当者が見つかりません' : '担当者が登録されていません'}
+          </div>
+        ) : contacts.map((c) => (
+          <div key={c.id}
+            onClick={() => router.push(`/contacts/${c.id}`)}
+            className="px-3 py-3 cursor-pointer hover:bg-blue-50/60">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-blue-600 flex-1 min-w-0 truncate">{c.name}</p>
+              {c.position && <span className="text-[10px] text-gray-500 flex-shrink-0">{c.position}</span>}
+            </div>
+            <p className="mt-0.5 text-xs text-gray-600 truncate">
+              {c.customer?.company_name ?? '—'}
+              {c.department && ` / ${c.department}`}
+            </p>
+            <div className="mt-1 flex items-center justify-between text-xs gap-2 text-gray-500">
+              <span className="truncate">{c.email ?? '—'}</span>
+              {c.phone && <span className="whitespace-nowrap flex-shrink-0">☎ {c.phone}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── PC: テーブル（ボディのみスクロール） ── */}
+      <Card className="hidden md:flex shadow-sm overflow-hidden flex-col flex-1 min-h-0">
         <CardContent className="p-0 flex flex-col h-full overflow-hidden">
 
           {/* テーブルヘッダー（固定） */}

@@ -166,8 +166,8 @@ export default function EmailsPage() {
   return (
     <div className="flex h-screen bg-gray-50">
 
-      {/* 左ペイン: 一覧 */}
-      <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
+      {/* 左ペイン: 一覧 (mobile では選択時に非表示) */}
+      <div className={`${selectedEmail ? 'hidden md:flex' : 'flex'} w-full md:w-96 bg-white border-r border-gray-200 flex-col`}>
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -288,15 +288,21 @@ export default function EmailsPage() {
         )}
       </div>
 
-      {/* 右ペイン: 詳細 */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* 右ペイン: 詳細 (mobile では選択時のみ表示) */}
+      <div className={`${selectedEmail ? 'flex' : 'hidden md:flex'} flex-1 flex-col overflow-hidden`}>
         {selectedEmail ? (
           <div className="flex-1 overflow-y-auto">
-            <div className="p-6">
+            <div className="p-4 md:p-6">
+              {/* mobile: 戻るボタン */}
+              <button
+                onClick={() => setSelectedEmail(null)}
+                className="md:hidden mb-3 text-sm text-blue-600 hover:underline">
+                ← 一覧に戻る
+              </button>
               {/* メタ情報 */}
               <div className="mb-4">
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <h2 className="text-xl font-semibold text-gray-900 flex-1">
+                <div className="flex flex-wrap items-start justify-between gap-2 md:gap-4 mb-3">
+                  <h2 className="text-lg md:text-xl font-semibold text-gray-900 flex-1 min-w-0">
                     {selectedEmail.subject || '(件名なし)'}
                   </h2>
                   {selectedEmail.category && CATEGORY_BADGE[selectedEmail.category] && (

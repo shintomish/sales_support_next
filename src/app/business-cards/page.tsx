@@ -97,20 +97,20 @@ export default function BusinessCardsPage() {
   );
 
   return (
-    <div className="flex flex-col h-screen py-8 px-6 max-w-7xl mx-auto">
+    <div className="flex flex-col h-screen py-4 md:py-8 px-4 md:px-6 max-w-7xl mx-auto">
 
       {/* ── タイトル ── */}
-      <div className="flex justify-between items-center mb-6 flex-shrink-0">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-4 md:mb-6 flex-shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">名刺管理</h1>
-          <p className="text-sm text-gray-400 mt-0.5">全 {cards.length}件</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800">名刺管理</h1>
+          <p className="text-xs md:text-sm text-gray-400 mt-0.5">全 {cards.length}件</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
             <Input
-              className="pl-8 bg-white w-64"
-              placeholder="会社名・氏名・部署・役職・メールで検索"
+              className="pl-8 bg-white w-48 md:w-64"
+              placeholder="会社名・氏名で検索"
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
             />
@@ -121,8 +121,55 @@ export default function BusinessCardsPage() {
         </div>
       </div>
 
-      {/* ── テーブル（ボディのみスクロール） ── */}
-      <Card className="shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+      {/* ── mobile: カード一覧 (< md) ── */}
+      <div className="md:hidden flex-1 min-h-0 overflow-y-auto bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+        {cards.length === 0 ? (
+          <div className="px-4 py-8 text-center text-gray-400">名刺が登録されていません</div>
+        ) : cards.map((card) => {
+          const statusStyle = STATUS_STYLE[card.status] ?? { label: card.status, bg: '#F1F5F9', color: '#475569' };
+          return (
+            <div key={card.id}
+              onClick={() => router.push(`/business-cards/${card.id}`)}
+              className="px-3 py-3 cursor-pointer hover:bg-blue-50/60 flex gap-3">
+              {card.image_path ? (
+                <Image
+                  src={card.image_path.startsWith('http')
+                    ? card.image_path
+                    : `${process.env.NEXT_PUBLIC_API_URL}/storage/${card.image_path}`}
+                  alt={`${card.person_name ?? ''}の名刺`}
+                  width={64} height={44}
+                  className="h-11 w-16 object-cover rounded-md shadow-sm border border-gray-100 flex-shrink-0"
+                  unoptimized />
+              ) : (
+                <div className="h-11 w-16 bg-gray-100 rounded-md flex items-center justify-center border border-gray-200 flex-shrink-0">
+                  <span className="text-[10px] text-gray-400">画像なし</span>
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-gray-800 truncate">
+                    {card.person_name ?? card.company_name ?? '—'}
+                  </p>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0"
+                    style={{ backgroundColor: statusStyle.bg, color: statusStyle.color }}>
+                    {statusStyle.label}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 truncate">
+                  {card.company_name ?? '—'}
+                  {card.position && ` / ${card.position}`}
+                </p>
+                <p className="text-xs text-gray-400 truncate">
+                  {card.email ?? card.mobile ?? card.phone ?? '—'}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── PC: テーブル（ボディのみスクロール） ── */}
+      <Card className="hidden md:flex shadow-sm overflow-hidden flex-col flex-1 min-h-0">
         <CardContent className="p-0 flex flex-col h-full overflow-hidden">
 
           {/* テーブルヘッダー（固定） */}

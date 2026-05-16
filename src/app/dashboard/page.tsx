@@ -119,16 +119,16 @@ export default function DashboardPage() {
     .map(p => ({ name: p.status, value: p.count, color: PIPELINE_COLORS[p.status] ?? '#94A3B8' }));
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-6">
+    <div className="max-w-7xl mx-auto py-4 md:py-6 px-4 md:px-6">
 
       {/* ヘッダー */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">ダッシュボード</h1>
-        <span className="text-sm text-gray-400">📅 {today}</span>
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-4 md:mb-6">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-800">ダッシュボード</h1>
+        <span className="text-xs md:text-sm text-gray-400">📅 {today}</span>
       </div>
 
       {/* ── KPIカード ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-6">
         {[
           { label: '総顧客数',     value: kpi.customers.toLocaleString(),      unit: '社',  bg: '#EFF6FF', color: '#2563EB', icon: '🏢' },
           { label: '進行中の商談', value: kpi.deals_active.toLocaleString(),   unit: '件',  bg: '#FFF3E0', color: '#FF8C00', icon: '💼' },
@@ -136,14 +136,14 @@ export default function DashboardPage() {
           { label: '今月の売上',   value: formatManEn(kpi.revenue_this_month), unit: '万円', bg: '#FDF2F8', color: '#DB2777', icon: '¥'  },
         ].map(({ label, value, unit, bg, color, icon }) => (
           <Card key={label} className="shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{label}</p>
-                  <p className="text-2xl font-bold text-gray-800 leading-none">{value}</p>
+            <CardContent className="p-3 md:p-4">
+              <div className="flex justify-between items-start gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] md:text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1 md:mb-2 truncate">{label}</p>
+                  <p className="text-xl md:text-2xl font-bold text-gray-800 leading-none">{value}</p>
                   <p className="text-xs text-gray-400 mt-1">{unit}</p>
                 </div>
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
+                <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg flex items-center justify-center text-base md:text-lg flex-shrink-0"
                      style={{ backgroundColor: bg, color }}>
                   {icon}
                 </div>
@@ -154,12 +154,12 @@ export default function DashboardPage() {
       </div>
 
       {/* ── クイックアクション ── */}
-      <Card className="mb-6 shadow-sm">
+      <Card className="mb-4 md:mb-6 shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-base text-gray-700">⚡ クイックアクション</CardTitle>
         </CardHeader>
         <CardContent className="pb-4">
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex gap-2 md:gap-3 flex-wrap">
             {QUICK_ACTIONS.map(({ label, href, icon, bg, color }) => (
               <button key={href} onClick={() => router.push(href)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-100 text-sm font-medium transition-all hover:shadow-md active:scale-95"
@@ -172,7 +172,7 @@ export default function DashboardPage() {
       </Card>
 
       {/* ── 月別売上 & 商談円グラフ ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-4 md:mb-6">
 
         {/* 月別売上棒グラフ */}
         <Card className="md:col-span-2 shadow-sm">
@@ -218,7 +218,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── 期限タスク & 活動履歴 & 今月成約 ── */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 md:gap-4">
 
         {/* 期限が近いタスク */}
         <Card className="md:col-span-2 shadow-sm flex flex-col" style={{ maxHeight: 280 }}>

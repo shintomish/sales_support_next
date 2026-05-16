@@ -115,13 +115,13 @@ function CustomersPage() {
   const hasFilter = !!(search || industryFilter || typeFilter);
 
   return (
-    <div className="flex flex-col h-screen py-8 px-6 max-w-7xl mx-auto">
+    <div className="flex flex-col h-screen py-4 md:py-8 px-4 md:px-6 max-w-7xl mx-auto">
 
       {/* ── タイトル ── */}
-      <div className="flex justify-between items-center mb-6 flex-shrink-0">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-4 md:mb-6 flex-shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">顧客一覧</h1>
-          {meta && <p className="text-sm text-gray-400 mt-0.5">全 {meta.total} 件{hasFilter && ' （絞り込み中）'}</p>}
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800">顧客一覧</h1>
+          {meta && <p className="text-xs md:text-sm text-gray-400 mt-0.5">全 {meta.total} 件{hasFilter && ' （絞り込み中）'}</p>}
         </div>
         <Button onClick={() => router.push('/customers/create')} className="gap-1">
           <span className="text-base">＋</span> 新規登録
@@ -159,8 +159,38 @@ function CustomersPage() {
         </CardContent>
       </Card>
 
-      {/* ── テーブル（ボディのみスクロール） ── */}
-      <Card className="shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+      {/* ── mobile: カード一覧 (< md) ── */}
+      <div className="md:hidden flex-1 min-h-0 overflow-y-auto bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+        {customers.length === 0 ? (
+          <div className="px-4 py-8 text-center text-gray-400">
+            {hasFilter ? '条件に一致する顧客が見つかりません' : '顧客が登録されていません'}
+          </div>
+        ) : customers.map((c) => (
+          <div key={c.id}
+            onClick={() => router.push(`/customers/${c.id}`)}
+            className="px-3 py-3 cursor-pointer hover:bg-blue-50/60">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-semibold text-blue-600 flex-1 min-w-0 truncate">{c.company_name}</p>
+              <div className="flex gap-1 flex-shrink-0">
+                {c.is_customer && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">売上先</span>}
+                {c.is_supplier && <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">仕入先</span>}
+              </div>
+            </div>
+            <div className="mt-1 flex items-center justify-between text-xs gap-2 text-gray-500">
+              <span className="truncate">
+                {c.industry ?? '—'}
+                {c.phone && ` / ☎ ${c.phone}`}
+              </span>
+              <span className="text-gray-400 whitespace-nowrap flex-shrink-0">
+                {new Date(c.created_at).toLocaleDateString('ja-JP')}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── PC: テーブル（ボディのみスクロール） ── */}
+      <Card className="hidden md:flex shadow-sm overflow-hidden flex-col flex-1 min-h-0">
         <CardContent className="p-0 flex flex-col h-full overflow-hidden">
 
           {/* テーブルヘッダー（固定） */}

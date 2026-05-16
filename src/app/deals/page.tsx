@@ -293,14 +293,14 @@ function DealsPage() {
   }, {});
 
   return (
-    <div className="flex flex-col h-screen py-8 px-6 max-w-[1400px] mx-auto">
+    <div className="flex flex-col h-screen py-4 md:py-8 px-4 md:px-6 max-w-[1400px] mx-auto">
 
       {/* ── タイトル ── */}
-      <div className="flex justify-between items-center mb-6 flex-shrink-0">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-4 md:mb-6 flex-shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">商談管理</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800">商談管理</h1>
           {meta && (
-            <p className="text-sm text-gray-400 mt-0.5">
+            <p className="text-xs md:text-sm text-gray-400 mt-0.5">
               {userFilter !== 'all' && grandTotal !== null
                 ? `${grandTotal}件中 ${meta.total}件`
                 : `全 ${meta.total}件`}
@@ -308,7 +308,7 @@ function DealsPage() {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
           {/* ビュー切り替えタブ */}
           <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-gray-50 p-0.5 gap-0.5">
             <button
@@ -401,8 +401,42 @@ function DealsPage() {
             </CardContent>
           </Card>
 
-          {/* テーブル */}
-          <Card className="shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+          {/* mobile: カード一覧 (< md) */}
+          <div className="md:hidden flex-1 min-h-0 overflow-y-auto bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+            {deals.length === 0 ? (
+              <div className="px-4 py-8 text-center text-gray-400">
+                {hasFilter ? '条件に一致する商談が見つかりません' : '商談が登録されていません'}
+              </div>
+            ) : deals.map((d) => {
+              const cfg = STATUS_CONFIG[d.status] ?? STATUS_CONFIG['新規'];
+              return (
+                <div key={d.id}
+                  onClick={() => router.push(`/deals/${d.id}`)}
+                  className="px-3 py-3 cursor-pointer hover:bg-blue-50/60">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-blue-600 flex-1 min-w-0 truncate">{d.title}</p>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0"
+                      style={{ backgroundColor: cfg.bg, color: cfg.color }}>{d.status}</span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-gray-600 truncate">
+                    {d.customer?.company_name ?? '—'}
+                  </p>
+                  <div className="mt-1 flex items-center justify-between text-xs gap-2">
+                    <span className="font-semibold text-gray-700">¥{Number(d.amount).toLocaleString()}</span>
+                    <div className="flex items-center gap-2 text-gray-500">
+                      {d.probability != null && <span>{d.probability}%</span>}
+                      {d.expected_close_date && (
+                        <span className="whitespace-nowrap">📅 {new Date(d.expected_close_date).toLocaleDateString('ja-JP')}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* PC: テーブル */}
+          <Card className="hidden md:flex shadow-sm overflow-hidden flex-col flex-1 min-h-0">
             <CardContent className="p-0 flex flex-col h-full overflow-hidden">
               <div className="flex-shrink-0 border-b bg-gray-50">
                 <table className="w-full text-sm table-fixed">
