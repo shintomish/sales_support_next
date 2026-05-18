@@ -602,6 +602,11 @@ export default function DeliveriesPage() {
   const [sendForm, setSendForm] = useState({ project_mail_id: '', engineer_mail_source_id: '', source_email: '', subject: '【案件ご紹介】', body: applyTemplate(TEMPLATE_PROJECT, null) })
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [dupWarn, setDupWarn] = useState<{
+    sourceEmail: string
+    sourceDomain: string
+    matches: Array<{ id: number; email: string; name: string | null }>
+  } | null>(null)
   const [mailBodyText, setMailBodyText] = useState('')
   const [mailBodyOpen, setMailBodyOpen] = useState(false)
 
@@ -1047,21 +1052,7 @@ export default function DeliveriesPage() {
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   const sourceEmailInvalid = !isLinked && sendForm.source_email !== '' && !EMAIL_RE.test(sendForm.source_email)
 
-  const handleSend = async () => {
-    if (!sendForm.subject || !sendForm.body) return
-    if (unresolvedPlaceholders.length > 0) {
-      alert(`未置換のプレースホルダがあります:\n${unresolvedPlaceholders.join(' / ')}\n\nメール署名設定（/settings/email-template）を確認してください。`)
-      return
-    }
-    if (!isLinked && !sendForm.source_email) {
-      alert('入手元アドレスを入力してください。\n（案件・技術者を紐づける場合は不要です）')
-      return
-    }
-    if (sourceEmailInvalid) {
-      alert('入手元アドレスのメール形式が正しくありません。')
-      return
-    }
-    if (!confirm(`配信先リスト全員（有効件数）にメールを送信します。よろしいですか？`)) return
+  const execSendBulk = async () => {
     setSending(true)
     setSendResult(null)
     try {
@@ -1086,6 +1077,45 @@ export default function DeliveriesPage() {
       setSendResult({ success: false, message: `エラー: ${(err as ApiError).response?.data?.message ?? (err as ApiError).message}` })
       setSending(false)
     }
+  }
+
+  const handleSend = async () => {
+    if (!sendForm.subject || !sendForm.body) return
+    if (unresolvedPlaceholders.length > 0) {
+      alert(`未置換のプレースホルダがあります:\n${unresolvedPlaceholders.join(' / ')}\n\nメール署名設定（/settings/email-template）を確認してください。`)
+      return
+    }
+    if (!isLinked && !sendForm.source_email) {
+      alert('入手元アドレスを入力してください。\n（案件・技術者を紐づける場合は不要です）')
+      return
+    }
+    if (sourceEmailInvalid) {
+      alert('入手元アドレスのメール形式が正しくありません。')
+      return
+    }
+
+    // 配信先リスト内に source メールと同一ドメインの宛先が含まれていないかバックエンドで確認
+    try {
+      const checkRes = await axios.post('/api/v1/delivery-campaigns/check-duplicates', {
+        project_mail_id:         deliveryType === 'project'  ? (sendForm.project_mail_id || null) : null,
+        engineer_mail_source_id: deliveryType === 'engineer' ? (sendForm.engineer_mail_source_id || null) : null,
+        source_email:            !isLinked ? (sendForm.source_email || null) : null,
+      })
+      const matches: Array<{ id: number; email: string; name: string | null }> = checkRes.data?.matches ?? []
+      if (matches.length > 0) {
+        setDupWarn({
+          sourceEmail:  checkRes.data?.source_email ?? '',
+          sourceDomain: checkRes.data?.source_domain ?? '',
+          matches,
+        })
+        return
+      }
+    } catch {
+      // check 失敗時はサイレントに通常確認に進む（送信そのものは止めない）
+    }
+
+    if (!confirm(`配信先リスト全員（有効件数）にメールを送信します。よろしいですか？`)) return
+    await execSendBulk()
   }
 
   // ── ソート切替 ────────────────────────────────────────
@@ -2526,6 +2556,55 @@ export default function DeliveriesPage() {
                 className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
               >
                 {newFormSaving ? '登録中...' : '登録'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 新規配信 重複ドメイン警告モーダル ──────────── */}
+      {dupWarn && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={() => setDupWarn(null)}>
+          <div onClick={e => e.stopPropagation()} className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="bg-red-50 px-5 py-3 border-b border-red-200">
+              <p className="text-sm font-bold text-red-700">⚠️ 元請けドメインが配信先に含まれています</p>
+            </div>
+            <div className="px-5 py-4 text-sm text-gray-700 space-y-3">
+              <p>
+                入手元 <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{dupWarn.sourceEmail}</span>
+                {' '}と同一ドメイン <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{dupWarn.sourceDomain}</span>{' '}
+                のアクティブ配信先が <span className="font-bold">{dupWarn.matches.length}</span> 件あります:
+              </p>
+              <ul className="max-h-40 overflow-y-auto text-xs bg-gray-50 rounded p-2 border border-gray-200 space-y-1">
+                {dupWarn.matches.slice(0, 10).map(m => (
+                  <li key={m.id} className="font-mono">
+                    {m.email}{m.name ? ` （${m.name}）` : ''}
+                  </li>
+                ))}
+                {dupWarn.matches.length > 10 && (
+                  <li className="text-gray-500 italic">他 {dupWarn.matches.length - 10} 件...</li>
+                )}
+              </ul>
+              <p className="text-xs text-red-600">
+                同じ案件を元請けに配信すると、抜き額が露呈する恐れがあります。
+              </p>
+              <p>本当に配信しますか？</p>
+            </div>
+            <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+              <button
+                onClick={() => setDupWarn(null)}
+                className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={async () => {
+                  setDupWarn(null)
+                  await execSendBulk()
+                }}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg"
+              >
+                配信する
               </button>
             </div>
           </div>
