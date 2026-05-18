@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 import OriginalMailAccordion from '@/components/OriginalMailAccordion'
-import { pickMailBody, buildEmailBody, type EmailBodyTemplate } from '@/lib/mailBody'
+import { pickMailBody, buildEmailBody, extractRecipientName, type EmailBodyTemplate } from '@/lib/mailBody'
 
 // ── 型定義 ──────────────────────────────────────────
 interface EngineerMail {
@@ -603,14 +603,17 @@ export default function EngineerMailMatchingPage() {
     setGeneratingId(project.project_id)
     try {
       const res = await axios.post(`/api/v1/engineer-mails/${id}/generate-proposal`, { project_id: project.project_id })
-      const greeting = `${res.data.to_name ? res.data.to_name + ' 様' : project.sales_contact ? project.sales_contact + ' 様' : '●● 様'}`
+      // 宛先名: API応答 → 案件営業担当 → 紹介元PMS本文の署名 から推測
+      const bodyName = extractRecipientName(project.pms_email_body)
+      const recipientName = res.data.to_name ?? project.sales_contact ?? bodyName ?? ''
+      const greeting = recipientName ? `${recipientName} 様` : '●● 様'
       const mainContentWithBlock = (res.data.body ?? '') + buildEngineerInfoBlock(mail)
       const wrappedBody = buildEmailBody(greeting, mainContentWithBlock, emailTemplate)
       setProposalDraft({
         subject: res.data.subject ?? `【技術者ご紹介】${mail?.name ?? '弊社技術者'} - ${project.project_title ?? ''}`,
         body: wrappedBody,
         to_address: res.data.to_address ?? project.to_email,
-        to_name: res.data.to_name ?? project.sales_contact,
+        to_name: recipientName,
         project_id: project.project_id,
         original_mail_body: project.pms_email_body,
         original_mail_label: '紹介元案件メール 本文',
@@ -627,14 +630,15 @@ export default function EngineerMailMatchingPage() {
   // 鮮度モード: 個別提案 (PMS送信者宛て)
   const handleGenerateProposalFromPms = (item: FreshPms) => {
     if (!item.email_from_address) return
-    const greeting = `${item.email_from_address ? '' : '●● 様'}`
+    const recipientName = extractRecipientName(item.email_body) ?? ''
+    const greeting = recipientName ? `${recipientName} 様` : '●● 様'
     const mainContent = `先日お送りいただいた案件「${item.title ?? ''}」について、弊社所属の技術者がマッチしておりますのでご提案いたします。${buildEngineerInfoBlock(mail)}\n\n面談やスキルシートのご要望がございましたら、お気軽にご返信ください。`
-    const wrappedBody = buildEmailBody(greeting || '●● 様', mainContent, emailTemplate)
+    const wrappedBody = buildEmailBody(greeting, mainContent, emailTemplate)
     setProposalDraft({
       subject: `【技術者ご紹介】${mail?.name ?? '弊社技術者'} - ${item.title ?? ''}`,
       body: wrappedBody,
       to_address: item.email_from_address ?? '',
-      to_name: '',
+      to_name: recipientName,
       project_mail_id: item.project_mail_id,
       original_mail_body: item.email_body,
       original_mail_label: '紹介元案件メール 本文',
@@ -665,11 +669,13 @@ export default function EngineerMailMatchingPage() {
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
       {/* 一斉配信モーダル */}
       {showBulkSend && (() => {
-        // 宛先 = EMS 送信者 (BP 営業担当)
-        const initToName = (mail.email?.from_name ?? '') + (mail.email?.from_name ? ' 様' : '')
+        // 宛先 = EMS 送信者 (BP 営業担当)。本文署名から氏名推測 → 無ければ from_name
+        const bodyName = extractRecipientName(pickMailBody(mail.email))
+        const recipientName = bodyName ?? mail.email?.from_name ?? ''
+        const initToName = recipientName ? `${recipientName} 様` : ''
         const initTo     = mail.email?.from_address ?? ''
         const initSubject = `【案件のご提案】${mail.name ?? '貴社技術者様'} 向け案件`
-        const greeting   = mail.email?.from_name ? `${mail.email.from_name} 様` : '営業ご担当者様'
+        const greeting   = recipientName ? `${recipientName} 様` : '営業ご担当者様'
 
         let projectLines = ''
         let selectedCount = 0

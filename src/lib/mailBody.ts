@@ -29,6 +29,47 @@ export function pickMailBody(
   return stripped || null
 }
 
+/**
+ * メール本文から差出人名を推測する。
+ * - 末尾の署名ブロックから氏名らしき行を1つ抽出
+ * - 「担当：○○」「○○ 様」「Name: ○○」等のパターンも拾う
+ * - 取得不可なら null
+ *
+ * 本文を pickMailBody() で取得済みのプレーンテキストに対して使う想定。
+ */
+export function extractRecipientName(body: string | null | undefined): string | null {
+  if (!body) return null
+  const lines = body.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+  if (lines.length === 0) return null
+
+  // 1) 「担当：山田太郎」「営業担当: ○○」
+  for (const l of lines) {
+    const m = l.match(/^(?:営業)?担当(?:者)?[：:]\s*([^\s<【\[（(]{2,15})/u)
+    if (m) return m[1].trim()
+  }
+
+  // 2) 「山田 太郎 <foo@bar>」「山田太郎(yamada@bar)」
+  for (const l of lines) {
+    const m = l.match(/^([一-龯ぁ-んァ-ヶー々〆〤]{1,5}[\s　]?[一-龯ぁ-んァ-ヶー々〆〤]{1,5})\s*[<(（]/u)
+    if (m) return m[1].replace(/\s+/g, ' ').trim()
+  }
+
+  // 3) 末尾署名: 下から見て「住所/TEL/FAX/MAIL/URL/会社名」より上の氏名行
+  const tail = lines.slice(-15)
+  const excludeRe = /(@|https?:|tel|fax|mail|mobile|url|〒|〶|株式会社|有限会社|合同会社|事業部|本社|支店|営業所|^\d|\d{2,}-\d{2,})/i
+  for (let i = tail.length - 1; i >= 0; i--) {
+    const l = tail[i]
+    if (excludeRe.test(l)) continue
+    // 「山田 太郎」「山田太郎」「ヤマダ タロウ」「Yamada Taro」
+    const jp = l.match(/^([一-龯ぁ-んァ-ヶー々〆〤]{2,6}[\s　]?[一-龯ぁ-んァ-ヶー々〆〤]{1,6})$/u)
+    if (jp) return jp[1].replace(/\s+/g, ' ').trim()
+    const en = l.match(/^([A-Z][a-z]+\s+[A-Z][a-z]+)$/)
+    if (en) return en[1]
+  }
+
+  return null
+}
+
 export interface EmailBodyTemplate {
   name: string
   name_en: string

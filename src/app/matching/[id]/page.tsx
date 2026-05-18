@@ -1513,19 +1513,39 @@ export default function MatchingPage() {
         if (freshMode) {
           const selected = freshItems.filter(i => freshChecked.has(i.engineer_mail_source_id))
           selectedCount = selected.length
-          engineerLines = selected.map(i => {
-            const skills = (i.skills ?? []).slice(0, 5).join('／')
-            const avail = i.available_from ? `${i.available_from}〜` : ''
-            return `・${i.name ?? '（氏名未取得）'}（${i.age ? `${i.age}歳` : ''}${i.affiliation ? `／${i.affiliation}` : ''}）\n　スキル：${skills || '—'}　稼働：${avail || '—'}`
-          }).join('\n')
+          engineerLines = selected.map((i, idx) => {
+            const skills = (i.skills ?? []).filter(Boolean).slice(0, 8).join('／')
+            const price = priceStr(i.unit_price_min, i.unit_price_max)
+            const block: string[] = []
+            block.push(`■ ${idx + 1}人目`)
+            block.push(`◇氏名：${i.name ?? '（氏名未取得）'}`)
+            if (i.age) block.push(`◇年齢：${i.age}歳`)
+            if (i.affiliation) block.push(`◇所属：${(i.affiliation_type === 'partner' ? '協力／' : i.affiliation_type === 'freelance' ? 'FL／' : '')}${i.affiliation}`)
+            if (skills) block.push(`◇スキル：${skills}`)
+            if (price) block.push(`◇希望単価：${price}/月`)
+            if (i.available_from) block.push(`◇稼働開始：${i.available_from}`)
+            if (i.nearest_station) block.push(`◇最寄駅：${i.nearest_station}`)
+            return block.join('\n')
+          }).join('\n\n')
         } else {
           const selected = engineers.filter(e => checked.has(e.engineer_id))
           selectedCount = selected.length
-          engineerLines = selected.map(e => {
-            const skills = e.skills.slice(0, 5).map(s => s.name).join('／')
-            const avail = e.availability_status === 'available' ? '稼働可' : e.availability_status === 'scheduled' ? '稼働予定' : e.availability_status === 'working' ? '稼働中' : ''
-            return `・${e.engineer_name}（${e.age ? `${e.age}歳` : ''}${e.affiliation ? `／${e.affiliation}` : ''}）\n　スキル：${skills || '—'}　稼働：${avail || '—'}`
-          }).join('\n')
+          engineerLines = selected.map((e, idx) => {
+            const skills = e.skills.slice(0, 8).map(s => s.experience_years ? `${s.name}(${s.experience_years}y)` : s.name).join('／')
+            const price = priceStr(e.desired_unit_price_min, e.desired_unit_price_max)
+            const availLabel = AVAILABILITY_LABEL[e.availability_status ?? ''] ?? ''
+            const availStr = [availLabel, e.available_from ? `${formatDate(e.available_from)}〜` : null].filter(Boolean).join(' ')
+            const block: string[] = []
+            block.push(`■ ${idx + 1}人目`)
+            block.push(`◇氏名：${e.engineer_name}`)
+            if (e.age) block.push(`◇年齢：${e.age}歳`)
+            if (e.affiliation) block.push(`◇所属：${(e.affiliation_type === 'partner' ? '協力／' : e.affiliation_type === 'freelance' ? 'FL／' : '')}${e.affiliation}`)
+            if (skills) block.push(`◇スキル：${skills}`)
+            if (price) block.push(`◇希望単価：${price}/月`)
+            if (availStr) block.push(`◇稼働：${availStr}`)
+            if (e.work_style) block.push(`◇勤務形態：${e.work_style}`)
+            return block.join('\n')
+          }).join('\n\n')
         }
         const projectInfoBlock = buildProjectInfoBlock(mail)
         const mainContent = `この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。\n\n【ご紹介エンジニア（${selectedCount}名）】\n${engineerLines}${projectInfoBlock}\n\n各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。\nまた、面談のご調整も随時承っております。`
