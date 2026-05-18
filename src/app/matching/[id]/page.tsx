@@ -4,6 +4,32 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 
+// PMS の構造化フィールドから「【案件情報】◇〜」ブロックを組み立てる
+// 個別提案/まとめて提案の両モードで同一フォーマットになるよう共通化
+function buildProjectInfoBlock(mail: ProjectMail | null): string {
+  if (!mail) return ''
+  const lines: string[] = []
+  if (mail.title) lines.push(`◇案件：${mail.title}`)
+  if (mail.customer_name) lines.push(`◇顧客：${mail.customer_name}`)
+  const req = Array.isArray(mail.required_skills) ? mail.required_skills.filter(Boolean) : []
+  if (req.length > 0) lines.push(`◇必須スキル：${req.join('／')}`)
+  const pref = Array.isArray(mail.preferred_skills) ? mail.preferred_skills.filter(Boolean) : []
+  if (pref.length > 0) lines.push(`◇歓迎スキル：${pref.join('／')}`)
+  const process = Array.isArray(mail.process) ? mail.process.filter(Boolean) : []
+  if (process.length > 0) lines.push(`◇工程：${process.join('／')}`)
+  if (mail.start_date) lines.push(`◇時期：${mail.start_date}`)
+  if (mail.work_location || mail.remote_ok) {
+    const loc = [mail.work_location, mail.remote_ok ? 'リモート可' : null].filter(Boolean).join('／')
+    if (loc) lines.push(`◇場所：${loc}`)
+  }
+  if (mail.unit_price_min || mail.unit_price_max) {
+    lines.push(`◇単価：${mail.unit_price_min ?? ''}〜${mail.unit_price_max ?? ''}万円`)
+  }
+  if (mail.contract_type) lines.push(`◇契約：${mail.contract_type}`)
+  if (lines.length === 0) return ''
+  return `\n\n【案件情報】\n${lines.join('\n')}`
+}
+
 // ── 元メール本文 アコーディオン ────────────────────────
 function OriginalMailAccordion({ body, label = '元メール本文' }: { body: string | null | undefined; label?: string }) {
   const [open, setOpen] = useState(false)
@@ -1455,7 +1481,7 @@ export default function MatchingPage() {
     const priceLine = item.unit_price_min || item.unit_price_max
       ? `${item.unit_price_min ?? ''}〜${item.unit_price_max ?? ''}万円`
       : '—'
-    const mainContent = `先日いただいた技術者ご紹介メール（件名: ${item.email_subject ?? '—'}）について、弊社で進行中の以下案件にマッチしておりますのでご提案させていただきます。\n\n【ご紹介エンジニア】\n・${item.name ?? '（氏名未取得）'}（${item.age ? `${item.age}歳／` : ''}${item.affiliation ?? '所属未取得'}）\n　スキル：${skillLine}\n　希望単価：${priceLine}\n\n【弊社案件】\n${mail?.title ?? ''}\n${mail?.required_skills?.slice(0, 5).join('／') ?? ''}\n\nご面談のご調整、もしくは類似案件のご紹介も可能でございます。お気軽にご返信ください。`
+    const mainContent = `先日いただいた技術者ご紹介メール（件名: ${item.email_subject ?? '—'}）について、弊社で進行中の以下案件にマッチしておりますのでご提案させていただきます。\n\n【ご紹介エンジニア】\n・${item.name ?? '（氏名未取得）'}（${item.age ? `${item.age}歳／` : ''}${item.affiliation ?? '所属未取得'}）\n　スキル：${skillLine}\n　希望単価：${priceLine}${buildProjectInfoBlock(mail)}\n\nご面談のご調整、もしくは類似案件のご紹介も可能でございます。お気軽にご返信ください。`
     const wrappedBody = buildEmailBody(greeting, mainContent, emailTemplate)
     setProposalDraft({
       subject: `【案件のご提案】${mail?.title ?? ''}`,
@@ -1483,7 +1509,9 @@ export default function MatchingPage() {
     try {
       const res = await axios.post(`/api/v1/project-mails/${id}/generate-proposal`, { engineer_id: eng.engineer_id })
       const greeting = `${res.data.to_name ? res.data.to_name + ' 様' : '●● 様'}`
-      const wrappedBody = buildEmailBody(greeting, res.data.body, emailTemplate)
+      // Claude が生成した prose に、まとめて提案と同形式の ◇案件情報 ブロックを追記
+      const mainContentWithBlock = (res.data.body ?? '') + buildProjectInfoBlock(mail)
+      const wrappedBody = buildEmailBody(greeting, mainContentWithBlock, emailTemplate)
       setProposalDraft({ ...res.data, subject: `【技術者ご紹介】${mail?.title ?? ''}`, body: wrappedBody, engineer_name: eng.engineer_name, project_mail_id: Number(id), original_mail_body: mail?.email?.body_text, original_mail_label: '紹介元案件メール 本文' })
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status
@@ -1565,28 +1593,7 @@ export default function MatchingPage() {
             return `・${e.engineer_name}（${e.age ? `${e.age}歳` : ''}${e.affiliation ? `／${e.affiliation}` : ''}）\n　スキル：${skills || '—'}　稼働：${avail || '—'}`
           }).join('\n')
         }
-        // 紹介元案件情報 (PMS の構造化フィールドから組み立て)
-        const projectInfoLines: string[] = []
-        if (mail?.title) projectInfoLines.push(`◇案件：${mail.title}`)
-        if (mail?.customer_name) projectInfoLines.push(`◇顧客：${mail.customer_name}`)
-        const reqSkills = Array.isArray(mail?.required_skills) ? mail.required_skills : []
-        if (reqSkills.length > 0) projectInfoLines.push(`◇必須スキル：${reqSkills.join('／')}`)
-        const prefSkills = Array.isArray(mail?.preferred_skills) ? mail.preferred_skills : []
-        if (prefSkills.length > 0) projectInfoLines.push(`◇歓迎スキル：${prefSkills.join('／')}`)
-        const process = Array.isArray(mail?.process) ? mail.process : []
-        if (process.length > 0) projectInfoLines.push(`◇工程：${process.join('／')}`)
-        if (mail?.start_date) projectInfoLines.push(`◇時期：${mail.start_date}`)
-        if (mail?.work_location || mail?.remote_ok) {
-          const loc = [mail?.work_location, mail?.remote_ok ? 'リモート可' : null].filter(Boolean).join('／')
-          if (loc) projectInfoLines.push(`◇場所：${loc}`)
-        }
-        if (mail?.unit_price_min || mail?.unit_price_max) {
-          projectInfoLines.push(`◇単価：${mail.unit_price_min ?? ''}〜${mail.unit_price_max ?? ''}万円`)
-        }
-        if (mail?.contract_type) projectInfoLines.push(`◇契約：${mail.contract_type}`)
-        const projectInfoBlock = projectInfoLines.length > 0
-          ? `\n\n【案件情報】\n${projectInfoLines.join('\n')}`
-          : ''
+        const projectInfoBlock = buildProjectInfoBlock(mail)
         const mainContent = `この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。\n\n【ご紹介エンジニア（${selectedCount}名）】\n${engineerLines}${projectInfoBlock}\n\n各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。\nまた、面談のご調整も随時承っております。`
         const initBody = buildEmailBody(greeting, mainContent, emailTemplate)
         return <BulkSendModal projectMailId={Number(id)} initialToName={initToName} initialTo={initTo} initialSubject={initSubject} initialBody={initBody} engineerCount={selectedCount} originalMailBody={mail?.email?.body_text} onClose={() => setShowBulkSend(false)} />
