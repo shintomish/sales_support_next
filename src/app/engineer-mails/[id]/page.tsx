@@ -91,9 +91,9 @@ function rankLabel(score: number): '◎' | '○' | '△' {
 }
 
 function rankColor(score: number) {
-  if (score >= 80) return { bg: '#dcfce7', fg: '#166534', border: '#86efac' }
-  if (score >= 60) return { bg: '#fef3c7', fg: '#92400e', border: '#fcd34d' }
-  return { bg: '#fee2e2', fg: '#991b1b', border: '#fca5a5' }
+  if (score >= 80) return { bg: '#dcfce7', border: '#16a34a', text: '#15803d' }
+  if (score >= 60) return { bg: '#dbeafe', border: '#2563eb', text: '#1d4ed8' }
+  return { bg: '#fef9c3', border: '#ca8a04', text: '#854d0e' }
 }
 
 function formatDate(iso: string | null): string | null {
@@ -350,44 +350,90 @@ function ProjectCard({ project, onPropose, generating, checked, onCheck }: {
   checked: boolean
   onCheck: (id: number) => void
 }) {
-  const rk = rankColor(project.match_score)
+  const color = rankColor(project.match_score)
+  const topSkills = project.required_skills.slice(0, 5)
   return (
-    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <input type="checkbox" checked={checked} onChange={() => onCheck(project.project_id)} style={{ marginTop: 4, width: 16, height: 16, cursor: 'pointer' }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, background: rk.bg, color: rk.fg, border: `1px solid ${rk.border}`, fontSize: 11, fontWeight: 700 }}>{rankLabel(project.match_score)} {project.match_score}</span>
-            <span style={{ fontSize: 11, color: '#6b7280' }}>{project.matched_count}/{project.total_skills} スキル一致</span>
-          </div>
-          <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', margin: 0 }}>{project.project_title ?? '（案件名未設定）'}</p>
+    <div style={{
+      background: '#fff',
+      borderRadius: 12,
+      border: `1px solid ${color.border}`,
+      boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    }}>
+      {/* カードヘッダー: チェックボックス + スコアバッジ + タイトル */}
+      <div style={{ background: color.bg, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => onCheck(project.project_id)}
+          onClick={e => e.stopPropagation()}
+          style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0, accentColor: color.border }}
+        />
+        <div
+          title={`${project.matched_count}/${project.total_skills} スキル一致`}
+          style={{
+            flexShrink: 0, width: 52, height: 52, borderRadius: 10,
+            border: `2px solid ${color.border}`, background: '#fff',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <span style={{ fontSize: 14, fontWeight: 800, color: color.text, lineHeight: 1 }}>{rankLabel(project.match_score)}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: color.text, lineHeight: 1.4 }}>{project.match_score}</span>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontWeight: 700, fontSize: 14, color: '#111827', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {project.project_title ?? '（案件名未設定）'}
+          </p>
           <p style={{ fontSize: 11, color: '#6b7280', margin: '2px 0 0' }}>
-            {project.work_style ?? '—'} / {project.nearest_station ?? '—'} / {priceStr(project.unit_price_min, project.unit_price_max)}
+            {project.matched_count}/{project.total_skills} スキル一致
           </p>
         </div>
       </div>
-      {project.required_skills.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {project.required_skills.map((s, i) => (
-            <span key={i} style={{
-              fontSize: 10, padding: '2px 6px', borderRadius: 3,
-              background: s.matched ? '#dcfce7' : '#f3f4f6',
-              color: s.matched ? '#166534' : '#6b7280',
-              border: `1px solid ${s.matched ? '#86efac' : '#e5e7eb'}`,
-              fontWeight: s.is_required ? 700 : 400,
-            }}>
-              {s.matched ? '✓ ' : ''}{s.name}{s.is_required ? '*' : ''}
-            </span>
-          ))}
+
+      {/* カードボディ */}
+      <div style={{ padding: '10px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* 単価・勤務形態・最寄駅 */}
+        <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#6b7280', flexWrap: 'wrap' }}>
+          <span>💴 {priceStr(project.unit_price_min, project.unit_price_max)}</span>
+          {project.work_style && <span>🏠 {project.work_style}</span>}
+          {project.nearest_station && <span>🚉 {project.nearest_station}</span>}
         </div>
-      )}
-      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        {/* スキルタグ */}
+        {topSkills.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {topSkills.map((s, i) => (
+              <span key={i} style={{
+                fontSize: 10,
+                background: s.matched ? '#dcfce7' : '#eff6ff',
+                color: s.matched ? '#15803d' : '#1d4ed8',
+                border: `1px solid ${s.matched ? '#86efac' : '#bfdbfe'}`,
+                borderRadius: 4, padding: '1px 5px',
+                fontWeight: s.is_required ? 700 : 400,
+              }}>
+                {s.matched ? '✓ ' : ''}{s.name}{s.is_required ? '*' : ''}
+              </span>
+            ))}
+            {project.required_skills.length > 5 && (
+              <span style={{ fontSize: 10, color: '#9ca3af', alignSelf: 'center' }}>+{project.required_skills.length - 5}</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* カードフッター */}
+      <div style={{ display: 'flex', borderTop: '1px solid #f3f4f6' }}>
         <button
           onClick={() => onPropose(project)}
           disabled={generating || !project.to_email}
           title={!project.to_email ? '案件提供者の連絡先メールが未登録' : ''}
-          style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: generating ? '#93c5fd' : !project.to_email ? '#e5e7eb' : '#2563eb', color: !project.to_email ? '#9ca3af' : '#fff', fontSize: 12, fontWeight: 600, cursor: generating || !project.to_email ? 'default' : 'pointer' }}>
-          {generating ? '生成中...' : '📨 個別提案'}
+          style={{
+            flex: 1, padding: '8px 0', border: 'none', cursor: generating || !project.to_email ? 'default' : 'pointer',
+            fontSize: 12, fontWeight: 600,
+            background: '#fff',
+            color: generating ? '#9ca3af' : !project.to_email ? '#d1d5db' : '#2563eb',
+            borderRadius: '0 0 12px 12px',
+          }}>
+          {generating ? '生成中…' : '📧 個別提案'}
         </button>
       </div>
     </div>
@@ -402,42 +448,85 @@ function FreshPmsCard({ item, onPropose, generating, checked, onCheck }: {
   checked: boolean
   onCheck: (id: number) => void
 }) {
-  const rk = rankColor(item.score)
+  const color = rankColor(item.score)
   const badgeMap: Record<string, { label: string; color: string }> = {
     new: { label: '新規', color: '#2563eb' },
     registered: { label: '登録済', color: '#16a34a' },
     proposed: { label: '提案済', color: '#a855f7' },
   }
   const badge = badgeMap[item.badge]
+  const topSkills = (item.required_skills ?? []).slice(0, 5)
   return (
-    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <input type="checkbox" checked={checked} onChange={() => onCheck(item.project_mail_id)} style={{ marginTop: 4, width: 16, height: 16, cursor: 'pointer' }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, background: rk.bg, color: rk.fg, border: `1px solid ${rk.border}`, fontSize: 11, fontWeight: 700 }}>{rankLabel(item.score)} {item.score}</span>
-            {badge && <span style={{ display: 'inline-block', padding: '2px 6px', borderRadius: 4, background: '#fff', color: badge.color, border: `1px solid ${badge.color}`, fontSize: 10, fontWeight: 600 }}>{badge.label}</span>}
-            <span style={{ fontSize: 11, color: '#6b7280' }}>{formatDate(item.received_at) ?? '—'}</span>
-          </div>
-          <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', margin: 0 }}>{item.title ?? '（案件名未設定）'}</p>
-          <p style={{ fontSize: 11, color: '#6b7280', margin: '2px 0 0' }}>
-            {item.customer_name ?? '—'} / {item.work_location ?? '—'} / {priceStr(item.unit_price_min, item.unit_price_max)}
+    <div style={{
+      background: '#fff', borderRadius: 12,
+      border: `1px solid ${color.border}`,
+      boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    }}>
+      {/* カードヘッダー */}
+      <div style={{ background: color.bg, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => onCheck(item.project_mail_id)}
+          onClick={e => e.stopPropagation()}
+          style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0, accentColor: color.border }}
+        />
+        <div style={{
+          flexShrink: 0, width: 52, height: 52, borderRadius: 10,
+          border: `2px solid ${color.border}`, background: '#fff',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ fontSize: 14, fontWeight: 800, color: color.text, lineHeight: 1 }}>{rankLabel(item.score)}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: color.text, lineHeight: 1.4 }}>{item.score}</span>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontWeight: 700, fontSize: 14, color: '#111827', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {item.title ?? '（案件名未設定）'}
+          </p>
+          <p style={{ fontSize: 11, color: '#6b7280', margin: '2px 0 0', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            {badge && <span style={{ padding: '1px 5px', borderRadius: 3, background: '#fff', color: badge.color, border: `1px solid ${badge.color}`, fontSize: 10, fontWeight: 600 }}>{badge.label}</span>}
+            <span>{item.customer_name ?? '—'}</span>
+            <span>{formatDate(item.received_at) ?? '—'}</span>
           </p>
         </div>
       </div>
-      {(item.required_skills ?? []).length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {(item.required_skills ?? []).slice(0, 12).map((s, i) => (
-            <span key={i} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb' }}>{s}</span>
-          ))}
+
+      {/* カードボディ */}
+      <div style={{ padding: '10px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#6b7280', flexWrap: 'wrap' }}>
+          <span>💴 {priceStr(item.unit_price_min, item.unit_price_max)}</span>
+          {item.work_location && <span>🏠 {item.work_location}</span>}
+          {item.start_date && <span>📅 {formatDate(item.start_date)}〜</span>}
         </div>
-      )}
-      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        {topSkills.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {topSkills.map((s, i) => (
+              <span key={i} style={{
+                fontSize: 10, background: '#eff6ff', color: '#1d4ed8',
+                border: '1px solid #bfdbfe', borderRadius: 4, padding: '1px 5px',
+              }}>{s}</span>
+            ))}
+            {(item.required_skills ?? []).length > 5 && (
+              <span style={{ fontSize: 10, color: '#9ca3af', alignSelf: 'center' }}>+{(item.required_skills ?? []).length - 5}</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* カードフッター */}
+      <div style={{ display: 'flex', borderTop: '1px solid #f3f4f6' }}>
         <button
           onClick={() => onPropose(item)}
           disabled={generating || !item.email_from_address}
-          style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: generating ? '#93c5fd' : !item.email_from_address ? '#e5e7eb' : '#2563eb', color: !item.email_from_address ? '#9ca3af' : '#fff', fontSize: 12, fontWeight: 600, cursor: generating || !item.email_from_address ? 'default' : 'pointer' }}>
-          {generating ? '生成中...' : '📨 個別提案'}
+          style={{
+            flex: 1, padding: '8px 0', border: 'none', cursor: generating || !item.email_from_address ? 'default' : 'pointer',
+            fontSize: 12, fontWeight: 600,
+            background: '#fff',
+            color: generating ? '#9ca3af' : !item.email_from_address ? '#d1d5db' : '#2563eb',
+            borderRadius: '0 0 12px 12px',
+          }}>
+          {generating ? '生成中…' : '📧 個別提案'}
         </button>
       </div>
     </div>
@@ -469,7 +558,7 @@ export default function EngineerMailMatchingPage() {
     Promise.all([
       axios.get(`/api/v1/engineer-mails/${id}`),
       axios.get(`/api/v1/engineer-mails/${id}/matched-projects`),
-      axios.get('/api/v1/settings/email-body-template').catch(() => null),
+      axios.get('/api/v1/email-body-templates/me').catch(() => null),
     ]).then(([emsRes, matchRes, tplRes]) => {
       setMail(emsRes.data)
       setProjects(matchRes.data?.data ?? [])
@@ -675,10 +764,10 @@ export default function EngineerMailMatchingPage() {
       </div>
 
       {/* メインリスト */}
-      <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
         {!freshMode && (
           projects.length === 0 ? (
-            <p style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>マッチする登録済案件がありません</p>
+            <p style={{ color: '#6b7280', textAlign: 'center', padding: 40, gridColumn: '1/-1' }}>マッチする登録済案件がありません</p>
           ) : (
             projects.map(p => (
               <ProjectCard
@@ -695,9 +784,9 @@ export default function EngineerMailMatchingPage() {
 
         {freshMode && (
           freshLoading ? (
-            <p style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>🔍 過去{freshDays}日のメール候補を取得中...</p>
+            <p style={{ color: '#6b7280', textAlign: 'center', padding: 40, gridColumn: '1/-1' }}>🔍 過去{freshDays}日のメール候補を取得中...</p>
           ) : freshItems.length === 0 ? (
-            <p style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>過去{freshDays}日のマッチする案件メールはありません</p>
+            <p style={{ color: '#6b7280', textAlign: 'center', padding: 40, gridColumn: '1/-1' }}>過去{freshDays}日のマッチする案件メールはありません</p>
           ) : (
             freshItems.map(i => (
               <FreshPmsCard
