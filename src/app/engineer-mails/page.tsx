@@ -86,6 +86,34 @@ type MatchedProject = {
   sales_contact: string
 }
 
+// 鮮度マッチング（過去N日の案件メールから候補抽出）
+type FreshPms = {
+  project_mail_id: number
+  title: string | null
+  customer_name: string | null
+  required_skills: string[] | null
+  unit_price_min: number | null
+  unit_price_max: number | null
+  work_location: string | null
+  remote_ok: boolean | null
+  start_date: string | null
+  received_at: string | null
+  email_from_address: string | null
+  email_from_name: string | null
+  email_subject: string | null
+  sales_contact: string | null
+  score: number
+  breakdown: {
+    requirements: number
+    skills: number
+    conditions: number
+    availability: number
+    track_record: number
+  }
+  reasons: string[]
+  badge: 'new' | 'registered' | 'proposed'
+}
+
 type ProposalModal = {
   project: MatchedProject
   to: string
@@ -97,6 +125,9 @@ type ProposalModal = {
   sending: boolean
   sent: boolean
   error: string
+  // 鮮度マッチング: PMS 起点の場合のみ project_mail_id を保持
+  // → 送信時に send-proposal-from-pms エンドポイントへルーティング
+  projectMailId?: number
 }
 
 type EmailBodyTemplate = {
@@ -251,6 +282,11 @@ export default function EngineerMailsPage() {
   // マッチ案件・提案送信
   const [matchedProjects, setMatchedProjects] = useState<MatchedProject[]>([])
   const [matchLoading, setMatchLoading] = useState(false)
+  // 鮮度マッチング: 過去N日の案件メールから候補抽出
+  const [freshMode, setFreshMode] = useState(false)
+  const [freshDays, setFreshDays] = useState<number>(7)
+  const [freshPms, setFreshPms] = useState<FreshPms[]>([])
+  const [freshLoading, setFreshLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [proposalModal, setProposalModal] = useState<ProposalModal | null>(null)
   const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
@@ -376,6 +412,56 @@ export default function EngineerMailsPage() {
     finally { setReplySending(false) }
   }
 
+  // 鮮度マッチング: モード切替/日数変更/選択EMS変更時に過去N日のPMSを取得
+  useEffect(() => {
+    if (!selected || !freshMode) return
+    setFreshLoading(true)
+    axios.get(`/api/v1/engineer-mails/${selected.id}/fresh-project-mails`, { params: { days: freshDays } })
+      .then(res => setFreshPms(Array.isArray(res.data?.data) ? res.data.data : []))
+      .catch(() => setFreshPms([]))
+      .finally(() => setFreshLoading(false))
+  }, [selected, freshMode, freshDays])
+
+  // 鮮度マッチング: PMS から提案メール草稿を生成
+  const handleGenerateFromPms = (item: FreshPms) => {
+    if (!selected) return
+    const toName = item.sales_contact ?? item.email_from_name ?? ''
+    const greeting = toName ? `${toName} 様` : '●● 様'
+    const skillLine = (item.required_skills || []).slice(0, 5).join('／') || '—'
+    const priceLine = item.unit_price_min || item.unit_price_max
+      ? `${item.unit_price_min ?? ''}〜${item.unit_price_max ?? ''}万円`
+      : '—'
+    const mainContent = `先日いただいた案件メール（件名: ${item.email_subject ?? '—'}）について、弊社にて対応可能な技術者がおりますのでご紹介させていただきます。\n\n【貴社案件】\n${item.title ?? ''}\n必須スキル：${skillLine}\n単価レンジ：${priceLine}\n\n【ご紹介エンジニア】\n・${selected.name ?? '（氏名未取得）'}（${selected.age ? `${selected.age}歳` : ''}${selected.affiliation_type ? `／${selected.affiliation_type}` : ''}）\n　スキル：${(selected.skills || []).slice(0, 5).join('／') || '—'}\n\nスキルシート送付・面談調整可能でございます。お気軽にご返信ください。`
+    const wrappedBody = buildEmailBody(greeting, mainContent, emailTemplate)
+    // ProposalModal を PMS 起点モードで開く（projectMailId 保持）
+    // project フィールドは表示互換のためダミーで埋める
+    setProposalModal({
+      project: {
+        project_id: 0,
+        project_title: item.title ?? '',
+        match_score: item.score,
+        matched_count: 0,
+        total_skills: 0,
+        required_skills: (item.required_skills || []).map(n => ({ name: n, is_required: true, matched: false })),
+        unit_price_min: item.unit_price_min,
+        unit_price_max: item.unit_price_max,
+        work_style: item.work_location,
+        to_email: item.email_from_address ?? '',
+        sales_contact: toName,
+      },
+      to: item.email_from_address ?? '',
+      toName,
+      subject: `【技術者ご紹介】${item.title ?? ''}`,
+      body: wrappedBody,
+      attachments: [],
+      generating: false,
+      sending: false,
+      sent: false,
+      error: '',
+      projectMailId: item.project_mail_id,
+    })
+  }
+
   // 提案文生成
   const handleGenerate = async (project: MatchedProject) => {
     const toName = project.sales_contact ?? ''
@@ -406,16 +492,30 @@ export default function EngineerMailsPage() {
     setProposalModal(m => m ? { ...m, sending: true, error: '' } : m)
     try {
       const formData = new FormData()
-      formData.append('project_id', String(proposalModal.project.project_id))
       formData.append('to',         proposalModal.to)
       formData.append('to_name',    proposalModal.toName ?? '')
       formData.append('subject',    proposalModal.subject)
       formData.append('body',       proposalModal.body)
       proposalModal.attachments.forEach(f => formData.append('attachments[]', f))
-      await axios.post(`/api/v1/engineer-mails/${selected.id}/send-proposal`, formData, {
+      // 鮮度マッチング(PMS起点) の場合は project_mail_id を送って別エンドポイントへ
+      const endpoint = proposalModal.projectMailId
+        ? `/api/v1/engineer-mails/${selected.id}/send-proposal-from-pms`
+        : `/api/v1/engineer-mails/${selected.id}/send-proposal`
+      if (proposalModal.projectMailId) {
+        formData.append('project_mail_id', String(proposalModal.projectMailId))
+      } else {
+        formData.append('project_id', String(proposalModal.project.project_id))
+      }
+      await axios.post(endpoint, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       setProposalModal(m => m ? { ...m, sending: false, sent: true } : m)
+      // 鮮度モード表示中なら一覧をリフレッシュして badge を更新
+      if (proposalModal.projectMailId && freshMode) {
+        axios.get(`/api/v1/engineer-mails/${selected.id}/fresh-project-mails`, { params: { days: freshDays } })
+          .then(res => setFreshPms(Array.isArray(res.data?.data) ? res.data.data : []))
+          .catch(() => {})
+      }
       setTimeout(() => setProposalModal(null), 1500)
     } catch {
       setProposalModal(m => m ? { ...m, sending: false, error: '送信に失敗しました' } : m)
@@ -994,48 +1094,149 @@ export default function EngineerMailsPage() {
 
             {/* マッチ案件 */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  <span className="text-sm font-semibold text-gray-700">マッチ案件</span>
+                  <span className="text-sm font-semibold text-gray-700">{freshMode ? '受信案件メール候補' : 'マッチ案件'}</span>
                   {(selected.unit_price_min || selected.unit_price_max) && (
                     <span className="ml-2 text-xs text-blue-600 font-medium">
                       技術者希望: {selected.unit_price_min ? Math.round(selected.unit_price_min) : '?'}〜{selected.unit_price_max ? Math.round(selected.unit_price_max) : '?'}万円
                     </span>
                   )}
                 </div>
-                {matchLoading && <span className="text-xs text-gray-400 animate-pulse">取得中...</span>}
-              </div>
-              {!matchLoading && matchedProjects.length === 0 && (
-                <p className="text-sm text-gray-400 px-4 py-3">単価条件に合う案件はありません</p>
-              )}
-              {matchedProjects.map(proj => (
-                <div key={proj.project_id} className="px-4 py-3 border-b border-gray-100 last:border-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">{proj.project_title}</p>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${proj.match_score >= 70 ? 'bg-emerald-100 text-emerald-700' : proj.match_score >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>
-                          {proj.match_score}%
-                        </span>
-                        {proj.unit_price_max != null && (
-                          <span className="text-xs text-emerald-600 font-medium">案件: 〜{Math.round(proj.unit_price_max)}万円</span>
-                        )}
-                        {proj.work_style && <span className="text-xs text-gray-400">{proj.work_style}</span>}
-                      </div>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {proj.required_skills.slice(0, 5).map((s, i) => (
-                          <span key={i} className={`text-xs px-1.5 py-0.5 rounded border ${s.matched ? 'bg-teal-50 text-teal-600 border-teal-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>{s.name}</span>
-                        ))}
-                      </div>
-                    </div>
+                <div className="flex items-center gap-2">
+                  {(matchLoading || freshLoading) && <span className="text-xs text-gray-400 animate-pulse">取得中...</span>}
+                  {/* モード切替: 登録済案件 ↔ 過去N日メール */}
+                  <div className="flex border border-gray-300 rounded-md overflow-hidden text-xs">
                     <button
-                      onClick={() => handleGenerate(proj)}
-                      className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 font-medium flex-shrink-0 whitespace-nowrap">
-                      提案送信
+                      onClick={() => setFreshMode(false)}
+                      className={`px-2 py-1 ${!freshMode ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                    >
+                      登録済
+                    </button>
+                    <button
+                      onClick={() => setFreshMode(true)}
+                      className={`px-2 py-1 border-l border-gray-300 ${freshMode ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                    >
+                      📨 メール
                     </button>
                   </div>
+                  {freshMode && (
+                    <select
+                      value={freshDays}
+                      onChange={e => setFreshDays(Number(e.target.value))}
+                      className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white"
+                    >
+                      <option value={3}>過去3日</option>
+                      <option value={7}>過去7日</option>
+                      <option value={14}>過去14日</option>
+                      <option value={30}>過去30日</option>
+                    </select>
+                  )}
                 </div>
-              ))}
+              </div>
+
+              {/* 登録済案件モード */}
+              {!freshMode && (
+                <>
+                  {!matchLoading && matchedProjects.length === 0 && (
+                    <p className="text-sm text-gray-400 px-4 py-3">単価条件に合う案件はありません</p>
+                  )}
+                  {matchedProjects.map(proj => (
+                    <div key={proj.project_id} className="px-4 py-3 border-b border-gray-100 last:border-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{proj.project_title}</p>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${proj.match_score >= 70 ? 'bg-emerald-100 text-emerald-700' : proj.match_score >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>
+                              {proj.match_score}%
+                            </span>
+                            {proj.unit_price_max != null && (
+                              <span className="text-xs text-emerald-600 font-medium">案件: 〜{Math.round(proj.unit_price_max)}万円</span>
+                            )}
+                            {proj.work_style && <span className="text-xs text-gray-400">{proj.work_style}</span>}
+                          </div>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {proj.required_skills.slice(0, 5).map((s, i) => (
+                              <span key={i} className={`text-xs px-1.5 py-0.5 rounded border ${s.matched ? 'bg-teal-50 text-teal-600 border-teal-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>{s.name}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleGenerate(proj)}
+                          className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 font-medium flex-shrink-0 whitespace-nowrap">
+                          提案送信
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* 鮮度マッチング: 過去N日の案件メール候補 */}
+              {freshMode && (
+                <>
+                  {!freshLoading && freshPms.length === 0 && (
+                    <p className="text-sm text-gray-400 px-4 py-3">過去{freshDays}日の受信案件メールに該当する候補はありません</p>
+                  )}
+                  {freshPms.map(item => {
+                    const badgeLabel =
+                      item.badge === 'proposed' ? '提案済' :
+                      item.badge === 'registered' ? '登録済' : '新規'
+                    const badgeCls =
+                      item.badge === 'proposed' ? 'bg-red-100 text-red-700' :
+                      item.badge === 'registered' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-green-100 text-green-700'
+                    return (
+                      <div key={item.project_mail_id} className="px-4 py-3 border-b border-gray-100 last:border-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${item.score >= 80 ? 'bg-emerald-100 text-emerald-700' : item.score >= 60 ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                {item.score}点
+                              </span>
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${badgeCls}`}>{badgeLabel}</span>
+                              {item.received_at && (
+                                <span className="text-[10px] text-gray-400">{formatDistanceToNow(new Date(item.received_at), { addSuffix: true, locale: ja })}</span>
+                              )}
+                            </div>
+                            <p className="text-sm font-medium text-gray-800 truncate mt-1">{item.title ?? '（件名未取得）'}</p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              {item.customer_name && <span className="text-xs text-gray-500">🏢 {item.customer_name}</span>}
+                              {item.unit_price_max != null && (
+                                <span className="text-xs text-emerald-600 font-medium">〜{Math.round(item.unit_price_max)}万円</span>
+                              )}
+                              {item.work_location && <span className="text-xs text-gray-400">📍 {item.work_location}{item.remote_ok ? '(リモート可)' : ''}</span>}
+                            </div>
+                            {item.required_skills && item.required_skills.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {item.required_skills.slice(0, 6).map((s, i) => (
+                                  <span key={i} className="text-xs bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded">{s}</span>
+                                ))}
+                              </div>
+                            )}
+                            {item.reasons.length > 0 && (
+                              <p className="text-[10px] text-gray-400 mt-1 truncate" title={item.reasons.join(' / ')}>
+                                {item.reasons.slice(0, 2).join(' / ')}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleGenerateFromPms(item)}
+                            disabled={item.badge === 'proposed'}
+                            className={`text-xs px-3 py-1.5 rounded-lg font-medium flex-shrink-0 whitespace-nowrap ${
+                              item.badge === 'proposed'
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                : 'bg-purple-600 text-white hover:bg-purple-700'
+                            }`}
+                          >
+                            {item.badge === 'proposed' ? '提案済' : '提案送信'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </>
+              )}
             </div>
 
             {/* スレッド会話履歴 */}

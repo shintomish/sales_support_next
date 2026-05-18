@@ -246,6 +246,8 @@ interface ProposalDraft {
   to_name: string
   engineer_name: string
   project_mail_id: number
+  // 鮮度マッチング経由（EMS から提案）の場合のみセット
+  engineer_mail_source_id?: number
 }
 
 function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () => void }) {
@@ -287,7 +289,13 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
       formData.append('subject', subject)
       formData.append('body', body)
       attachments.forEach(f => formData.append('attachments[]', f))
-      await axios.post(`/api/v1/project-mails/${draft.project_mail_id}/send-proposal`, formData, {
+      const endpoint = draft.engineer_mail_source_id
+        ? `/api/v1/project-mails/${draft.project_mail_id}/send-proposal-from-ems`
+        : `/api/v1/project-mails/${draft.project_mail_id}/send-proposal`
+      if (draft.engineer_mail_source_id) {
+        formData.append('engineer_mail_source_id', String(draft.engineer_mail_source_id))
+      }
+      await axios.post(endpoint, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       setSent(true)
@@ -476,6 +484,34 @@ interface MatchedEngineer {
   desired_unit_price_min: number | null
   desired_unit_price_max: number | null
   skills: { name: string; experience_years: number | null }[]
+}
+
+// 鮮度マッチング（過去N日メールから候補抽出）の項目
+interface FreshEms {
+  engineer_mail_source_id: number
+  name: string | null
+  age: number | null
+  affiliation: string | null
+  affiliation_type: string | null
+  nearest_station: string | null
+  skills: string[] | null
+  unit_price_min: number | null
+  unit_price_max: number | null
+  available_from: string | null
+  received_at: string | null
+  email_from_address: string | null
+  email_subject: string | null
+  score: number
+  breakdown: {
+    requirements: number
+    skills: number
+    conditions: number
+    availability: number
+    track_record: number
+  }
+  reasons: string[]
+  badge: 'new' | 'registered' | 'proposed'
+  registered_engineer_id: number | null
 }
 
 // ── ユーティリティ ────────────────────────────────────
@@ -1032,6 +1068,133 @@ function RankGroup({
   )
 }
 
+// ── 鮮度マッチング: EMS リスト ────────────────────────
+function FreshEmsList({
+  loading,
+  items,
+  days,
+  onPropose,
+}: {
+  loading: boolean
+  items: FreshEms[]
+  days: number
+  onPropose: (item: FreshEms) => void
+}) {
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 48, color: '#9ca3af' }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>📨</div>
+        <p>過去{days}日のメールから候補を抽出中...</p>
+      </div>
+    )
+  }
+  if (items.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: 48, color: '#9ca3af' }}>
+        <p style={{ fontSize: 32, marginBottom: 8 }}>📭</p>
+        <p>過去{days}日の受信メールにマッチする候補がありません</p>
+      </div>
+    )
+  }
+  const sorted = [...items].sort((a, b) => b.score - a.score)
+  return (
+    <div>
+      <div style={{ marginBottom: 12, fontSize: 12, color: '#6b7280' }}>
+        📨 過去{days}日の受信メールから {items.length} 件の候補
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+        {sorted.map(item => {
+          const c = rankColor(item.score)
+          const badgeLabel =
+            item.badge === 'proposed' ? '提案済' :
+            item.badge === 'registered' ? '登録済（未提案）' : '新規'
+          const badgeColor =
+            item.badge === 'proposed' ? { bg: '#fee2e2', color: '#991b1b' } :
+            item.badge === 'registered' ? { bg: '#fef3c7', color: '#92400e' } :
+            { bg: '#dcfce7', color: '#166534' }
+          const priceLabel = item.unit_price_min || item.unit_price_max
+            ? `${item.unit_price_min ?? '?'}〜${item.unit_price_max ?? '?'}万`
+            : null
+          return (
+            <div
+              key={item.engineer_mail_source_id}
+              style={{
+                background: '#fff',
+                border: `1px solid ${c.border}`,
+                borderRadius: 10,
+                padding: 14,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, background: c.bg, color: c.text, borderRadius: 4, padding: '2px 8px' }}>
+                  {rankLabel(item.score)} {item.score}点
+                </span>
+                <span style={{ fontSize: 10, fontWeight: 600, background: badgeColor.bg, color: badgeColor.color, borderRadius: 4, padding: '2px 6px' }}>
+                  {badgeLabel}
+                </span>
+                <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9ca3af' }}>
+                  {formatDate(item.received_at)}
+                </span>
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>
+                  {item.name ?? '（氏名未取得）'}
+                  {item.age && <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: 6, fontSize: 12 }}>{item.age}歳</span>}
+                </div>
+                {item.affiliation && (
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>🏢 {item.affiliation}</div>
+                )}
+              </div>
+              {item.skills && item.skills.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {item.skills.slice(0, 8).map((s, i) => (
+                    <span key={i} style={{ fontSize: 10, background: '#eff6ff', color: '#1d4ed8', borderRadius: 3, padding: '1px 6px' }}>{s}</span>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, fontSize: 11, color: '#6b7280', flexWrap: 'wrap' }}>
+                {priceLabel && <span>💴 {priceLabel}</span>}
+                {item.available_from && <span>📅 {item.available_from}〜</span>}
+                {item.nearest_station && <span>🚉 {item.nearest_station}</span>}
+              </div>
+              {item.reasons.length > 0 && (
+                <div style={{ fontSize: 10, color: '#6b7280', borderTop: '1px dashed #e5e7eb', paddingTop: 6 }}>
+                  {item.reasons.slice(0, 3).join(' / ')}
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                <div style={{ fontSize: 10, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }} title={item.email_subject ?? ''}>
+                  📧 {item.email_subject ?? '—'}
+                </div>
+                <button
+                  onClick={() => onPropose(item)}
+                  disabled={item.badge === 'proposed'}
+                  style={{
+                    fontSize: 11,
+                    background: item.badge === 'proposed' ? '#e5e7eb' : '#2563eb',
+                    color: item.badge === 'proposed' ? '#9ca3af' : '#fff',
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '5px 12px',
+                    cursor: item.badge === 'proposed' ? 'not-allowed' : 'pointer',
+                    fontWeight: 600,
+                  }}
+                >
+                  {item.badge === 'proposed' ? '提案済' : '提案メール作成'}
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── メインページ ──────────────────────────────────────
 export default function MatchingPage() {
   const params = useParams()
@@ -1051,13 +1214,17 @@ export default function MatchingPage() {
   const [checked, setChecked] = useState<Set<number>>(new Set())
   const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card')
-  const [sourceFilter, setSourceFilter] = useState<'' | 'self' | 'bp' | 'mail'>('')
+  const [sourceFilter, setSourceFilter] = useState<'' | 'self' | 'bp'>('')
+  // 鮮度マッチング機能（過去N日メール）
+  const [freshMode, setFreshMode] = useState(false)
+  const [freshDays, setFreshDays] = useState<number>(7)
+  const [freshItems, setFreshItems] = useState<FreshEms[]>([])
+  const [freshLoading, setFreshLoading] = useState(false)
 
   const visibleEngineers = engineers.filter(e => {
     if (excluded.has(e.engineer_id)) return false
     if (sourceFilter === 'self') return e.affiliation_type === 'self'
     if (sourceFilter === 'bp') return e.affiliation_type && e.affiliation_type !== 'self' && !e.engineer_mail_source_id
-    if (sourceFilter === 'mail') return !!e.engineer_mail_source_id
     return true
   })
   const allChecked = visibleEngineers.length > 0 && visibleEngineers.every(e => checked.has(e.engineer_id))
@@ -1097,6 +1264,36 @@ export default function MatchingPage() {
       setLoading(false)
     })
   }, [id])
+
+  // 鮮度マッチング: モード切替 / 日数変更時に過去N日の EMS を取得
+  useEffect(() => {
+    if (!id || !freshMode) return
+    setFreshLoading(true)
+    axios.get(`/api/v1/project-mails/${id}/fresh-engineer-mails`, { params: { days: freshDays } })
+      .then(res => setFreshItems(Array.isArray(res.data?.data) ? res.data.data : []))
+      .catch(() => setFreshItems([]))
+      .finally(() => setFreshLoading(false))
+  }, [id, freshMode, freshDays])
+
+  // 鮮度マッチング: EMS から提案メール草稿を生成
+  const handleGenerateProposalFromEms = (item: FreshEms) => {
+    const greeting = item.name ? `${item.name} 様` : '●● 様'
+    const skillLine = (item.skills || []).slice(0, 5).join('／') || '—'
+    const priceLine = item.unit_price_min || item.unit_price_max
+      ? `${item.unit_price_min ?? ''}〜${item.unit_price_max ?? ''}万円`
+      : '—'
+    const mainContent = `先日いただいた技術者ご紹介メール（件名: ${item.email_subject ?? '—'}）について、弊社で進行中の以下案件にマッチしておりますのでご提案させていただきます。\n\n【ご紹介エンジニア】\n・${item.name ?? '（氏名未取得）'}（${item.age ? `${item.age}歳／` : ''}${item.affiliation ?? '所属未取得'}）\n　スキル：${skillLine}\n　希望単価：${priceLine}\n\n【弊社案件】\n${mail?.title ?? ''}\n${mail?.required_skills?.slice(0, 5).join('／') ?? ''}\n\nご面談のご調整、もしくは類似案件のご紹介も可能でございます。お気軽にご返信ください。`
+    const wrappedBody = buildEmailBody(greeting, mainContent, emailTemplate)
+    setProposalDraft({
+      subject: `【案件のご提案】${mail?.title ?? ''}`,
+      body: wrappedBody,
+      to_address: item.email_from_address ?? '',
+      to_name: item.name ?? '',
+      engineer_name: item.name ?? '（氏名未取得）',
+      project_mail_id: Number(id),
+      engineer_mail_source_id: item.engineer_mail_source_id,
+    })
+  }
 
   const togglePropose = (engId: number) => {
     setProposed(prev => {
@@ -1227,16 +1424,37 @@ export default function MatchingPage() {
               { value: '', label: '全て' },
               { value: 'self', label: '自社' },
               { value: 'bp', label: 'BP' },
-              { value: 'mail', label: 'メール' },
             ] as const).map(opt => (
               <button
                 key={opt.value}
-                onClick={() => setSourceFilter(opt.value)}
-                style={{ padding: '5px 10px', border: 'none', borderLeft: opt.value ? '1px solid rgba(255,255,255,0.3)' : 'none', cursor: 'pointer', fontSize: 11, background: sourceFilter === opt.value ? 'rgba(255,255,255,0.35)' : 'transparent', color: '#fff', fontWeight: sourceFilter === opt.value ? 700 : 400 }}
+                onClick={() => { setSourceFilter(opt.value); setFreshMode(false) }}
+                style={{ padding: '5px 10px', border: 'none', borderLeft: opt.value ? '1px solid rgba(255,255,255,0.3)' : 'none', cursor: 'pointer', fontSize: 11, background: !freshMode && sourceFilter === opt.value ? 'rgba(255,255,255,0.35)' : 'transparent', color: '#fff', fontWeight: !freshMode && sourceFilter === opt.value ? 700 : 400 }}
               >
                 {opt.label}
               </button>
             ))}
+          </div>
+          {/* 鮮度マッチング: 過去N日メール */}
+          <div style={{ display: 'flex', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, overflow: 'hidden', flexShrink: 0, alignItems: 'stretch' }}>
+            <button
+              onClick={() => setFreshMode(v => !v)}
+              title="過去N日の受信メールから候補抽出"
+              style={{ padding: '5px 10px', border: 'none', cursor: 'pointer', fontSize: 11, background: freshMode ? 'rgba(255,255,255,0.35)' : 'transparent', color: '#fff', fontWeight: freshMode ? 700 : 400 }}
+            >
+              📨 メール
+            </button>
+            {freshMode && (
+              <select
+                value={freshDays}
+                onChange={e => setFreshDays(Number(e.target.value))}
+                style={{ padding: '0 6px', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11, cursor: 'pointer', outline: 'none' }}
+              >
+                <option value={3} style={{ color: '#000' }}>過去3日</option>
+                <option value={7} style={{ color: '#000' }}>過去7日</option>
+                <option value={14} style={{ color: '#000' }}>過去14日</option>
+                <option value={30} style={{ color: '#000' }}>過去30日</option>
+              </select>
+            )}
           </div>
           <button
             onClick={toggleCheckAll}
@@ -1295,7 +1513,14 @@ export default function MatchingPage() {
 
       {/* 技術者リスト */}
       <div style={{ padding: '20px 20px 40px' }}>
-        {engineers.length === 0 ? (
+        {freshMode ? (
+          <FreshEmsList
+            loading={freshLoading}
+            items={freshItems}
+            days={freshDays}
+            onPropose={handleGenerateProposalFromEms}
+          />
+        ) : engineers.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 48, color: '#9ca3af' }}>
             <p style={{ fontSize: 32, marginBottom: 8 }}>🤔</p>
             <p>マッチする技術者が見つかりませんでした</p>
