@@ -4,6 +4,29 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 
+// ── 元メール本文 アコーディオン ────────────────────────
+function OriginalMailAccordion({ body, label = '元メール本文' }: { body: string | null | undefined; label?: string }) {
+  const [open, setOpen] = useState(false)
+  if (!body || !body.trim()) return null
+  return (
+    <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, background: '#fafafa' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        style={{ width: '100%', textAlign: 'left', padding: '8px 12px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 12, color: '#374151', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+      >
+        <span>📧 {label}</span>
+        <span style={{ color: '#9ca3af', fontSize: 11 }}>{open ? '▲ 閉じる' : '▼ 開く'}</span>
+      </button>
+      {open && (
+        <pre style={{ margin: 0, padding: '8px 12px 12px', fontSize: 11, lineHeight: 1.6, color: '#4b5563', whiteSpace: 'pre-wrap', wordBreak: 'break-word', borderTop: '1px solid #e5e7eb', maxHeight: 240, overflowY: 'auto', fontFamily: 'inherit' }}>
+          {body}
+        </pre>
+      )}
+    </div>
+  )
+}
+
 // ── 一斉配信モーダル ──────────────────────────────────
 function BulkSendModal({
   projectMailId,
@@ -12,6 +35,7 @@ function BulkSendModal({
   initialSubject,
   initialBody,
   engineerCount,
+  originalMailBody,
   onClose,
 }: {
   projectMailId: number
@@ -20,6 +44,7 @@ function BulkSendModal({
   initialSubject: string
   initialBody: string
   engineerCount: number
+  originalMailBody?: string | null
   onClose: () => void
 }) {
   const [toName, setToName] = useState(initialToName)
@@ -120,6 +145,9 @@ function BulkSendModal({
               />
             </div>
           </div>
+
+          {/* 元メール本文 (アコーディオン) */}
+          <OriginalMailAccordion body={originalMailBody} label="紹介元案件メール 本文" />
 
           {/* 本文 */}
           <div>
@@ -248,6 +276,9 @@ interface ProposalDraft {
   project_mail_id: number
   // 鮮度マッチング経由（EMS から提案）の場合のみセット
   engineer_mail_source_id?: number
+  // モーダル内 ▼アコーディオン表示用 (登録済モード=PMS本文 / 鮮度モード=EMS本文)
+  original_mail_body?: string | null
+  original_mail_label?: string
 }
 
 function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () => void }) {
@@ -370,6 +401,7 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
 
         {/* 本文 */}
         <div style={{ padding: '16px 20px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <OriginalMailAccordion body={draft.original_mail_body} label={draft.original_mail_label ?? '元メール本文'} />
           <textarea
             value={body}
             onChange={e => setBody(e.target.value)}
@@ -458,7 +490,7 @@ interface ProjectMail {
   age_limit: string | null
   contract_type: string | null
   supply_chain: number | null
-  email: { from_address: string | null; from_name: string | null } | null
+  email: { from_address: string | null; from_name: string | null; body_text: string | null } | null
 }
 
 interface MatchedEngineer {
@@ -503,6 +535,7 @@ interface FreshEms {
   received_at: string | null
   email_from_address: string | null
   email_subject: string | null
+  email_body: string | null
   score: number
   breakdown: {
     requirements: number
@@ -1432,6 +1465,8 @@ export default function MatchingPage() {
       engineer_name: item.name ?? '（氏名未取得）',
       project_mail_id: Number(id),
       engineer_mail_source_id: item.engineer_mail_source_id,
+      original_mail_body: item.email_body,
+      original_mail_label: '技術者ご紹介メール 本文',
     })
   }
 
@@ -1449,7 +1484,7 @@ export default function MatchingPage() {
       const res = await axios.post(`/api/v1/project-mails/${id}/generate-proposal`, { engineer_id: eng.engineer_id })
       const greeting = `${res.data.to_name ? res.data.to_name + ' 様' : '●● 様'}`
       const wrappedBody = buildEmailBody(greeting, res.data.body, emailTemplate)
-      setProposalDraft({ ...res.data, subject: `【技術者ご紹介】${mail?.title ?? ''}`, body: wrappedBody, engineer_name: eng.engineer_name, project_mail_id: Number(id) })
+      setProposalDraft({ ...res.data, subject: `【技術者ご紹介】${mail?.title ?? ''}`, body: wrappedBody, engineer_name: eng.engineer_name, project_mail_id: Number(id), original_mail_body: mail?.email?.body_text, original_mail_label: '紹介元案件メール 本文' })
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status
       if (status === 503) {
@@ -1554,7 +1589,7 @@ export default function MatchingPage() {
           : ''
         const mainContent = `この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。\n\n【ご紹介エンジニア（${selectedCount}名）】\n${engineerLines}${projectInfoBlock}\n\n各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。\nまた、面談のご調整も随時承っております。`
         const initBody = buildEmailBody(greeting, mainContent, emailTemplate)
-        return <BulkSendModal projectMailId={Number(id)} initialToName={initToName} initialTo={initTo} initialSubject={initSubject} initialBody={initBody} engineerCount={selectedCount} onClose={() => setShowBulkSend(false)} />
+        return <BulkSendModal projectMailId={Number(id)} initialToName={initToName} initialTo={initTo} initialSubject={initSubject} initialBody={initBody} engineerCount={selectedCount} originalMailBody={mail?.email?.body_text} onClose={() => setShowBulkSend(false)} />
       })()}
       {/* 提案メールモーダル */}
       {proposalDraft && <ProposalModal draft={proposalDraft} onClose={() => setProposalDraft(null)} />}

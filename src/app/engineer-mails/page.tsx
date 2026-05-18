@@ -101,6 +101,7 @@ type FreshPms = {
   email_from_address: string | null
   email_from_name: string | null
   email_subject: string | null
+  email_body: string | null
   sales_contact: string | null
   score: number
   breakdown: {
@@ -128,6 +129,8 @@ type ProposalModal = {
   // 鮮度マッチング: PMS 起点の場合のみ project_mail_id を保持
   // → 送信時に send-proposal-from-pms エンドポイントへルーティング
   projectMailId?: number
+  // ▼アコーディオン用 (鮮度モード=PMS本文をセット)
+  originalMailBody?: string | null
 }
 
 type EmailBodyTemplate = {
@@ -247,6 +250,29 @@ const SCORE_FILTERS = [
   { value: 'mid',  label: '中 60-',  scoreMin: 60, scoreMax: 79  },
   { value: 'low',  label: '低 ～39', scoreMin: 0,  scoreMax: 39  },
 ]
+
+// 元メール本文 ▼アコーディオン
+function OriginalMailAccordion({ body, label = '元メール本文' }: { body: string | null | undefined; label?: string }) {
+  const [open, setOpen] = useState(false)
+  if (!body || !body.trim()) return null
+  return (
+    <div className="border border-gray-200 rounded-lg bg-gray-50">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full text-left px-3 py-2 text-xs font-semibold text-gray-700 flex items-center justify-between hover:bg-gray-100 rounded-lg"
+      >
+        <span>📧 {label}</span>
+        <span className="text-gray-400 text-[11px]">{open ? '▲ 閉じる' : '▼ 開く'}</span>
+      </button>
+      {open && (
+        <pre className="m-0 px-3 pb-3 pt-1 text-[11px] leading-relaxed text-gray-600 whitespace-pre-wrap break-words border-t border-gray-200 max-h-60 overflow-y-auto font-sans">
+          {body}
+        </pre>
+      )}
+    </div>
+  )
+}
 
 function scoreRank(score: number) {
   if (score >= 85) return { label: '◎', cls: 'bg-emerald-500 text-white' }
@@ -459,6 +485,7 @@ export default function EngineerMailsPage() {
       sent: false,
       error: '',
       projectMailId: item.project_mail_id,
+      originalMailBody: item.email_body,
     })
   }
 
@@ -1432,6 +1459,7 @@ export default function EngineerMailsPage() {
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                     />
                   </div>
+                  <OriginalMailAccordion body={proposalModal.originalMailBody} label="紹介元案件メール 本文" />
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">本文</label>
                     <textarea
