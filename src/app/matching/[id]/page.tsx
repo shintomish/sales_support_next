@@ -1073,11 +1073,13 @@ function FreshEmsList({
   loading,
   items,
   days,
+  viewMode,
   onPropose,
 }: {
   loading: boolean
   items: FreshEms[]
   days: number
+  viewMode: 'card' | 'list'
   onPropose: (item: FreshEms) => void
 }) {
   if (loading) {
@@ -1097,6 +1099,100 @@ function FreshEmsList({
     )
   }
   const sorted = [...items].sort((a, b) => b.score - a.score)
+
+  // ── リスト(テーブル)表示 ──
+  if (viewMode === 'list') {
+    return (
+      <div>
+        <div style={{ marginBottom: 12, fontSize: 12, color: '#6b7280' }}>
+          📨 過去{days}日の受信メールから {items.length} 件の候補
+        </div>
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', width: 70 }}>スコア</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', width: 110 }}>状態</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151' }}>技術者</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151' }}>所属</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151' }}>スキル</th>
+                <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#374151', width: 90 }}>単価</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', width: 100 }}>稼動可能</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', width: 100 }}>受信</th>
+                <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: '#374151', width: 110 }}>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map(item => {
+                const c = rankColor(item.score)
+                const badgeLabel =
+                  item.badge === 'proposed' ? '提案済' :
+                  item.badge === 'registered' ? '登録済' : '新規'
+                const badgeColor =
+                  item.badge === 'proposed' ? { bg: '#fee2e2', color: '#991b1b' } :
+                  item.badge === 'registered' ? { bg: '#fef3c7', color: '#92400e' } :
+                  { bg: '#dcfce7', color: '#166534' }
+                const priceLabel = item.unit_price_min || item.unit_price_max
+                  ? `${item.unit_price_min ?? '?'}〜${item.unit_price_max ?? '?'}万`
+                  : '—'
+                return (
+                  <tr key={item.engineer_mail_source_id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '8px 10px' }}>
+                      <span style={{ fontWeight: 700, background: c.bg, color: c.text, borderRadius: 4, padding: '2px 6px' }}>
+                        {rankLabel(item.score)}{item.score}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, background: badgeColor.bg, color: badgeColor.color, borderRadius: 4, padding: '2px 6px' }}>
+                        {badgeLabel}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 10px', color: '#111827' }}>
+                      <div style={{ fontWeight: 600 }}>{item.name ?? '（未取得）'}</div>
+                      {item.age && <div style={{ fontSize: 10, color: '#6b7280' }}>{item.age}歳</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px', color: '#6b7280', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.affiliation ?? ''}>
+                      {item.affiliation ?? '—'}
+                    </td>
+                    <td style={{ padding: '8px 10px', maxWidth: 240 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                        {(item.skills ?? []).slice(0, 6).map((s, i) => (
+                          <span key={i} style={{ fontSize: 10, background: '#eff6ff', color: '#1d4ed8', borderRadius: 3, padding: '1px 5px' }}>{s}</span>
+                        ))}
+                      </div>
+                    </td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', color: '#374151' }}>{priceLabel}</td>
+                    <td style={{ padding: '8px 10px', color: '#6b7280' }}>{item.available_from ?? '—'}</td>
+                    <td style={{ padding: '8px 10px', color: '#9ca3af', fontSize: 11 }}>{formatDate(item.received_at) ?? '—'}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => onPropose(item)}
+                        disabled={item.badge === 'proposed'}
+                        style={{
+                          fontSize: 11,
+                          background: item.badge === 'proposed' ? '#e5e7eb' : '#2563eb',
+                          color: item.badge === 'proposed' ? '#9ca3af' : '#fff',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '4px 10px',
+                          cursor: item.badge === 'proposed' ? 'not-allowed' : 'pointer',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {item.badge === 'proposed' ? '提案済' : '提案'}
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  // ── カード表示 ──
   return (
     <div>
       <div style={{ marginBottom: 12, fontSize: 12, color: '#6b7280' }}>
@@ -1217,7 +1313,7 @@ export default function MatchingPage() {
   const [sourceFilter, setSourceFilter] = useState<'' | 'self' | 'bp'>('')
   // 鮮度マッチング機能（過去N日メール）
   const [freshMode, setFreshMode] = useState(false)
-  const [freshDays, setFreshDays] = useState<number>(7)
+  const [freshDays, setFreshDays] = useState<number>(3)
   const [freshItems, setFreshItems] = useState<FreshEms[]>([])
   const [freshLoading, setFreshLoading] = useState(false)
 
@@ -1518,6 +1614,7 @@ export default function MatchingPage() {
             loading={freshLoading}
             items={freshItems}
             days={freshDays}
+            viewMode={viewMode}
             onPropose={handleGenerateProposalFromEms}
           />
         ) : engineers.length === 0 ? (

@@ -284,7 +284,7 @@ export default function EngineerMailsPage() {
   const [matchLoading, setMatchLoading] = useState(false)
   // 鮮度マッチング: 過去N日の案件メールから候補抽出
   const [freshMode, setFreshMode] = useState(false)
-  const [freshDays, setFreshDays] = useState<number>(7)
+  const [freshDays, setFreshDays] = useState<number>(3)
   const [freshPms, setFreshPms] = useState<FreshPms[]>([])
   const [freshLoading, setFreshLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
