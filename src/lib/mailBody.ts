@@ -1,16 +1,5 @@
-/**
- * 元メール本文取得: body_text 優先、空なら body_html を strip-tags してフォールバック
- * HTML-only で取り込まれたメール (Kagoya IMAP 経由など、約7%) を表示するための共通処理
- */
-export function pickMailBody(
-  email: { body_text: string | null; body_html: string | null } | null | undefined,
-): string | null {
-  if (!email) return null
-  const text = (email.body_text ?? '').trim()
-  if (text) return text
-  const html = email.body_html ?? ''
-  if (!html.trim()) return null
-  const stripped = html
+function stripHtmlToText(html: string): string {
+  return html
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<br\s*\/?>/gi, '\n')
@@ -28,7 +17,39 @@ export function pickMailBody(
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
-  return stripped || null
+}
+
+/**
+ * 元メール本文取得: body_text 優先、空なら body_html を strip-tags してフォールバック。
+ * HTML-only で取り込まれたメール (Kagoya IMAP 経由など、約7%) を表示するための共通処理。
+ *
+ * ただし body_text が "改行ほぼ無しの一塊" (HTML→text 変換に失敗したケース) の時は、
+ * 改行情報を保持している body_html を strip し直したほうが読みやすいので
+ * そちらを優先する。
+ */
+export function pickMailBody(
+  email: { body_text: string | null; body_html: string | null } | null | undefined,
+): string | null {
+  if (!email) return null
+  const text = (email.body_text ?? '').trim()
+  const html = (email.body_html ?? '').trim()
+
+  if (text) {
+    const textNewlines = (text.match(/\n/g)?.length ?? 0)
+    // 500文字超で改行密度が 250文字/改行 より低い = 一塊に潰れている
+    const textCollapsed = text.length > 500 && textNewlines < text.length / 250
+    if (!textCollapsed) return text
+    // collapsed: html が改行情報を持っていればそちらを採用
+    if (html) {
+      const stripped = stripHtmlToText(html)
+      const strippedNewlines = (stripped.match(/\n/g)?.length ?? 0)
+      if (strippedNewlines > textNewlines * 3) return stripped || text
+    }
+    return text
+  }
+
+  if (!html) return null
+  return stripHtmlToText(html) || null
 }
 
 /**
