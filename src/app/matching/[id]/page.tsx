@@ -449,12 +449,14 @@ interface ProjectMail {
   sales_contact: string | null
   required_skills: string[]
   preferred_skills: string[]
+  process: string[] | null
   work_location: string | null
   remote_ok: boolean | null
   unit_price_min: number | null
   unit_price_max: number | null
   start_date: string | null
   age_limit: string | null
+  contract_type: string | null
   supply_chain: number | null
   email: { from_address: string | null; from_name: string | null } | null
 }
@@ -1523,7 +1525,29 @@ export default function MatchingPage() {
             return `・${e.engineer_name}（${e.age ? `${e.age}歳` : ''}${e.affiliation ? `／${e.affiliation}` : ''}）\n　スキル：${skills || '—'}　稼働：${avail || '—'}`
           }).join('\n')
         }
-        const mainContent = `この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。\n\n【ご紹介エンジニア（${selectedCount}名）】\n${engineerLines}\n\n各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。\nまた、面談のご調整も随時承っております。`
+        // 紹介元案件情報 (PMS の構造化フィールドから組み立て)
+        const projectInfoLines: string[] = []
+        if (mail?.title) projectInfoLines.push(`◇案件：${mail.title}`)
+        if (mail?.customer_name) projectInfoLines.push(`◇顧客：${mail.customer_name}`)
+        const reqSkills = Array.isArray(mail?.required_skills) ? mail.required_skills : []
+        if (reqSkills.length > 0) projectInfoLines.push(`◇必須スキル：${reqSkills.join('／')}`)
+        const prefSkills = Array.isArray(mail?.preferred_skills) ? mail.preferred_skills : []
+        if (prefSkills.length > 0) projectInfoLines.push(`◇歓迎スキル：${prefSkills.join('／')}`)
+        const process = Array.isArray(mail?.process) ? mail.process : []
+        if (process.length > 0) projectInfoLines.push(`◇工程：${process.join('／')}`)
+        if (mail?.start_date) projectInfoLines.push(`◇時期：${mail.start_date}`)
+        if (mail?.work_location || mail?.remote_ok) {
+          const loc = [mail?.work_location, mail?.remote_ok ? 'リモート可' : null].filter(Boolean).join('／')
+          if (loc) projectInfoLines.push(`◇場所：${loc}`)
+        }
+        if (mail?.unit_price_min || mail?.unit_price_max) {
+          projectInfoLines.push(`◇単価：${mail.unit_price_min ?? ''}〜${mail.unit_price_max ?? ''}万円`)
+        }
+        if (mail?.contract_type) projectInfoLines.push(`◇契約：${mail.contract_type}`)
+        const projectInfoBlock = projectInfoLines.length > 0
+          ? `\n\n【案件情報】\n${projectInfoLines.join('\n')}`
+          : ''
+        const mainContent = `この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。\n\n【ご紹介エンジニア（${selectedCount}名）】\n${engineerLines}${projectInfoBlock}\n\n各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。\nまた、面談のご調整も随時承っております。`
         const initBody = buildEmailBody(greeting, mainContent, emailTemplate)
         return <BulkSendModal projectMailId={Number(id)} initialToName={initToName} initialTo={initTo} initialSubject={initSubject} initialBody={initBody} engineerCount={selectedCount} onClose={() => setShowBulkSend(false)} />
       })()}
