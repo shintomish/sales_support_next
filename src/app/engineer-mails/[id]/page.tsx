@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 import OriginalMailAccordion from '@/components/OriginalMailAccordion'
 import { pickMailBody, buildEmailBody, extractRecipientName, type EmailBodyTemplate } from '@/lib/mailBody'
+import { isSameDomain, extractDomain } from '@/lib/mailDomain'
 
 // ── 型定義 ──────────────────────────────────────────
 interface EngineerMail {
@@ -265,12 +266,9 @@ function BulkSendModalToBp({
   const [body, setBody] = useState(initialBody)
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [domainWarn, setDomainWarn] = useState(false)
 
-  const handleSend = async () => {
-    if (!to.trim()) { alert('送信先メールアドレスを入力してください'); return }
-    if (!subject.trim()) { alert('件名を入力してください'); return }
-    if (!body.trim()) { alert('本文を入力してください'); return }
-    if (!confirm(`${toName || to} に送信しますか？`)) return
+  const execSend = async () => {
     setSending(true)
     try {
       const payload: Record<string, unknown> = {
@@ -290,6 +288,20 @@ function BulkSendModalToBp({
     }
   }
 
+  const handleSend = async () => {
+    if (!to.trim()) { alert('送信先メールアドレスを入力してください'); return }
+    if (!subject.trim()) { alert('件名を入力してください'); return }
+    if (!body.trim()) { alert('本文を入力してください'); return }
+    // 編集された送信先がまだ元 BP と同一ドメインの場合は確認
+    const edited = to.trim() !== initialTo.trim()
+    if (edited && isSameDomain(to, initialTo)) {
+      setDomainWarn(true)
+      return
+    }
+    if (!confirm(`${toName || to} に送信しますか？`)) return
+    await execSend()
+  }
+
   if (sent) {
     return (
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -305,6 +317,24 @@ function BulkSendModalToBp({
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      {/* ドメイン一致警告 */}
+      {domainWarn && (
+        <div onClick={() => setDomainWarn(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 440, overflow: 'hidden' }}>
+            <div style={{ background: '#fef2f2', padding: '12px 20px', borderBottom: '1px solid #fecaca', fontSize: 13, fontWeight: 700, color: '#b91c1c' }}>⚠️ 元 BP ドメインと一致しています</div>
+            <div style={{ padding: '16px 20px', fontSize: 13, color: '#374151', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <p style={{ margin: 0 }}>配信先 <span style={{ fontFamily: 'monospace', fontSize: 12, background: '#f3f4f6', padding: '2px 6px', borderRadius: 4 }}>{to}</span> のドメイン (<span style={{ fontFamily: 'monospace' }}>{extractDomain(to)}</span>) が、技術者ご紹介元 <span style={{ fontFamily: 'monospace', fontSize: 12, background: '#f3f4f6', padding: '2px 6px', borderRadius: 4 }}>{initialTo}</span> と一致しています。</p>
+              <p style={{ margin: 0, fontSize: 12, color: '#dc2626' }}>同一技術者を同 BP に提示すると重複/抜き額露呈の恐れがあります。</p>
+              <p style={{ margin: 0 }}>本当に送信しますか？</p>
+            </div>
+            <div style={{ padding: '12px 20px', background: '#f9fafb', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button onClick={() => setDomainWarn(false)} style={{ padding: '8px 16px', borderRadius: 8, background: '#f3f4f6', color: '#374151', border: 'none', fontSize: 13, cursor: 'pointer' }}>キャンセル</button>
+              <button onClick={async () => { setDomainWarn(false); await execSend() }} style={{ padding: '8px 16px', borderRadius: 8, background: '#dc2626', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>送信する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>

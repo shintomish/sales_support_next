@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import axios from '@/lib/axios'
 import { useRouter, useParams } from 'next/navigation'
 import type { ApiError } from '@/lib/error-helpers'
+import { extractDomain } from '@/lib/mailDomain'
 
 // ── 型定義 ────────────────────────────────────────────────
 
@@ -40,13 +41,6 @@ type Campaign = {
 }
 
 // ── ヘルパー ──────────────────────────────────────────────
-
-// メールアドレスからドメインを抽出（小文字化）
-function extractDomain(email: string): string | null {
-  const at = email.lastIndexOf('@')
-  if (at < 0) return null
-  return email.slice(at + 1).trim().toLowerCase()
-}
 
 const formatDateTime = (s: string | null | undefined): string => {
   if (!s) return '—'
