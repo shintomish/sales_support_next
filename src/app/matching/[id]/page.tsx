@@ -1075,12 +1075,16 @@ function FreshEmsList({
   days,
   viewMode,
   onPropose,
+  checked,
+  onCheck,
 }: {
   loading: boolean
   items: FreshEms[]
   days: number
   viewMode: 'card' | 'list'
   onPropose: (item: FreshEms) => void
+  checked: Set<number>
+  onCheck: (emsId: number) => void
 }) {
   if (loading) {
     return (
@@ -1111,6 +1115,7 @@ function FreshEmsList({
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600, color: '#374151', width: 32 }}></th>
                 <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', width: 70 }}>スコア</th>
                 <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', width: 110 }}>状態</th>
                 <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151' }}>技術者</th>
@@ -1137,6 +1142,15 @@ function FreshEmsList({
                   : '—'
                 return (
                   <tr key={item.engineer_mail_source_id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={checked.has(item.engineer_mail_source_id)}
+                        onChange={() => onCheck(item.engineer_mail_source_id)}
+                        disabled={item.badge === 'proposed'}
+                        style={{ cursor: item.badge === 'proposed' ? 'not-allowed' : 'pointer' }}
+                      />
+                    </td>
                     <td style={{ padding: '8px 10px' }}>
                       <span style={{ fontWeight: 700, background: c.bg, color: c.text, borderRadius: 4, padding: '2px 6px' }}>
                         {rankLabel(item.score)}{item.score}
@@ -1226,6 +1240,13 @@ function FreshEmsList({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={checked.has(item.engineer_mail_source_id)}
+                  onChange={() => onCheck(item.engineer_mail_source_id)}
+                  disabled={item.badge === 'proposed'}
+                  style={{ cursor: item.badge === 'proposed' ? 'not-allowed' : 'pointer' }}
+                />
                 <span style={{ fontSize: 13, fontWeight: 700, background: c.bg, color: c.text, borderRadius: 4, padding: '2px 8px' }}>
                   {rankLabel(item.score)} {item.score}点
                 </span>
@@ -1316,6 +1337,7 @@ export default function MatchingPage() {
   const [freshDays, setFreshDays] = useState<number>(3)
   const [freshItems, setFreshItems] = useState<FreshEms[]>([])
   const [freshLoading, setFreshLoading] = useState(false)
+  const [freshChecked, setFreshChecked] = useState<Set<number>>(new Set())
 
   const visibleEngineers = engineers.filter(e => {
     if (excluded.has(e.engineer_id)) return false
@@ -1338,6 +1360,25 @@ export default function MatchingPage() {
       setChecked(new Set())
     } else {
       setChecked(new Set(visibleEngineers.map(e => e.engineer_id)))
+    }
+  }
+
+  // 鮮度モード用: 提案済を除いて全選択対象とする
+  const selectableFreshItems = freshItems.filter(i => i.badge !== 'proposed')
+  const allFreshChecked = selectableFreshItems.length > 0 && selectableFreshItems.every(i => freshChecked.has(i.engineer_mail_source_id))
+  const toggleFreshCheck = (emsId: number) => {
+    setFreshChecked(prev => {
+      const n = new Set(prev)
+      if (n.has(emsId)) n.delete(emsId)
+      else n.add(emsId)
+      return n
+    })
+  }
+  const toggleFreshCheckAll = () => {
+    if (allFreshChecked) {
+      setFreshChecked(new Set())
+    } else {
+      setFreshChecked(new Set(selectableFreshItems.map(i => i.engineer_mail_source_id)))
     }
   }
 
@@ -1365,6 +1406,7 @@ export default function MatchingPage() {
   useEffect(() => {
     if (!id || !freshMode) return
     setFreshLoading(true)
+    setFreshChecked(new Set())  // 件数/構成が変わるので選択をリセット
     axios.get(`/api/v1/project-mails/${id}/fresh-engineer-mails`, { params: { days: freshDays } })
       .then(res => setFreshItems(Array.isArray(res.data?.data) ? res.data.data : []))
       .catch(() => setFreshItems([]))
@@ -1455,22 +1497,35 @@ export default function MatchingPage() {
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
       {/* 一斉配信モーダル */}
       {showBulkSend && (()=>{
-        const selected = engineers.filter(e => checked.has(e.engineer_id))
-        // 宛先は案件メールの送信元（案件をくれた相手）
+        // 宛先は案件メールの送信元（案件をくれた相手）— 登録済/鮮度モード共通
         const initToName = (mail?.sales_contact || mail?.email?.from_name || '') + ' 様'
         const initTo     = mail?.email?.from_address ?? ''
         const initSubject = `【技術者ご紹介】${mail?.title ?? ''}`
         const greeting   = mail?.sales_contact || mail?.email?.from_name
           ? `${mail.sales_contact || mail.email?.from_name} 様`
           : '営業ご担当者様'
-        const engineerLines = selected.map(e => {
-          const skills = e.skills.slice(0, 5).map(s => s.name).join('／')
-          const avail = e.availability_status === 'available' ? '稼働可' : e.availability_status === 'scheduled' ? '稼働予定' : e.availability_status === 'working' ? '稼働中' : ''
-          return `・${e.engineer_name}（${e.age ? `${e.age}歳` : ''}${e.affiliation ? `／${e.affiliation}` : ''}）\n　スキル：${skills || '—'}　稼働：${avail || '—'}`
-        }).join('\n')
-        const mainContent = `この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。\n\n【ご紹介エンジニア（${selected.length}名）】\n${engineerLines}\n\n各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。\nまた、面談のご調整も随時承っております。`
+        let engineerLines = ''
+        let selectedCount = 0
+        if (freshMode) {
+          const selected = freshItems.filter(i => freshChecked.has(i.engineer_mail_source_id))
+          selectedCount = selected.length
+          engineerLines = selected.map(i => {
+            const skills = (i.skills ?? []).slice(0, 5).join('／')
+            const avail = i.available_from ? `${i.available_from}〜` : ''
+            return `・${i.name ?? '（氏名未取得）'}（${i.age ? `${i.age}歳` : ''}${i.affiliation ? `／${i.affiliation}` : ''}）\n　スキル：${skills || '—'}　稼働：${avail || '—'}`
+          }).join('\n')
+        } else {
+          const selected = engineers.filter(e => checked.has(e.engineer_id))
+          selectedCount = selected.length
+          engineerLines = selected.map(e => {
+            const skills = e.skills.slice(0, 5).map(s => s.name).join('／')
+            const avail = e.availability_status === 'available' ? '稼働可' : e.availability_status === 'scheduled' ? '稼働予定' : e.availability_status === 'working' ? '稼働中' : ''
+            return `・${e.engineer_name}（${e.age ? `${e.age}歳` : ''}${e.affiliation ? `／${e.affiliation}` : ''}）\n　スキル：${skills || '—'}　稼働：${avail || '—'}`
+          }).join('\n')
+        }
+        const mainContent = `この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。\n\n【ご紹介エンジニア（${selectedCount}名）】\n${engineerLines}\n\n各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。\nまた、面談のご調整も随時承っております。`
         const initBody = buildEmailBody(greeting, mainContent, emailTemplate)
-        return <BulkSendModal projectMailId={Number(id)} initialToName={initToName} initialTo={initTo} initialSubject={initSubject} initialBody={initBody} engineerCount={selected.length} onClose={() => setShowBulkSend(false)} />
+        return <BulkSendModal projectMailId={Number(id)} initialToName={initToName} initialTo={initTo} initialSubject={initSubject} initialBody={initBody} engineerCount={selectedCount} onClose={() => setShowBulkSend(false)} />
       })()}
       {/* 提案メールモーダル */}
       {proposalDraft && <ProposalModal draft={proposalDraft} onClose={() => setProposalDraft(null)} />}
@@ -1552,8 +1607,25 @@ export default function MatchingPage() {
               </select>
             )}
           </div>
-          {/* 鮮度モードは 1件ずつ個別に提案するフローなので、まとめて提案系は登録済モード時のみ表示 */}
-          {!freshMode && (
+          {/* 全選択 / まとめて提案 (登録済モード / 鮮度モードで対象が切替わる。送信先は常に案件提供者) */}
+          {freshMode ? (
+            <>
+              <button
+                onClick={toggleFreshCheckAll}
+                disabled={selectableFreshItems.length === 0}
+                style={{ fontSize: 12, background: allFreshChecked ? '#6b7280' : 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: 6, padding: '5px 12px', cursor: selectableFreshItems.length > 0 ? 'pointer' : 'not-allowed', fontWeight: 600, flexShrink: 0, opacity: selectableFreshItems.length === 0 ? 0.5 : 1 }}
+              >
+                {allFreshChecked ? '☑ 全解除' : '☐ 全選択'}
+              </button>
+              <button
+                onClick={() => setShowBulkSend(true)}
+                disabled={freshChecked.size === 0}
+                style={{ fontSize: 12, background: freshChecked.size > 0 ? '#f59e0b' : '#d1d5db', border: 'none', color: freshChecked.size > 0 ? '#fff' : '#9ca3af', borderRadius: 6, padding: '5px 12px', cursor: freshChecked.size > 0 ? 'pointer' : 'not-allowed', fontWeight: 600, flexShrink: 0 }}
+              >
+                📤 まとめて提案{freshChecked.size > 0 ? `（${freshChecked.size}名）` : ''}
+              </button>
+            </>
+          ) : (
             <>
               <button
                 onClick={toggleCheckAll}
@@ -1621,6 +1693,8 @@ export default function MatchingPage() {
             days={freshDays}
             viewMode={viewMode}
             onPropose={handleGenerateProposalFromEms}
+            checked={freshChecked}
+            onCheck={toggleFreshCheck}
           />
         ) : engineers.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 48, color: '#9ca3af' }}>
