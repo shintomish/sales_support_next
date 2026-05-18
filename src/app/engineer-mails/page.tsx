@@ -974,6 +974,11 @@ export default function EngineerMailsPage() {
                     技術者登録
                   </button>
                   <button
+                    onClick={() => router.push(`/engineer-mails/${selected.id}`)}
+                    className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium">
+                    🎯 マッチング
+                  </button>
+                  <button
                     onClick={() => router.push(`/deliveries?tab=send&delivery_type=engineer&engineer_mail_id=${selected.id}`)}
                     className="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg hover:bg-orange-700 font-medium">
                     📤 一斉配信

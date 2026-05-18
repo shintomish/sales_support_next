@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
+import OriginalMailAccordion from '@/components/OriginalMailAccordion'
+import { pickMailBody, buildEmailBody, type EmailBodyTemplate } from '@/lib/mailBody'
 
 // PMS の構造化フィールドから「【案件情報】◇〜」ブロックを組み立てる
 // 個別提案/まとめて提案の両モードで同一フォーマットになるよう共通化
@@ -31,28 +33,6 @@ function buildProjectInfoBlock(mail: ProjectMail | null): string {
 }
 
 // ── 元メール本文 アコーディオン ────────────────────────
-function OriginalMailAccordion({ body, label = '元メール本文' }: { body: string | null | undefined; label?: string }) {
-  const [open, setOpen] = useState(false)
-  if (!body || !body.trim()) return null
-  return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, background: '#fafafa' }}>
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        style={{ width: '100%', textAlign: 'left', padding: '8px 12px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 12, color: '#374151', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-      >
-        <span>📧 {label}</span>
-        <span style={{ color: '#9ca3af', fontSize: 11 }}>{open ? '▲ 閉じる' : '▼ 開く'}</span>
-      </button>
-      {open && (
-        <pre style={{ margin: 0, padding: '8px 12px 12px', fontSize: 11, lineHeight: 1.6, color: '#4b5563', whiteSpace: 'pre-wrap', wordBreak: 'break-word', borderTop: '1px solid #e5e7eb', maxHeight: 240, overflowY: 'auto', fontFamily: 'inherit' }}>
-          {body}
-        </pre>
-      )}
-    </div>
-  )
-}
-
 // ── 一斉配信モーダル ──────────────────────────────────
 function BulkSendModal({
   projectMailId,
@@ -246,52 +226,6 @@ function BulkSendModal({
 }
 
 // ── 提案メールモーダル ────────────────────────────────
-interface EmailBodyTemplate {
-  name: string
-  name_en: string
-  department: string
-  position: string
-  email: string
-  mobile: string
-  body_text?: string | null
-}
-
-function buildEmailBody(
-  greeting: string,
-  mainContent: string,
-  tpl: EmailBodyTemplate | null,
-): string {
-  // body_text（設定ページで保存済みのテンプレート）があればそちらを優先
-  if (tpl?.body_text) {
-    return tpl.body_text
-      .replace(/^.*?様\s*/u, `${greeting}\n\n`)   // 1行目の「●● 様」を実際の宛先に置換
-      .replace('（本文）', mainContent)
-  }
-
-  const intro = tpl
-    ? `いつも大変お世話になっております。\n株式会社アイゼン・ソリューションの${tpl.name}です。`
-    : `いつも大変お世話になっております。`
-
-  const sig = tpl
-    ? `_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-　　株式会社アイゼン・ソリューション
-　${tpl.department ?? ''}
-　${tpl.position ?? ''}
-　${tpl.name}${tpl.name_en ? `（${tpl.name_en}）` : ''}
-
-　〒332-0017
-　埼玉県川口市栄町3-12-11 コスモ川口栄町2F
-　Tel：048-253-3922　Fax：048-271-9355
-
-　E-Mail：${tpl.email ?? ''}
-　Mobile：${tpl.mobile ?? ''}
-
-　URL:https://www.aizen-sol.co.jp
-_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
-    : ''
-
-  return `${greeting}\n\n${intro}\n\n${mainContent}\n\nお忙しいところ大変恐れ入りますが、ご検討いただけますと幸いでございます。\n何卒よろしくお願いいたします。\n${sig}`
-}
 
 interface ProposalDraft {
   subject: string
@@ -517,33 +451,6 @@ interface ProjectMail {
   contract_type: string | null
   supply_chain: number | null
   email: { from_address: string | null; from_name: string | null; body_text: string | null; body_html: string | null } | null
-}
-
-// 元メール本文取得: body_text 優先、空なら body_html を strip-tags してフォールバック
-function pickMailBody(email: { body_text: string | null; body_html: string | null } | null | undefined): string | null {
-  if (!email) return null
-  const text = (email.body_text ?? '').trim()
-  if (text) return text
-  const html = email.body_html ?? ''
-  if (!html.trim()) return null
-  // 簡易 HTML → text: script/style 除去 + タグ削除 + 連続空行詰め
-  const stripped = html
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\r\n/g, '\n')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-  return stripped || null
 }
 
 interface MatchedEngineer {

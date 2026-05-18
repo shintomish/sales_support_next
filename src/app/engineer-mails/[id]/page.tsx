@@ -1,0 +1,717 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import axios from '@/lib/axios'
+import OriginalMailAccordion from '@/components/OriginalMailAccordion'
+import { pickMailBody, buildEmailBody, type EmailBodyTemplate } from '@/lib/mailBody'
+
+// ── 型定義 ──────────────────────────────────────────
+interface EngineerMail {
+  id: number
+  email_id: number
+  name: string | null
+  age: number | null
+  affiliation: string | null
+  affiliation_type: string | null
+  unit_price_min: number | null
+  unit_price_max: number | null
+  available_from: string | null
+  nearest_station: string | null
+  skills: string[] | null
+  email: { from_address: string | null; from_name: string | null; body_text: string | null; body_html: string | null } | null
+}
+
+interface MatchedProject {
+  project_id: number
+  project_title: string | null
+  status: string | null
+  work_style: string | null
+  nearest_station: string | null
+  unit_price_min: number | null
+  unit_price_max: number | null
+  match_score: number
+  matched_count: number
+  total_skills: number
+  required_skills: { name: string | null; is_required: boolean; matched: boolean }[]
+  to_email: string
+  sales_contact: string
+  // 元 PMS (個別提案モーダル ▼元メール本文 用)
+  pms_id: number | null
+  pms_email_subject: string | null
+  pms_email_from_address: string | null
+  pms_email_body: string | null
+}
+
+// 鮮度マッチング: 過去N日のPMS候補
+interface FreshPms {
+  project_mail_id: number
+  title: string | null
+  customer_name: string | null
+  required_skills: string[] | null
+  unit_price_min: number | null
+  unit_price_max: number | null
+  work_location: string | null
+  remote_ok: boolean | null
+  start_date: string | null
+  received_at: string | null
+  email_from_address: string | null
+  email_subject: string | null
+  email_body: string | null
+  score: number
+  breakdown: {
+    requirements: number
+    skills: number
+    conditions: number
+    availability: number
+    track_record: number
+  }
+  reasons: string[]
+  badge: 'new' | 'registered' | 'proposed'
+}
+
+interface ProposalDraft {
+  subject: string
+  body: string
+  to_address: string
+  to_name: string
+  project_id?: number
+  // 鮮度マッチング(PMS起点) の場合
+  project_mail_id?: number
+  // ▼アコーディオン表示用
+  original_mail_body?: string | null
+  original_mail_label?: string
+}
+
+// ── ユーティリティ ────────────────────────────────────
+function rankLabel(score: number): '◎' | '○' | '△' {
+  if (score >= 80) return '◎'
+  if (score >= 60) return '○'
+  return '△'
+}
+
+function rankColor(score: number) {
+  if (score >= 80) return { bg: '#dcfce7', fg: '#166534', border: '#86efac' }
+  if (score >= 60) return { bg: '#fef3c7', fg: '#92400e', border: '#fcd34d' }
+  return { bg: '#fee2e2', fg: '#991b1b', border: '#fca5a5' }
+}
+
+function formatDate(iso: string | null): string | null {
+  if (!iso) return null
+  try { return new Date(iso).toLocaleDateString('ja-JP') } catch { return iso }
+}
+
+function priceStr(min: number | null, max: number | null): string {
+  if (!min && !max) return '—'
+  if (min && max && min !== max) return `${(min / 10000).toFixed(0)}〜${(max / 10000).toFixed(0)}万`
+  return `${((max ?? min ?? 0) / 10000).toFixed(0)}万`
+}
+
+// EMS の構造化フィールドから「【技術者情報】◇〜」ブロックを組み立てる
+// 個別提案/まとめて提案の両モードで同一フォーマット
+function buildEngineerInfoBlock(ems: EngineerMail | null): string {
+  if (!ems) return ''
+  const lines: string[] = []
+  if (ems.name) lines.push(`◇氏名：${ems.name}`)
+  if (ems.age) lines.push(`◇年齢：${ems.age}歳`)
+  if (ems.affiliation) lines.push(`◇所属：${ems.affiliation}`)
+  const skills = Array.isArray(ems.skills) ? ems.skills.filter(Boolean) : []
+  if (skills.length > 0) lines.push(`◇スキル：${skills.slice(0, 8).join('／')}`)
+  const price = priceStr(ems.unit_price_min, ems.unit_price_max)
+  if (price !== '—') lines.push(`◇希望単価：${price}/月`)
+  if (ems.available_from) lines.push(`◇稼働開始：${ems.available_from}`)
+  if (ems.nearest_station) lines.push(`◇最寄駅：${ems.nearest_station}`)
+  if (lines.length === 0) return ''
+  return `\n\n【技術者情報】\n${lines.join('\n')}`
+}
+
+// ── 提案メールモーダル ────────────────────────────────
+function ProposalModal({ draft, engineerMailId, onClose }: { draft: ProposalDraft; engineerMailId: number; onClose: () => void }) {
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [toName, setToName] = useState(draft.to_name ? draft.to_name + ' 様' : '')
+  const [toAddress, setToAddress] = useState(draft.to_address)
+  const [body, setBody] = useState(draft.body)
+  const [subject, setSubject] = useState(draft.subject)
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleToNameChange = (name: string) => {
+    setToName(name)
+    setBody(prev => {
+      const lines = prev.split('\n')
+      lines[0] = name ? `${name} 様` : '●● 様'
+      return lines.join('\n')
+    })
+  }
+
+  const handleSend = async () => {
+    if (!confirm(`${toName || toAddress} に送信しますか？`)) return
+    setSending(true)
+    try {
+      const formData = new FormData()
+      formData.append('to', toAddress)
+      formData.append('to_name', toName)
+      formData.append('subject', subject)
+      formData.append('body', body)
+      attachments.forEach(f => formData.append('attachments[]', f))
+      // 鮮度モード = send-proposal-from-pms / 登録済モード = send-proposal
+      const endpoint = draft.project_mail_id
+        ? `/api/v1/engineer-mails/${engineerMailId}/send-proposal-from-pms`
+        : `/api/v1/engineer-mails/${engineerMailId}/send-proposal`
+      if (draft.project_mail_id) {
+        formData.append('project_mail_id', String(draft.project_mail_id))
+      } else if (draft.project_id) {
+        formData.append('project_id', String(draft.project_id))
+      }
+      await axios.post(endpoint, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      setSent(true)
+      setTimeout(() => onClose(), 1500)
+    } catch {
+      alert('送信に失敗しました')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (sent) {
+    return (
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 400, padding: '40px 32px', textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+          <p style={{ fontSize: 16, fontWeight: 700, color: '#111827', margin: '0 0 8px' }}>送信しました</p>
+          <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 4px' }}>{toName || toAddress}</p>
+          <p style={{ fontSize: 12, color: '#9ca3af', margin: '0 0 24px' }}>{subject}</p>
+          <button onClick={onClose} style={{ padding: '10px 32px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>閉じる</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>📧 提案メール草稿</p>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9ca3af' }}>✕</button>
+        </div>
+        <div style={{ padding: '12px 20px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb', fontSize: 12 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+            <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>宛先名</span>
+            <input type="text" value={toName} onChange={e => handleToNameChange(e.target.value)} placeholder="担当者名" style={{ flex: 1, fontSize: 12, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+            <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>送信先</span>
+            <input type="email" value={toAddress} onChange={e => setToAddress(e.target.value)} placeholder="example@example.com" style={{ flex: 1, fontSize: 12, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>件名</span>
+            <input type="text" value={subject} onChange={e => setSubject(e.target.value)} style={{ flex: 1, fontSize: 12, fontWeight: 600, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4 }} />
+          </div>
+        </div>
+        <div style={{ padding: '16px 20px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <OriginalMailAccordion body={draft.original_mail_body} label={draft.original_mail_label ?? '元メール本文'} />
+          <textarea value={body} onChange={e => setBody(e.target.value)} style={{ width: '100%', fontSize: 13, color: '#374151', lineHeight: 1.7, fontFamily: 'sans-serif', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', resize: 'vertical', minHeight: 280, boxSizing: 'border-box' }} />
+          <div
+            onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
+            onDragLeave={e => { e.preventDefault(); setIsDragging(false) }}
+            onDrop={e => { e.preventDefault(); setIsDragging(false); const files = Array.from(e.dataTransfer.files); setAttachments(prev => [...prev, ...files]) }}
+            onClick={() => fileInputRef.current?.click()}
+            style={{ border: `2px dashed ${isDragging ? '#2563eb' : '#d1d5db'}`, borderRadius: 8, padding: '12px', textAlign: 'center', cursor: 'pointer', background: isDragging ? '#eff6ff' : '#f9fafb', fontSize: 12, color: '#6b7280' }}>
+            📎 添付ファイル (クリックまたはドラッグ)
+            <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }} onChange={e => { const files = Array.from(e.target.files ?? []); setAttachments(prev => [...prev, ...files]) }} />
+          </div>
+          {attachments.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+              {attachments.map((f, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', background: '#f3f4f6', borderRadius: 4 }}>
+                  <span style={{ color: '#374151' }}>📄 {f.name} ({(f.size / 1024).toFixed(1)}KB)</span>
+                  <button onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer' }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button onClick={onClose} disabled={sending} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontSize: 13 }}>キャンセル</button>
+          <button onClick={handleSend} disabled={sending} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: sending ? '#93c5fd' : '#2563eb', color: '#fff', cursor: sending ? 'default' : 'pointer', fontSize: 13, fontWeight: 600 }}>
+            {sending ? '送信中...' : '📤 送信'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── まとめて提案モーダル (BP=EMS送信者 宛て) ────────────
+function BulkSendModalToBp({
+  engineerMailId, initialToName, initialTo, initialSubject, initialBody, projectCount, projectIds, projectMailIds, originalMailBody, onClose,
+}: {
+  engineerMailId: number
+  initialToName: string
+  initialTo: string
+  initialSubject: string
+  initialBody: string
+  projectCount: number
+  projectIds?: number[]
+  projectMailIds?: number[]
+  originalMailBody?: string | null
+  onClose: () => void
+}) {
+  const [toName, setToName] = useState(initialToName)
+  const [to, setTo] = useState(initialTo)
+  const [subject, setSubject] = useState(initialSubject)
+  const [body, setBody] = useState(initialBody)
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  const handleSend = async () => {
+    if (!to.trim()) { alert('送信先メールアドレスを入力してください'); return }
+    if (!subject.trim()) { alert('件名を入力してください'); return }
+    if (!body.trim()) { alert('本文を入力してください'); return }
+    if (!confirm(`${toName || to} に送信しますか？`)) return
+    setSending(true)
+    try {
+      const payload: Record<string, unknown> = {
+        recipients: [{ to, name: toName }],
+        subject,
+        body,
+      }
+      if (projectIds && projectIds.length > 0) payload.project_ids = projectIds
+      if (projectMailIds && projectMailIds.length > 0) payload.project_mail_ids = projectMailIds
+      await axios.post(`/api/v1/engineer-mails/${engineerMailId}/send-bulk-to-bp`, payload)
+      setSent(true)
+      setTimeout(() => onClose(), 1500)
+    } catch {
+      alert('送信に失敗しました')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (sent) {
+    return (
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 400, padding: '40px 32px', textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+          <p style={{ fontSize: 16, fontWeight: 700, color: '#111827', margin: '0 0 8px' }}>送信しました</p>
+          <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 4px' }}>{toName || to}</p>
+          <button onClick={onClose} style={{ padding: '10px 32px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>閉じる</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>📧 まとめて提案（BP宛て）</p>
+            <p style={{ fontSize: 11, color: '#6b7280', margin: '2px 0 0' }}>選択案件 {projectCount}件を提示</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9ca3af' }}>✕</button>
+        </div>
+        <div style={{ padding: '12px 20px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb', fontSize: 12 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+            <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>宛先名</span>
+            <input type="text" value={toName} onChange={e => setToName(e.target.value)} style={{ flex: 1, fontSize: 12, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+            <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>送信先</span>
+            <input type="email" value={to} onChange={e => setTo(e.target.value)} style={{ flex: 1, fontSize: 12, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ color: '#6b7280', width: 40, flexShrink: 0 }}>件名</span>
+            <input type="text" value={subject} onChange={e => setSubject(e.target.value)} style={{ flex: 1, fontSize: 12, fontWeight: 600, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4 }} />
+          </div>
+        </div>
+        <div style={{ padding: '16px 20px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <OriginalMailAccordion body={originalMailBody} label="技術者ご紹介メール 本文" />
+          <textarea value={body} onChange={e => setBody(e.target.value)} style={{ width: '100%', fontSize: 13, color: '#374151', lineHeight: 1.7, fontFamily: 'sans-serif', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', resize: 'vertical', minHeight: 320, boxSizing: 'border-box' }} />
+        </div>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button onClick={onClose} disabled={sending} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontSize: 13 }}>キャンセル</button>
+          <button onClick={handleSend} disabled={sending} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: sending ? '#93c5fd' : '#2563eb', color: '#fff', cursor: sending ? 'default' : 'pointer', fontSize: 13, fontWeight: 600 }}>
+            {sending ? '送信中...' : `📤 送信 (${projectCount}件)`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── 案件カード ────────────────────────────────────────
+function ProjectCard({ project, onPropose, generating, checked, onCheck }: {
+  project: MatchedProject
+  onPropose: (p: MatchedProject) => void
+  generating: boolean
+  checked: boolean
+  onCheck: (id: number) => void
+}) {
+  const rk = rankColor(project.match_score)
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <input type="checkbox" checked={checked} onChange={() => onCheck(project.project_id)} style={{ marginTop: 4, width: 16, height: 16, cursor: 'pointer' }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, background: rk.bg, color: rk.fg, border: `1px solid ${rk.border}`, fontSize: 11, fontWeight: 700 }}>{rankLabel(project.match_score)} {project.match_score}</span>
+            <span style={{ fontSize: 11, color: '#6b7280' }}>{project.matched_count}/{project.total_skills} スキル一致</span>
+          </div>
+          <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', margin: 0 }}>{project.project_title ?? '（案件名未設定）'}</p>
+          <p style={{ fontSize: 11, color: '#6b7280', margin: '2px 0 0' }}>
+            {project.work_style ?? '—'} / {project.nearest_station ?? '—'} / {priceStr(project.unit_price_min, project.unit_price_max)}
+          </p>
+        </div>
+      </div>
+      {project.required_skills.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {project.required_skills.map((s, i) => (
+            <span key={i} style={{
+              fontSize: 10, padding: '2px 6px', borderRadius: 3,
+              background: s.matched ? '#dcfce7' : '#f3f4f6',
+              color: s.matched ? '#166534' : '#6b7280',
+              border: `1px solid ${s.matched ? '#86efac' : '#e5e7eb'}`,
+              fontWeight: s.is_required ? 700 : 400,
+            }}>
+              {s.matched ? '✓ ' : ''}{s.name}{s.is_required ? '*' : ''}
+            </span>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        <button
+          onClick={() => onPropose(project)}
+          disabled={generating || !project.to_email}
+          title={!project.to_email ? '案件提供者の連絡先メールが未登録' : ''}
+          style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: generating ? '#93c5fd' : !project.to_email ? '#e5e7eb' : '#2563eb', color: !project.to_email ? '#9ca3af' : '#fff', fontSize: 12, fontWeight: 600, cursor: generating || !project.to_email ? 'default' : 'pointer' }}>
+          {generating ? '生成中...' : '📨 個別提案'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── 鮮度マッチング: PMS リスト ────────────────────────
+function FreshPmsCard({ item, onPropose, generating, checked, onCheck }: {
+  item: FreshPms
+  onPropose: (p: FreshPms) => void
+  generating: boolean
+  checked: boolean
+  onCheck: (id: number) => void
+}) {
+  const rk = rankColor(item.score)
+  const badgeMap: Record<string, { label: string; color: string }> = {
+    new: { label: '新規', color: '#2563eb' },
+    registered: { label: '登録済', color: '#16a34a' },
+    proposed: { label: '提案済', color: '#a855f7' },
+  }
+  const badge = badgeMap[item.badge]
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <input type="checkbox" checked={checked} onChange={() => onCheck(item.project_mail_id)} style={{ marginTop: 4, width: 16, height: 16, cursor: 'pointer' }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, background: rk.bg, color: rk.fg, border: `1px solid ${rk.border}`, fontSize: 11, fontWeight: 700 }}>{rankLabel(item.score)} {item.score}</span>
+            {badge && <span style={{ display: 'inline-block', padding: '2px 6px', borderRadius: 4, background: '#fff', color: badge.color, border: `1px solid ${badge.color}`, fontSize: 10, fontWeight: 600 }}>{badge.label}</span>}
+            <span style={{ fontSize: 11, color: '#6b7280' }}>{formatDate(item.received_at) ?? '—'}</span>
+          </div>
+          <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', margin: 0 }}>{item.title ?? '（案件名未設定）'}</p>
+          <p style={{ fontSize: 11, color: '#6b7280', margin: '2px 0 0' }}>
+            {item.customer_name ?? '—'} / {item.work_location ?? '—'} / {priceStr(item.unit_price_min, item.unit_price_max)}
+          </p>
+        </div>
+      </div>
+      {(item.required_skills ?? []).length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {(item.required_skills ?? []).slice(0, 12).map((s, i) => (
+            <span key={i} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb' }}>{s}</span>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        <button
+          onClick={() => onPropose(item)}
+          disabled={generating || !item.email_from_address}
+          style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: generating ? '#93c5fd' : !item.email_from_address ? '#e5e7eb' : '#2563eb', color: !item.email_from_address ? '#9ca3af' : '#fff', fontSize: 12, fontWeight: 600, cursor: generating || !item.email_from_address ? 'default' : 'pointer' }}>
+          {generating ? '生成中...' : '📨 個別提案'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── メインページ ──────────────────────────────────────
+export default function EngineerMailMatchingPage() {
+  const params = useParams()
+  const router = useRouter()
+  const id = params.id as string
+
+  const [mail, setMail] = useState<EngineerMail | null>(null)
+  const [projects, setProjects] = useState<MatchedProject[]>([])
+  const [freshItems, setFreshItems] = useState<FreshPms[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [freshMode, setFreshMode] = useState(false)
+  const [freshDays, setFreshDays] = useState(3)
+  const [freshLoading, setFreshLoading] = useState(false)
+  const [checked, setChecked] = useState<Set<number>>(new Set())
+  const [freshChecked, setFreshChecked] = useState<Set<number>>(new Set())
+  const [proposalDraft, setProposalDraft] = useState<ProposalDraft | null>(null)
+  const [generatingId, setGeneratingId] = useState<number | null>(null)
+  const [showBulkSend, setShowBulkSend] = useState(false)
+  const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
+
+  useEffect(() => {
+    Promise.all([
+      axios.get(`/api/v1/engineer-mails/${id}`),
+      axios.get(`/api/v1/engineer-mails/${id}/matched-projects`),
+      axios.get('/api/v1/settings/email-body-template').catch(() => null),
+    ]).then(([emsRes, matchRes, tplRes]) => {
+      setMail(emsRes.data)
+      setProjects(matchRes.data?.data ?? [])
+      if (tplRes?.data) setEmailTemplate(tplRes.data)
+    }).catch((e: unknown) => {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
+      setError(msg ?? 'データを取得できませんでした')
+    }).finally(() => setLoading(false))
+  }, [id])
+
+  useEffect(() => {
+    if (!freshMode) return
+    setFreshLoading(true)
+    axios.get(`/api/v1/engineer-mails/${id}/fresh-project-mails`, { params: { days: freshDays } })
+      .then(res => setFreshItems(res.data?.data ?? []))
+      .catch(() => setFreshItems([]))
+      .finally(() => setFreshLoading(false))
+  }, [id, freshMode, freshDays])
+
+  const toggleCheck = (pid: number) => {
+    setChecked(prev => { const n = new Set(prev); n.has(pid) ? n.delete(pid) : n.add(pid); return n })
+  }
+  const toggleFreshCheck = (pmid: number) => {
+    setFreshChecked(prev => { const n = new Set(prev); n.has(pmid) ? n.delete(pmid) : n.add(pmid); return n })
+  }
+  const selectableProjects = projects.filter(p => !!p.to_email)
+  const selectableFresh = freshItems.filter(i => !!i.email_from_address)
+  const allChecked = selectableProjects.length > 0 && selectableProjects.every(p => checked.has(p.project_id))
+  const allFreshChecked = selectableFresh.length > 0 && selectableFresh.every(i => freshChecked.has(i.project_mail_id))
+
+  const toggleAll = () => {
+    if (allChecked) setChecked(new Set())
+    else setChecked(new Set(selectableProjects.map(p => p.project_id)))
+  }
+  const toggleAllFresh = () => {
+    if (allFreshChecked) setFreshChecked(new Set())
+    else setFreshChecked(new Set(selectableFresh.map(i => i.project_mail_id)))
+  }
+
+  // 登録済モード: 個別提案 (案件提供者宛て)
+  const handleGenerateProposal = async (project: MatchedProject) => {
+    setGeneratingId(project.project_id)
+    try {
+      const res = await axios.post(`/api/v1/engineer-mails/${id}/generate-proposal`, { project_id: project.project_id })
+      const greeting = `${res.data.to_name ? res.data.to_name + ' 様' : project.sales_contact ? project.sales_contact + ' 様' : '●● 様'}`
+      const mainContentWithBlock = (res.data.body ?? '') + buildEngineerInfoBlock(mail)
+      const wrappedBody = buildEmailBody(greeting, mainContentWithBlock, emailTemplate)
+      setProposalDraft({
+        subject: res.data.subject ?? `【技術者ご紹介】${mail?.name ?? '弊社技術者'} - ${project.project_title ?? ''}`,
+        body: wrappedBody,
+        to_address: res.data.to_address ?? project.to_email,
+        to_name: res.data.to_name ?? project.sales_contact,
+        project_id: project.project_id,
+        original_mail_body: project.pms_email_body,
+        original_mail_label: '紹介元案件メール 本文',
+      })
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status
+      if (status === 503) alert('Claude API が混雑中です。少し待ってから再試行してください。')
+      else alert('メール生成に失敗しました')
+    } finally {
+      setGeneratingId(null)
+    }
+  }
+
+  // 鮮度モード: 個別提案 (PMS送信者宛て)
+  const handleGenerateProposalFromPms = (item: FreshPms) => {
+    if (!item.email_from_address) return
+    const greeting = `${item.email_from_address ? '' : '●● 様'}`
+    const mainContent = `先日お送りいただいた案件「${item.title ?? ''}」について、弊社所属の技術者がマッチしておりますのでご提案いたします。${buildEngineerInfoBlock(mail)}\n\n面談やスキルシートのご要望がございましたら、お気軽にご返信ください。`
+    const wrappedBody = buildEmailBody(greeting || '●● 様', mainContent, emailTemplate)
+    setProposalDraft({
+      subject: `【技術者ご紹介】${mail?.name ?? '弊社技術者'} - ${item.title ?? ''}`,
+      body: wrappedBody,
+      to_address: item.email_from_address ?? '',
+      to_name: '',
+      project_mail_id: item.project_mail_id,
+      original_mail_body: item.email_body,
+      original_mail_label: '紹介元案件メール 本文',
+    })
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+          <p style={{ color: '#6b7280' }}>マッチング計算中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !mail) {
+    return (
+      <div style={{ padding: 32, color: '#dc2626' }}>
+        <p>{error ?? 'データを取得できませんでした'}</p>
+        <button onClick={() => router.back()} style={{ marginTop: 12, color: '#2563eb' }}>← 戻る</button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
+      {/* 一斉配信モーダル */}
+      {showBulkSend && (() => {
+        // 宛先 = EMS 送信者 (BP 営業担当)
+        const initToName = (mail.email?.from_name ?? '') + (mail.email?.from_name ? ' 様' : '')
+        const initTo     = mail.email?.from_address ?? ''
+        const initSubject = `【案件のご提案】${mail.name ?? '貴社技術者様'} 向け案件`
+        const greeting   = mail.email?.from_name ? `${mail.email.from_name} 様` : '営業ご担当者様'
+
+        let projectLines = ''
+        let selectedCount = 0
+        const sentProjectIds: number[] = []
+        const sentPmsIds: number[] = []
+        if (freshMode) {
+          const sel = freshItems.filter(i => freshChecked.has(i.project_mail_id))
+          selectedCount = sel.length
+          sel.forEach(i => sentPmsIds.push(i.project_mail_id))
+          projectLines = sel.map(i => {
+            const skills = (i.required_skills ?? []).slice(0, 5).join('／')
+            const price  = priceStr(i.unit_price_min, i.unit_price_max)
+            return `・${i.title ?? '（案件名未設定）'}（${i.customer_name ?? '—'}）\n　スキル：${skills || '—'}　単価：${price}　場所：${i.work_location ?? '—'}`
+          }).join('\n')
+        } else {
+          const sel = projects.filter(p => checked.has(p.project_id))
+          selectedCount = sel.length
+          sel.forEach(p => sentProjectIds.push(p.project_id))
+          projectLines = sel.map(p => {
+            const skills = p.required_skills.slice(0, 5).map(s => s.name).filter(Boolean).join('／')
+            const price  = priceStr(p.unit_price_min, p.unit_price_max)
+            return `・${p.project_title ?? '（案件名未設定）'}\n　スキル：${skills || '—'}　単価：${price}　働き方：${p.work_style ?? '—'}`
+          }).join('\n')
+        }
+        const engineerInfoBlock = buildEngineerInfoBlock(mail)
+        const mainContent = `この度、貴社よりご紹介いただいた技術者様について、弊社で取り扱っている以下の案件にマッチしておりますのでご案内いたします。${engineerInfoBlock}\n\n【ご提案案件（${selectedCount}件）】\n${projectLines}\n\nご興味のある案件がございましたら、お気軽にご返信ください。詳細資料の送付も可能です。`
+        const initBody = buildEmailBody(greeting, mainContent, emailTemplate)
+        return (
+          <BulkSendModalToBp
+            engineerMailId={Number(id)}
+            initialToName={initToName}
+            initialTo={initTo}
+            initialSubject={initSubject}
+            initialBody={initBody}
+            projectCount={selectedCount}
+            projectIds={sentProjectIds.length > 0 ? sentProjectIds : undefined}
+            projectMailIds={sentPmsIds.length > 0 ? sentPmsIds : undefined}
+            originalMailBody={pickMailBody(mail.email)}
+            onClose={() => setShowBulkSend(false)}
+          />
+        )
+      })()}
+
+      {/* 個別提案モーダル */}
+      {proposalDraft && <ProposalModal draft={proposalDraft} engineerMailId={Number(id)} onClose={() => setProposalDraft(null)} />}
+
+      {/* ヘッダー */}
+      <div style={{ background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)', color: '#fff', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <button onClick={() => router.back()} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← 戻る</button>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <p style={{ fontSize: 11, opacity: 0.85, margin: 0 }}>技術者マッチング</p>
+          <p style={{ fontSize: 15, fontWeight: 700, margin: '2px 0 0' }}>{mail.name ?? '（氏名未取得）'}{mail.age ? ` / ${mail.age}歳` : ''}{mail.affiliation ? ` / ${mail.affiliation}` : ''}</p>
+        </div>
+        <div style={{ display: 'flex', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+          <button
+            onClick={() => setFreshMode(false)}
+            style={{ padding: '5px 10px', border: 'none', cursor: 'pointer', fontSize: 11, background: !freshMode ? 'rgba(255,255,255,0.35)' : 'transparent', color: '#fff', fontWeight: !freshMode ? 700 : 400 }}>
+            登録済案件
+          </button>
+          <button
+            onClick={() => setFreshMode(true)}
+            title="過去N日の案件メールから候補抽出"
+            style={{ padding: '5px 10px', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 11, background: freshMode ? 'rgba(255,255,255,0.35)' : 'transparent', color: '#fff', fontWeight: freshMode ? 700 : 400 }}>
+            📨 メール候補
+          </button>
+        </div>
+        {freshMode && (
+          <select value={freshDays} onChange={e => setFreshDays(Number(e.target.value))}
+            style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11 }}>
+            <option value={3}>過去3日</option>
+            <option value={7}>過去7日</option>
+            <option value={14}>過去14日</option>
+            <option value={30}>過去30日</option>
+          </select>
+        )}
+        <button
+          onClick={freshMode ? toggleAllFresh : toggleAll}
+          style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
+          {(freshMode ? allFreshChecked : allChecked) ? '全解除' : '全選択'}
+        </button>
+        <button
+          onClick={() => setShowBulkSend(true)}
+          disabled={freshMode ? freshChecked.size === 0 : checked.size === 0}
+          style={{
+            padding: '6px 14px', borderRadius: 6, border: 'none',
+            background: (freshMode ? freshChecked.size : checked.size) > 0 ? '#fff' : 'rgba(255,255,255,0.25)',
+            color: (freshMode ? freshChecked.size : checked.size) > 0 ? '#16a34a' : 'rgba(255,255,255,0.6)',
+            fontSize: 12, fontWeight: 700, cursor: (freshMode ? freshChecked.size : checked.size) > 0 ? 'pointer' : 'default',
+          }}>
+          📤 まとめて提案 ({freshMode ? freshChecked.size : checked.size})
+        </button>
+      </div>
+
+      {/* メインリスト */}
+      <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {!freshMode && (
+          projects.length === 0 ? (
+            <p style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>マッチする登録済案件がありません</p>
+          ) : (
+            projects.map(p => (
+              <ProjectCard
+                key={p.project_id}
+                project={p}
+                onPropose={handleGenerateProposal}
+                generating={generatingId === p.project_id}
+                checked={checked.has(p.project_id)}
+                onCheck={toggleCheck}
+              />
+            ))
+          )
+        )}
+
+        {freshMode && (
+          freshLoading ? (
+            <p style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>🔍 過去{freshDays}日のメール候補を取得中...</p>
+          ) : freshItems.length === 0 ? (
+            <p style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>過去{freshDays}日のマッチする案件メールはありません</p>
+          ) : (
+            freshItems.map(i => (
+              <FreshPmsCard
+                key={i.project_mail_id}
+                item={i}
+                onPropose={handleGenerateProposalFromPms}
+                generating={false}
+                checked={freshChecked.has(i.project_mail_id)}
+                onCheck={toggleFreshCheck}
+              />
+            ))
+          )
+        )}
+      </div>
+    </div>
+  )
+}
