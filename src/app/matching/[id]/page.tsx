@@ -1450,8 +1450,13 @@ export default function MatchingPage() {
       const greeting = `${res.data.to_name ? res.data.to_name + ' 様' : '●● 様'}`
       const wrappedBody = buildEmailBody(greeting, res.data.body, emailTemplate)
       setProposalDraft({ ...res.data, subject: `【技術者ご紹介】${mail?.title ?? ''}`, body: wrappedBody, engineer_name: eng.engineer_name, project_mail_id: Number(id) })
-    } catch {
-      alert('メール生成に失敗しました')
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status
+      if (status === 503) {
+        alert('Claude API が混雑中です。少し待ってから再試行してください。')
+      } else {
+        alert('メール生成に失敗しました')
+      }
     } finally {
       setGeneratingId(null)
     }

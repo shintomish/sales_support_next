@@ -471,8 +471,12 @@ export default function EngineerMailsPage() {
       const greeting = toName ? `${toName} 様` : '●● 様'
       const wrappedBody = buildEmailBody(greeting, res.data.body, emailTemplate)
       setProposalModal(m => m ? { ...m, subject: res.data.subject, body: wrappedBody, generating: false } : m)
-    } catch {
-      setProposalModal(m => m ? { ...m, generating: false, error: '文章生成に失敗しました' } : m)
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status
+      const msg = status === 503
+        ? 'Claude API が混雑中です。少し待ってから再試行してください。'
+        : '文章生成に失敗しました'
+      setProposalModal(m => m ? { ...m, generating: false, error: msg } : m)
     }
   }
 
