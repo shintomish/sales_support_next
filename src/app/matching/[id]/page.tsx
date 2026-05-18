@@ -516,7 +516,34 @@ interface ProjectMail {
   age_limit: string | null
   contract_type: string | null
   supply_chain: number | null
-  email: { from_address: string | null; from_name: string | null; body_text: string | null } | null
+  email: { from_address: string | null; from_name: string | null; body_text: string | null; body_html: string | null } | null
+}
+
+// 元メール本文取得: body_text 優先、空なら body_html を strip-tags してフォールバック
+function pickMailBody(email: { body_text: string | null; body_html: string | null } | null | undefined): string | null {
+  if (!email) return null
+  const text = (email.body_text ?? '').trim()
+  if (text) return text
+  const html = email.body_html ?? ''
+  if (!html.trim()) return null
+  // 簡易 HTML → text: script/style 除去 + タグ削除 + 連続空行詰め
+  const stripped = html
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return stripped || null
 }
 
 interface MatchedEngineer {
@@ -1512,7 +1539,7 @@ export default function MatchingPage() {
       // Claude が生成した prose に、まとめて提案と同形式の ◇案件情報 ブロックを追記
       const mainContentWithBlock = (res.data.body ?? '') + buildProjectInfoBlock(mail)
       const wrappedBody = buildEmailBody(greeting, mainContentWithBlock, emailTemplate)
-      setProposalDraft({ ...res.data, subject: `【技術者ご紹介】${mail?.title ?? ''}`, body: wrappedBody, engineer_name: eng.engineer_name, project_mail_id: Number(id), original_mail_body: mail?.email?.body_text, original_mail_label: '紹介元案件メール 本文' })
+      setProposalDraft({ ...res.data, subject: `【技術者ご紹介】${mail?.title ?? ''}`, body: wrappedBody, engineer_name: eng.engineer_name, project_mail_id: Number(id), original_mail_body: pickMailBody(mail?.email), original_mail_label: '紹介元案件メール 本文' })
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status
       if (status === 503) {
@@ -1596,7 +1623,7 @@ export default function MatchingPage() {
         const projectInfoBlock = buildProjectInfoBlock(mail)
         const mainContent = `この度は、貴社のご要件に対応可能なエンジニアをご紹介させていただきたく、ご連絡差し上げました。\n\n【ご紹介エンジニア（${selectedCount}名）】\n${engineerLines}${projectInfoBlock}\n\n各エンジニアのスキルシートをご要望の場合は、お気軽にご返信ください。\nまた、面談のご調整も随時承っております。`
         const initBody = buildEmailBody(greeting, mainContent, emailTemplate)
-        return <BulkSendModal projectMailId={Number(id)} initialToName={initToName} initialTo={initTo} initialSubject={initSubject} initialBody={initBody} engineerCount={selectedCount} originalMailBody={mail?.email?.body_text} onClose={() => setShowBulkSend(false)} />
+        return <BulkSendModal projectMailId={Number(id)} initialToName={initToName} initialTo={initTo} initialSubject={initSubject} initialBody={initBody} engineerCount={selectedCount} originalMailBody={pickMailBody(mail?.email)} onClose={() => setShowBulkSend(false)} />
       })()}
       {/* 提案メールモーダル */}
       {proposalDraft && <ProposalModal draft={proposalDraft} onClose={() => setProposalDraft(null)} />}
