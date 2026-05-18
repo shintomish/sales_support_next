@@ -744,11 +744,11 @@ export default function EngineerMailMatchingPage() {
         </div>
         {freshMode && (
           <select value={freshDays} onChange={e => setFreshDays(Number(e.target.value))}
-            style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11 }}>
-            <option value={3}>過去3日</option>
-            <option value={7}>過去7日</option>
-            <option value={14}>過去14日</option>
-            <option value={30}>過去30日</option>
+            style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
+            <option value={3} style={{ color: '#000' }}>過去3日</option>
+            <option value={7} style={{ color: '#000' }}>過去7日</option>
+            <option value={14} style={{ color: '#000' }}>過去14日</option>
+            <option value={30} style={{ color: '#000' }}>過去30日</option>
           </select>
         )}
         <button
