@@ -607,6 +607,8 @@ export default function DeliveriesPage() {
     sourceDomain: string
     matches: Array<{ id: number; email: string; name: string | null }>
   } | null>(null)
+  // ドメイン重複モーダル内: 該当配信先を今回除外して送るか
+  const [dupExclude, setDupExclude] = useState(true)
   const [mailBodyText, setMailBodyText] = useState('')
   const [mailBodyOpen, setMailBodyOpen] = useState(false)
 
@@ -1053,7 +1055,7 @@ export default function DeliveriesPage() {
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   const sourceEmailInvalid = !isLinked && sendForm.source_email !== '' && !EMAIL_RE.test(sendForm.source_email)
 
-  const execSendBulk = async () => {
+  const execSendBulk = async (excludeAddressIds: number[] = []) => {
     setSending(true)
     setSendResult(null)
     try {
@@ -1066,6 +1068,7 @@ export default function DeliveriesPage() {
         formData.append('engineer_mail_source_id', sendForm.engineer_mail_source_id)
       if (!isLinked && sendForm.source_email)
         formData.append('source_email', sendForm.source_email)
+      excludeAddressIds.forEach(id => formData.append('exclude_address_ids[]', String(id)))
       attachments.forEach(file => formData.append('attachments[]', file))
 
       const res = await axios.post('/api/v1/delivery-campaigns', formData, {
@@ -1104,6 +1107,7 @@ export default function DeliveriesPage() {
       })
       const matches: Array<{ id: number; email: string; name: string | null }> = checkRes.data?.matches ?? []
       if (matches.length > 0) {
+        setDupExclude(true) // モーダルを開くたびに「除外」を初期 ON に戻す
         setDupWarn({
           sourceEmail:  checkRes.data?.source_email ?? '',
           sourceDomain: checkRes.data?.source_domain ?? '',
@@ -2589,7 +2593,18 @@ export default function DeliveriesPage() {
               <p className="text-xs text-red-600">
                 同じ案件を元請けに配信すると、抜き額が露呈する恐れがあります。
               </p>
-              <p>本当に配信しますか？</p>
+              <label className="flex items-center gap-2 text-sm bg-yellow-50 border border-yellow-300 rounded px-3 py-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={dupExclude}
+                  onChange={e => setDupExclude(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <span>今回これら <span className="font-bold">{dupWarn.matches.length} 件</span> を除外して配信</span>
+              </label>
+              <p className="text-xs text-gray-500">
+                ※ 除外しても配信先の有効/無効状態は変更されません（次回送信時は通常通り含まれます）
+              </p>
             </div>
             <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
               <button
@@ -2600,12 +2615,13 @@ export default function DeliveriesPage() {
               </button>
               <button
                 onClick={async () => {
+                  const excludeIds = dupExclude ? dupWarn.matches.map(m => m.id) : []
                   setDupWarn(null)
-                  await execSendBulk()
+                  await execSendBulk(excludeIds)
                 }}
-                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg"
+                className={`px-4 py-2 text-sm rounded-lg text-white ${dupExclude ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}
               >
-                配信する
+                {dupExclude ? '除外して配信' : '配信する'}
               </button>
             </div>
           </div>
