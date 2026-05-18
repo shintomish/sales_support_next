@@ -862,7 +862,7 @@ export default function DeliveriesPage() {
   // ── 有効/無効切替 ─────────────────────────────────────
   const toggleActive = async (addr: DeliveryAddress) => {
     await axios.patch(`/api/v1/delivery-addresses/${addr.id}`, { is_active: !addr.is_active })
-    fetchAddresses()
+    await fetchAddresses()
   }
 
   // ── 全有効・全無効・状態保存 ────────────────────────
@@ -986,8 +986,9 @@ export default function DeliveriesPage() {
         is_active:          editForm.is_active,
         unsubscribe_reason: editForm.is_active ? null : (editForm.unsubscribe_reason || null),
       })
+      // 再フェッチを await してから modal を閉じることで、リストへの反映遅延を防ぐ
+      await fetchAddresses()
       setEditingAddrId(null)
-      fetchAddresses()
     } catch (err: unknown) {
       setEditFormError((err as ApiError).response?.data?.message ?? 'エラーが発生しました。')
     } finally {
@@ -1007,7 +1008,7 @@ export default function DeliveriesPage() {
   const saveEditName = async (addr: DeliveryAddress) => {
     await axios.patch(`/api/v1/delivery-addresses/${addr.id}`, { name: editingNameValue })
     setEditingNameId(null)
-    fetchAddresses()
+    await fetchAddresses()
   }
 
   // ── 配信実行 ─────────────────────────────────────────
