@@ -2,7 +2,8 @@ function stripHtmlToText(html: string): string {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<br\s*\/?>/gi, '\n')
+    // <br>, <br/>, <br style="...">, <br class="..."> など属性付きも全部改行に
+    .replace(/<br\b[^>]*>/gi, '\n')
     // テーブルレイアウト対応: セル/行/見出しの区切りで改行
     .replace(/<\/(td|th)>/gi, '\t')
     .replace(/<\/(tr|thead|tbody|table|p|div|li|h[1-6]|article|section|header|footer)>/gi, '\n')
