@@ -1552,22 +1552,27 @@ export default function MatchingPage() {
               </select>
             )}
           </div>
-          <button
-            onClick={toggleCheckAll}
-            style={{ fontSize: 12, background: allChecked ? '#6b7280' : 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}
-          >
-            {allChecked ? '☑ 全解除' : '☐ 全選択'}
-          </button>
-          <button
-            onClick={() => setShowBulkSend(true)}
-            disabled={checked.size === 0}
-            style={{ fontSize: 12, background: checked.size > 0 ? '#f59e0b' : '#d1d5db', border: 'none', color: checked.size > 0 ? '#fff' : '#9ca3af', borderRadius: 6, padding: '5px 12px', cursor: checked.size > 0 ? 'pointer' : 'not-allowed', fontWeight: 600, flexShrink: 0 }}
-          >
-            📤 まとめて提案{checked.size > 0 ? `（${checked.size}名）` : ''}
-          </button>
+          {/* 鮮度モードは 1件ずつ個別に提案するフローなので、まとめて提案系は登録済モード時のみ表示 */}
+          {!freshMode && (
+            <>
+              <button
+                onClick={toggleCheckAll}
+                style={{ fontSize: 12, background: allChecked ? '#6b7280' : 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}
+              >
+                {allChecked ? '☑ 全解除' : '☐ 全選択'}
+              </button>
+              <button
+                onClick={() => setShowBulkSend(true)}
+                disabled={checked.size === 0}
+                style={{ fontSize: 12, background: checked.size > 0 ? '#f59e0b' : '#d1d5db', border: 'none', color: checked.size > 0 ? '#fff' : '#9ca3af', borderRadius: 6, padding: '5px 12px', cursor: checked.size > 0 ? 'pointer' : 'not-allowed', fontWeight: 600, flexShrink: 0 }}
+              >
+                📤 まとめて提案{checked.size > 0 ? `（${checked.size}名）` : ''}
+              </button>
+            </>
+          )}
           <span style={{ fontSize: 13, background: 'rgba(255,255,255,0.15)', borderRadius: 6, padding: '3px 10px', flexShrink: 0 }}>
-            候補 {visibleEngineers.length}名
-            {proposedCount > 0 && <span style={{ marginLeft: 6, color: '#86efac' }}>提案 {proposedCount}名</span>}
+            候補 {freshMode ? freshItems.length : visibleEngineers.length}名
+            {!freshMode && proposedCount > 0 && <span style={{ marginLeft: 6, color: '#86efac' }}>提案 {proposedCount}名</span>}
           </span>
         </div>
 
