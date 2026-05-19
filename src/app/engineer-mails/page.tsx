@@ -311,6 +311,7 @@ export default function EngineerMailsPage() {
   // 鮮度マッチング: 過去N日の案件メールから候補抽出
   const [freshMode, setFreshMode] = useState(false)
   const [freshDays, setFreshDays] = useState<number>(3)
+  const [freshMinScore, setFreshMinScore] = useState<number>(70)
   const [freshPms, setFreshPms] = useState<FreshPms[]>([])
   const [freshLoading, setFreshLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -442,11 +443,11 @@ export default function EngineerMailsPage() {
   useEffect(() => {
     if (!selected || !freshMode) return
     setFreshLoading(true)
-    axios.get(`/api/v1/engineer-mails/${selected.id}/fresh-project-mails`, { params: { days: freshDays } })
+    axios.get(`/api/v1/engineer-mails/${selected.id}/fresh-project-mails`, { params: { days: freshDays, min_score: freshMinScore } })
       .then(res => setFreshPms(Array.isArray(res.data?.data) ? res.data.data : []))
       .catch(() => setFreshPms([]))
       .finally(() => setFreshLoading(false))
-  }, [selected, freshMode, freshDays])
+  }, [selected, freshMode, freshDays, freshMinScore])
 
   // 鮮度マッチング: PMS から提案メール草稿を生成
   const handleGenerateFromPms = (item: FreshPms) => {
@@ -543,7 +544,7 @@ export default function EngineerMailsPage() {
       setProposalModal(m => m ? { ...m, sending: false, sent: true } : m)
       // 鮮度モード表示中なら一覧をリフレッシュして badge を更新
       if (proposalModal.projectMailId && freshMode) {
-        axios.get(`/api/v1/engineer-mails/${selected.id}/fresh-project-mails`, { params: { days: freshDays } })
+        axios.get(`/api/v1/engineer-mails/${selected.id}/fresh-project-mails`, { params: { days: freshDays, min_score: freshMinScore } })
           .then(res => setFreshPms(Array.isArray(res.data?.data) ? res.data.data : []))
           .catch(() => {})
       }
@@ -1157,16 +1158,28 @@ export default function EngineerMailsPage() {
                     </button>
                   </div>
                   {freshMode && (
-                    <select
-                      value={freshDays}
-                      onChange={e => setFreshDays(Number(e.target.value))}
-                      className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white"
-                    >
-                      <option value={3}>過去3日</option>
-                      <option value={7}>過去7日</option>
-                      <option value={14}>過去14日</option>
-                      <option value={30}>過去30日</option>
-                    </select>
+                    <>
+                      <select
+                        value={freshDays}
+                        onChange={e => setFreshDays(Number(e.target.value))}
+                        className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white"
+                      >
+                        <option value={3}>過去3日</option>
+                        <option value={7}>過去7日</option>
+                        <option value={14}>過去14日</option>
+                        <option value={30}>過去30日</option>
+                      </select>
+                      <select
+                        value={freshMinScore}
+                        onChange={e => setFreshMinScore(Number(e.target.value))}
+                        title="マッチスコアの下限"
+                        className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white"
+                      >
+                        <option value={70}>高 (70+)</option>
+                        <option value={60}>中 (60+)</option>
+                        <option value={50}>低 (50+)</option>
+                      </select>
+                    </>
                   )}
                 </div>
               </div>

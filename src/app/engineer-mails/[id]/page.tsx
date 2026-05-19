@@ -563,6 +563,150 @@ function FreshPmsCard({ item, onPropose, generating, checked, onCheck }: {
   )
 }
 
+// ── 案件 リスト行（登録済モード） ─────────────────────
+function ProjectRow({ project, onPropose, generating, checked, onCheck }: {
+  project: MatchedProject
+  onPropose: (p: MatchedProject) => void
+  generating: boolean
+  checked: boolean
+  onCheck: (id: number) => void
+}) {
+  const c = rankColor(project.match_score)
+  return (
+    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+      <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => onCheck(project.project_id)}
+          style={{ cursor: 'pointer', accentColor: c.border }}
+        />
+      </td>
+      <td style={{ padding: '8px 10px' }}>
+        <span style={{ fontWeight: 700, background: c.bg, color: c.text, borderRadius: 4, padding: '2px 6px' }}>
+          {rankLabel(project.match_score)}{project.match_score}
+        </span>
+      </td>
+      <td style={{ padding: '8px 10px', color: '#111827' }}>
+        <div style={{ fontWeight: 600, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={project.project_title ?? ''}>
+          {project.project_title ?? '（案件名未設定）'}
+        </div>
+        <div style={{ fontSize: 10, color: '#6b7280' }}>{project.matched_count}/{project.total_skills} スキル一致</div>
+      </td>
+      <td style={{ padding: '8px 10px', maxWidth: 260 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+          {project.required_skills.slice(0, 6).map((s, i) => (
+            <span key={i} style={{
+              fontSize: 10,
+              background: s.matched ? '#dcfce7' : '#eff6ff',
+              color: s.matched ? '#15803d' : '#1d4ed8',
+              border: `1px solid ${s.matched ? '#86efac' : '#bfdbfe'}`,
+              borderRadius: 3, padding: '1px 5px',
+              fontWeight: s.is_required ? 700 : 400,
+            }}>
+              {s.matched ? '✓ ' : ''}{s.name}{s.is_required ? '*' : ''}
+            </span>
+          ))}
+        </div>
+      </td>
+      <td style={{ padding: '8px 10px', textAlign: 'right', color: '#374151' }}>{priceStr(project.unit_price_min, project.unit_price_max)}</td>
+      <td style={{ padding: '8px 10px', color: '#6b7280' }}>{project.work_style ?? '—'}</td>
+      <td style={{ padding: '8px 10px', color: '#6b7280' }}>{project.nearest_station ?? '—'}</td>
+      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+        <button
+          onClick={() => onPropose(project)}
+          disabled={generating || !project.to_email}
+          title={!project.to_email ? '案件提供者の連絡先メールが未登録' : ''}
+          style={{
+            fontSize: 11,
+            background: generating || !project.to_email ? '#e5e7eb' : '#2563eb',
+            color: generating || !project.to_email ? '#9ca3af' : '#fff',
+            border: 'none', borderRadius: 6, padding: '4px 10px',
+            cursor: generating || !project.to_email ? 'not-allowed' : 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          {generating ? '生成中…' : '提案'}
+        </button>
+      </td>
+    </tr>
+  )
+}
+
+// ── 鮮度マッチング: PMS リスト行 ─────────────────────
+function FreshPmsRow({ item, onPropose, generating, checked, onCheck }: {
+  item: FreshPms
+  onPropose: (p: FreshPms) => void
+  generating: boolean
+  checked: boolean
+  onCheck: (id: number) => void
+}) {
+  const c = rankColor(item.score)
+  const badgeMap: Record<string, { label: string; bg: string; color: string }> = {
+    new:        { label: '新規',   bg: '#dcfce7', color: '#166534' },
+    registered: { label: '登録済', bg: '#fef3c7', color: '#92400e' },
+    proposed:   { label: '提案済', bg: '#fee2e2', color: '#991b1b' },
+  }
+  const badge = badgeMap[item.badge] ?? badgeMap.new
+  return (
+    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+      <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => onCheck(item.project_mail_id)}
+          disabled={item.badge === 'proposed'}
+          style={{ cursor: item.badge === 'proposed' ? 'not-allowed' : 'pointer', accentColor: c.border }}
+        />
+      </td>
+      <td style={{ padding: '8px 10px' }}>
+        <span style={{ fontWeight: 700, background: c.bg, color: c.text, borderRadius: 4, padding: '2px 6px' }}>
+          {rankLabel(item.score)}{item.score}
+        </span>
+      </td>
+      <td style={{ padding: '8px 10px' }}>
+        <span style={{ fontSize: 10, fontWeight: 600, background: badge.bg, color: badge.color, borderRadius: 4, padding: '2px 6px' }}>
+          {badge.label}
+        </span>
+      </td>
+      <td style={{ padding: '8px 10px', color: '#111827' }}>
+        <div style={{ fontWeight: 600, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title ?? ''}>
+          {item.title ?? '（案件名未設定）'}
+        </div>
+      </td>
+      <td style={{ padding: '8px 10px', color: '#6b7280', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.customer_name ?? ''}>
+        {item.customer_name ?? '—'}
+      </td>
+      <td style={{ padding: '8px 10px', maxWidth: 240 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+          {(item.required_skills ?? []).slice(0, 6).map((s, i) => (
+            <span key={i} style={{ fontSize: 10, background: '#eff6ff', color: '#1d4ed8', borderRadius: 3, padding: '1px 5px' }}>{s}</span>
+          ))}
+        </div>
+      </td>
+      <td style={{ padding: '8px 10px', textAlign: 'right', color: '#374151' }}>{priceStr(item.unit_price_min, item.unit_price_max)}</td>
+      <td style={{ padding: '8px 10px', color: '#6b7280' }}>{item.start_date ? formatDate(item.start_date) : '—'}</td>
+      <td style={{ padding: '8px 10px', color: '#9ca3af', fontSize: 11 }}>{formatDate(item.received_at) ?? '—'}</td>
+      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+        <button
+          onClick={() => onPropose(item)}
+          disabled={generating || !item.email_from_address || item.badge === 'proposed'}
+          style={{
+            fontSize: 11,
+            background: item.badge === 'proposed' || generating || !item.email_from_address ? '#e5e7eb' : '#2563eb',
+            color:      item.badge === 'proposed' || generating || !item.email_from_address ? '#9ca3af' : '#fff',
+            border: 'none', borderRadius: 6, padding: '4px 10px',
+            cursor: item.badge === 'proposed' || generating || !item.email_from_address ? 'not-allowed' : 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          {item.badge === 'proposed' ? '提案済' : (generating ? '生成中…' : '提案')}
+        </button>
+      </td>
+    </tr>
+  )
+}
+
 // ── メインページ ──────────────────────────────────────
 export default function EngineerMailMatchingPage() {
   const params = useParams()
@@ -576,6 +720,8 @@ export default function EngineerMailMatchingPage() {
   const [error, setError] = useState<string | null>(null)
   const [freshMode, setFreshMode] = useState(false)
   const [freshDays, setFreshDays] = useState(3)
+  const [freshMinScore, setFreshMinScore] = useState<number>(70)
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('card')
   const [freshLoading, setFreshLoading] = useState(false)
   const [checked, setChecked] = useState<Set<number>>(new Set())
   const [freshChecked, setFreshChecked] = useState<Set<number>>(new Set())
@@ -602,11 +748,11 @@ export default function EngineerMailMatchingPage() {
   useEffect(() => {
     if (!freshMode) return
     setFreshLoading(true)
-    axios.get(`/api/v1/engineer-mails/${id}/fresh-project-mails`, { params: { days: freshDays } })
+    axios.get(`/api/v1/engineer-mails/${id}/fresh-project-mails`, { params: { days: freshDays, min_score: freshMinScore } })
       .then(res => setFreshItems(res.data?.data ?? []))
       .catch(() => setFreshItems([]))
       .finally(() => setFreshLoading(false))
-  }, [id, freshMode, freshDays])
+  }, [id, freshMode, freshDays, freshMinScore])
 
   const toggleCheck = (pid: number) => {
     setChecked(prev => { const n = new Set(prev); n.has(pid) ? n.delete(pid) : n.add(pid); return n })
@@ -759,6 +905,23 @@ export default function EngineerMailMatchingPage() {
           <p style={{ fontSize: 11, opacity: 0.85, margin: 0 }}>技術者マッチング</p>
           <p style={{ fontSize: 15, fontWeight: 700, margin: '2px 0 0' }}>{mail.name ?? '（氏名未取得）'}{mail.age ? ` / ${mail.age}歳` : ''}{mail.affiliation ? ` / ${mail.affiliation}` : ''}</p>
         </div>
+        {/* カード/リスト切替 */}
+        <div style={{ display: 'flex', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+          <button
+            onClick={() => setViewMode('card')}
+            title="カード表示"
+            style={{ padding: '5px 10px', border: 'none', cursor: 'pointer', fontSize: 14, background: viewMode === 'card' ? 'rgba(255,255,255,0.35)' : 'transparent', color: '#fff', fontWeight: viewMode === 'card' ? 700 : 400 }}
+          >
+            ⊞
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            title="リスト表示"
+            style={{ padding: '5px 10px', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 14, background: viewMode === 'list' ? 'rgba(255,255,255,0.35)' : 'transparent', color: '#fff', fontWeight: viewMode === 'list' ? 700 : 400 }}
+          >
+            ≡
+          </button>
+        </div>
         <div style={{ display: 'flex', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
           <button
             onClick={() => setFreshMode(false)}
@@ -773,13 +936,22 @@ export default function EngineerMailMatchingPage() {
           </button>
         </div>
         {freshMode && (
-          <select value={freshDays} onChange={e => setFreshDays(Number(e.target.value))}
-            style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
-            <option value={3} style={{ color: '#000' }}>過去3日</option>
-            <option value={7} style={{ color: '#000' }}>過去7日</option>
-            <option value={14} style={{ color: '#000' }}>過去14日</option>
-            <option value={30} style={{ color: '#000' }}>過去30日</option>
-          </select>
+          <>
+            <select value={freshDays} onChange={e => setFreshDays(Number(e.target.value))}
+              style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
+              <option value={3} style={{ color: '#000' }}>過去3日</option>
+              <option value={7} style={{ color: '#000' }}>過去7日</option>
+              <option value={14} style={{ color: '#000' }}>過去14日</option>
+              <option value={30} style={{ color: '#000' }}>過去30日</option>
+            </select>
+            <select value={freshMinScore} onChange={e => setFreshMinScore(Number(e.target.value))}
+              title="マッチスコアの下限"
+              style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
+              <option value={70} style={{ color: '#000' }}>高 (70+)</option>
+              <option value={60} style={{ color: '#000' }}>中 (60+)</option>
+              <option value={50} style={{ color: '#000' }}>低 (50+)</option>
+            </select>
+          </>
         )}
         <button
           onClick={freshMode ? toggleAllFresh : toggleAll}
@@ -800,43 +972,122 @@ export default function EngineerMailMatchingPage() {
       </div>
 
       {/* メインリスト */}
-      <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-        {!freshMode && (
-          projects.length === 0 ? (
-            <p style={{ color: '#6b7280', textAlign: 'center', padding: 40, gridColumn: '1/-1' }}>マッチする登録済案件がありません</p>
-          ) : (
-            projects.map(p => (
-              <ProjectCard
-                key={p.project_id}
-                project={p}
-                onPropose={handleGenerateProposal}
-                generating={generatingId === p.project_id}
-                checked={checked.has(p.project_id)}
-                onCheck={toggleCheck}
-              />
-            ))
-          )
-        )}
+      {viewMode === 'card' ? (
+        <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+          {!freshMode && (
+            projects.length === 0 ? (
+              <p style={{ color: '#6b7280', textAlign: 'center', padding: 40, gridColumn: '1/-1' }}>マッチする登録済案件がありません</p>
+            ) : (
+              projects.map(p => (
+                <ProjectCard
+                  key={p.project_id}
+                  project={p}
+                  onPropose={handleGenerateProposal}
+                  generating={generatingId === p.project_id}
+                  checked={checked.has(p.project_id)}
+                  onCheck={toggleCheck}
+                />
+              ))
+            )
+          )}
 
-        {freshMode && (
-          freshLoading ? (
-            <p style={{ color: '#6b7280', textAlign: 'center', padding: 40, gridColumn: '1/-1' }}>🔍 過去{freshDays}日のメール候補を取得中...</p>
-          ) : freshItems.length === 0 ? (
-            <p style={{ color: '#6b7280', textAlign: 'center', padding: 40, gridColumn: '1/-1' }}>過去{freshDays}日のマッチする案件メールはありません</p>
-          ) : (
-            freshItems.map(i => (
-              <FreshPmsCard
-                key={i.project_mail_id}
-                item={i}
-                onPropose={handleGenerateProposalFromPms}
-                generating={false}
-                checked={freshChecked.has(i.project_mail_id)}
-                onCheck={toggleFreshCheck}
-              />
-            ))
-          )
-        )}
-      </div>
+          {freshMode && (
+            freshLoading ? (
+              <p style={{ color: '#6b7280', textAlign: 'center', padding: 40, gridColumn: '1/-1' }}>🔍 過去{freshDays}日のメール候補を取得中...</p>
+            ) : freshItems.length === 0 ? (
+              <p style={{ color: '#6b7280', textAlign: 'center', padding: 40, gridColumn: '1/-1' }}>過去{freshDays}日のマッチする案件メールはありません</p>
+            ) : (
+              freshItems.map(i => (
+                <FreshPmsCard
+                  key={i.project_mail_id}
+                  item={i}
+                  onPropose={handleGenerateProposalFromPms}
+                  generating={false}
+                  checked={freshChecked.has(i.project_mail_id)}
+                  onCheck={toggleFreshCheck}
+                />
+              ))
+            )
+          )}
+        </div>
+      ) : (
+        // ── リスト表示 ──
+        <div style={{ padding: '16px 20px' }}>
+          {!freshMode && (
+            projects.length === 0 ? (
+              <p style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>マッチする登録済案件がありません</p>
+            ) : (
+              <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      <th style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600, color: '#374151', width: 32 }}></th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', width: 70 }}>スコア</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151' }}>案件</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151' }}>必須スキル</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#374151', width: 100 }}>単価</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', width: 90 }}>勤務形態</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', width: 110 }}>最寄駅</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: '#374151', width: 90 }}>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projects.map(p => (
+                      <ProjectRow
+                        key={p.project_id}
+                        project={p}
+                        onPropose={handleGenerateProposal}
+                        generating={generatingId === p.project_id}
+                        checked={checked.has(p.project_id)}
+                        onCheck={toggleCheck}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+
+          {freshMode && (
+            freshLoading ? (
+              <p style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>🔍 過去{freshDays}日のメール候補を取得中...</p>
+            ) : freshItems.length === 0 ? (
+              <p style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>過去{freshDays}日のマッチする案件メールはありません</p>
+            ) : (
+              <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      <th style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600, color: '#374151', width: 32 }}></th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', width: 70 }}>スコア</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', width: 70 }}>状態</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151' }}>案件</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151' }}>顧客</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151' }}>必須スキル</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#374151', width: 100 }}>単価</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', width: 100 }}>開始</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', width: 100 }}>受信</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: '#374151', width: 90 }}>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {freshItems.map(i => (
+                      <FreshPmsRow
+                        key={i.project_mail_id}
+                        item={i}
+                        onPropose={handleGenerateProposalFromPms}
+                        generating={false}
+                        checked={freshChecked.has(i.project_mail_id)}
+                        onCheck={toggleFreshCheck}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+        </div>
+      )}
     </div>
   )
 }

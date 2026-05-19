@@ -1360,6 +1360,7 @@ export default function MatchingPage() {
   // 鮮度マッチング機能（過去N日メール）
   const [freshMode, setFreshMode] = useState(false)
   const [freshDays, setFreshDays] = useState<number>(3)
+  const [freshMinScore, setFreshMinScore] = useState<number>(70)
   const [freshItems, setFreshItems] = useState<FreshEms[]>([])
   const [freshLoading, setFreshLoading] = useState(false)
   const [freshChecked, setFreshChecked] = useState<Set<number>>(new Set())
@@ -1432,11 +1433,11 @@ export default function MatchingPage() {
     if (!id || !freshMode) return
     setFreshLoading(true)
     setFreshChecked(new Set())  // 件数/構成が変わるので選択をリセット
-    axios.get(`/api/v1/project-mails/${id}/fresh-engineer-mails`, { params: { days: freshDays } })
+    axios.get(`/api/v1/project-mails/${id}/fresh-engineer-mails`, { params: { days: freshDays, min_score: freshMinScore } })
       .then(res => setFreshItems(Array.isArray(res.data?.data) ? res.data.data : []))
       .catch(() => setFreshItems([]))
       .finally(() => setFreshLoading(false))
-  }, [id, freshMode, freshDays])
+  }, [id, freshMode, freshDays, freshMinScore])
 
   // 鮮度マッチング: EMS から提案メール草稿を生成
   const handleGenerateProposalFromEms = (item: FreshEms) => {
@@ -1640,28 +1641,38 @@ export default function MatchingPage() {
               </button>
             ))}
           </div>
-          {/* 鮮度マッチング: 過去N日メール */}
-          <div style={{ display: 'flex', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, overflow: 'hidden', flexShrink: 0, alignItems: 'stretch' }}>
-            <button
-              onClick={() => setFreshMode(v => !v)}
-              title="過去N日の受信メールから候補抽出"
-              style={{ padding: '5px 10px', border: 'none', cursor: 'pointer', fontSize: 11, background: freshMode ? 'rgba(255,255,255,0.35)' : 'transparent', color: '#fff', fontWeight: freshMode ? 700 : 400 }}
-            >
-              📨 メール
-            </button>
-            {freshMode && (
+          {/* 鮮度マッチング: 過去N日メール (技術者画面と同じスタイル) */}
+          <button
+            onClick={() => setFreshMode(v => !v)}
+            title="過去N日の受信メールから候補抽出"
+            style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 11, background: freshMode ? 'rgba(255,255,255,0.35)' : 'transparent', color: '#fff', fontWeight: freshMode ? 700 : 400, flexShrink: 0 }}
+          >
+            📨 メール
+          </button>
+          {freshMode && (
+            <>
               <select
                 value={freshDays}
                 onChange={e => setFreshDays(Number(e.target.value))}
-                style={{ padding: '0 6px', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11, cursor: 'pointer', outline: 'none' }}
+                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}
               >
                 <option value={3} style={{ color: '#000' }}>過去3日</option>
                 <option value={7} style={{ color: '#000' }}>過去7日</option>
                 <option value={14} style={{ color: '#000' }}>過去14日</option>
                 <option value={30} style={{ color: '#000' }}>過去30日</option>
               </select>
-            )}
-          </div>
+              <select
+                value={freshMinScore}
+                onChange={e => setFreshMinScore(Number(e.target.value))}
+                title="マッチスコアの下限"
+                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}
+              >
+                <option value={70} style={{ color: '#000' }}>高 (70+)</option>
+                <option value={60} style={{ color: '#000' }}>中 (60+)</option>
+                <option value={50} style={{ color: '#000' }}>低 (50+)</option>
+              </select>
+            </>
+          )}
           {/* 全選択 / まとめて提案 (登録済モード / 鮮度モードで対象が切替わる。送信先は常に案件提供者) */}
           {freshMode ? (
             <>
