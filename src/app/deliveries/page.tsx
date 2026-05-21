@@ -647,6 +647,16 @@ export default function DeliveriesPage() {
     if (tab === 'addresses') fetchAddresses()
   }, [tab, fetchAddresses])
 
+  // send タブを開いた時に active_count を取得 (confirm 表示用)。
+  // addresses tab を経由しなくても件数が分かるようにする。
+  useEffect(() => {
+    if (tab === 'send' && !addresses) {
+      axios.get('/api/v1/delivery-addresses', { params: { per_page: 1 } })
+        .then(res => setAddresses(res.data))
+        .catch(() => {})
+    }
+  }, [tab, addresses])
+
   // ── キャンペーン一覧取得 ──────────────────────────────
   const fetchCampaigns = useCallback(async () => {
     const res = await axios.get('/api/v1/delivery-campaigns', {
@@ -1121,7 +1131,9 @@ export default function DeliveriesPage() {
       // check 失敗時はサイレントに通常確認に進む（送信そのものは止めない）
     }
 
-    if (!confirm(`配信先リスト全員（有効件数）にメールを送信します。よろしいですか？`)) return
+    const activeCount = addresses?.active_count
+    const countLabel = activeCount != null ? `${activeCount} 件` : '有効件数'
+    if (!confirm(`配信先リスト全員（${countLabel}）にメールを送信します。よろしいですか？`)) return
     await execSendBulk()
   }
 
@@ -2367,10 +2379,10 @@ export default function DeliveriesPage() {
                 disabled={sending || !!sendProgress || !sendForm.subject || !sendForm.body || unresolvedPlaceholders.length > 0 || (!isLinked && (!sendForm.source_email || sourceEmailInvalid))}
                 className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-6 py-2.5 rounded"
               >
-                {sending ? '送信準備中...' : '配信先リストへ一括送信'}
+                {sending ? '送信準備中...' : (addresses?.active_count != null ? `配信先リストへ一括送信（${addresses.active_count} 件）` : '配信先リストへ一括送信')}
               </button>
               <span className="text-xs text-gray-400">
-                ※ 有効な配信先全員に送信されます
+                ※ 有効な配信先{addresses?.active_count != null ? ` ${addresses.active_count} 件` : '全員'}に送信されます
               </span>
             </div>
           </div>
