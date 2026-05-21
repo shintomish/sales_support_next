@@ -134,10 +134,11 @@ export function formatMatchTableMarkdown(
  * 一度挿入したものを toggle で確実に外せるよう、separator(─×48) で挟まれたブロックを 1 つ取り除く。
  */
 export function removeMatchTableFromBody(body: string): string {
-  // ─ を 48 個連続したブロックで対照表を識別 (notice の改行も含めて削除)
+  // ─ を 48 個連続したブロックで対照表を識別 (前後の空行も含めて削除)
+  // 置換は \n\n (空行) を残す: 元本文の段落区切りを保持するため
   const sep = '─'.repeat(48)
-  const re = new RegExp(`\\n*${sep}\\n[\\s\\S]*?\\n${sep}\\n[^\\n]*\\n\\n?`)
-  return body.replace(re, '\n').replace(/\n{3,}/g, '\n\n')
+  const re = new RegExp(`\\n*${sep}\\n[\\s\\S]*?\\n${sep}\\n[^\\n]*\\n*`)
+  return body.replace(re, '\n\n').replace(/\n{3,}/g, '\n\n')
 }
 
 /**

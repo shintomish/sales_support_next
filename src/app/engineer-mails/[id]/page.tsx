@@ -227,6 +227,9 @@ function ProposalModal({ draft, engineerMailId, onClose, engineerAttachments }: 
   }
 
   // 対照表 toggle: 現在の本文をベースに挿入/除去 (toggle 再現性 + 編集保持)
+  // 連続クリックや fetch 中の OFF を考慮し、最新の checked 状態を ref で追跡
+  const includeMatchRef = useRef(includeMatchTable)
+  includeMatchRef.current = includeMatchTable
   const handleToggleMatchTable = async (checked: boolean) => {
     setIncludeMatchTable(checked)
     if (!checked) {
@@ -234,6 +237,8 @@ function ProposalModal({ draft, engineerMailId, onClose, engineerAttachments }: 
       return
     }
     const md = matchTableMd ?? (await fetchMatchTable())
+    // fetch 完了時に user が既に OFF にしていたらスキップ
+    if (!includeMatchRef.current) return
     if (!md) {
       setIncludeMatchTable(false)
       return
