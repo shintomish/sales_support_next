@@ -14,15 +14,16 @@ interface EmailBodyTemplate {
   sender_display_name?: string;
 }
 
-const EMPTY: EmailBodyTemplate = {
-  name: '', name_en: '', department: '', position: '', email: '', mobile: '', sender_display_name: '',
-};
-
-// 送信者名 (From ヘッダ表示名) のプリセット候補。custom 入力も可。
+// 送信者名 (From ヘッダ表示名) のプリセット 2 種。英文がデフォルト。
 const SENDER_PRESETS = [
   { value: 'Aizen Solution SES Support', label: 'Aizen Solution SES Support （英文）' },
   { value: 'アイゼン・ソリューション (営業)', label: 'アイゼン・ソリューション (営業)（和文）' },
 ];
+const SENDER_DEFAULT = SENDER_PRESETS[0].value;
+
+const EMPTY: EmailBodyTemplate = {
+  name: '', name_en: '', department: '', position: '', email: '', mobile: '', sender_display_name: SENDER_DEFAULT,
+};
 
 function buildPreview(form: EmailBodyTemplate) {
   return `●● 様
@@ -65,6 +66,10 @@ export default function EmailTemplatePage() {
       .then(res => {
         if (res.data) {
           const loaded = { ...EMPTY, ...res.data };
+          // sender_display_name が null/空 または プリセット外 の場合は英文デフォルトに正規化
+          if (!loaded.sender_display_name || !SENDER_PRESETS.some(p => p.value === loaded.sender_display_name)) {
+            loaded.sender_display_name = SENDER_DEFAULT;
+          }
           setForm(loaded);
           // body_text 保存済 = 過去にプレビューを手動編集した可能性 → 手動編集モードで再開
           if (res.data.body_text) {
@@ -197,25 +202,6 @@ export default function EmailTemplatePage() {
                   <span className="text-xs text-gray-400 font-mono">{preset.value} &lt;outsource@aizen-sol.co.jp&gt;</span>
                 </label>
               ))}
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="sender_display_name_preset"
-                  value=""
-                  checked={!form.sender_display_name || !SENDER_PRESETS.some(p => p.value === form.sender_display_name)}
-                  onChange={() => setForm(f => ({ ...f, sender_display_name: '' }))}
-                />
-                <span>カスタム / 未指定 (env 既定値を使う)</span>
-              </label>
-              {form.sender_display_name && !SENDER_PRESETS.some(p => p.value === form.sender_display_name) && (
-                <input
-                  type="text"
-                  value={form.sender_display_name}
-                  onChange={e => setForm(f => ({ ...f, sender_display_name: e.target.value }))}
-                  placeholder="カスタム表示名を入力"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              )}
             </div>
           </div>
 
