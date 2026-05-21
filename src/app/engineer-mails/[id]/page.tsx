@@ -7,10 +7,17 @@ import OriginalMailAccordion from '@/components/OriginalMailAccordion'
 import RequirementMatchAccordion from '@/components/RequirementMatchAccordion'
 import { pickMailBody, buildEmailBody, extractRecipientName, type EmailBodyTemplate } from '@/lib/mailBody'
 import { isSameDomain, extractDomain } from '@/lib/mailDomain'
-import { formatMatchTableMarkdown, insertMatchTableIntoBody } from '@/lib/requirementCategoryLabel'
+import { formatMatchTableMarkdown, insertMatchTableIntoBody, removeMatchTableFromBody } from '@/lib/requirementCategoryLabel'
 import { useAuthStore } from '@/store/authStore'
 
 // ── 型定義 ──────────────────────────────────────────
+interface EmailAttachment {
+  id: number
+  filename: string
+  mime_type: string | null
+  size: number | null
+}
+
 interface EngineerMail {
   id: number
   email_id: number
@@ -23,7 +30,31 @@ interface EngineerMail {
   available_from: string | null
   nearest_station: string | null
   skills: string[] | null
-  email: { from_address: string | null; from_name: string | null; body_text: string | null; body_html: string | null } | null
+  email: { from_address: string | null; from_name: string | null; body_text: string | null; body_html: string | null; attachments?: EmailAttachment[] } | null
+}
+
+function formatBytes(b: number | null | undefined): string {
+  if (!b) return '—'
+  if (b < 1024) return `${b}B`
+  if (b < 1024 * 1024) return `${Math.round(b / 1024)}KB`
+  return `${(b / 1024 / 1024).toFixed(1)}MB`
+}
+
+async function downloadEngineerAttachment(engineerMailId: number, att: EmailAttachment) {
+  try {
+    const res = await axios.get(
+      `/api/v1/engineer-mails/${engineerMailId}/attachment/${att.id}`,
+      { responseType: 'blob' }
+    )
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = att.filename
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    alert(`ダウンロードに失敗しました: ${att.filename}`)
+  }
 }
 
 interface MatchedProject {
@@ -130,7 +161,7 @@ function buildEngineerInfoBlock(ems: EngineerMail | null): string {
 }
 
 // ── 提案メールモーダル ────────────────────────────────
-function ProposalModal({ draft, engineerMailId, onClose }: { draft: ProposalDraft; engineerMailId: number; onClose: () => void }) {
+function ProposalModal({ draft, engineerMailId, onClose, engineerAttachments }: { draft: ProposalDraft; engineerMailId: number; onClose: () => void; engineerAttachments?: EmailAttachment[] }) {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [toName, setToName] = useState(draft.to_name ? draft.to_name + ' 様' : '')
@@ -138,8 +169,34 @@ function ProposalModal({ draft, engineerMailId, onClose }: { draft: ProposalDraf
   const [body, setBody] = useState(draft.body)
   const [subject, setSubject] = useState(draft.subject)
   const [attachments, setAttachments] = useState<File[]>([])
+  const [includingEngineerAttachments, setIncludingEngineerAttachments] = useState(false)
+  const [addedEngineerAttIds, setAddedEngineerAttIds] = useState<Set<number>>(new Set())
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const includeEngineerAttachments = async () => {
+    if (!engineerAttachments || engineerAttachments.length === 0) return
+    const targets = engineerAttachments.filter(a => !addedEngineerAttIds.has(a.id))
+    if (targets.length === 0) return
+    setIncludingEngineerAttachments(true)
+    try {
+      const files = await Promise.all(targets.map(async att => {
+        const res = await axios.get(
+          `/api/v1/engineer-mails/${engineerMailId}/attachment/${att.id}`,
+          { responseType: 'blob' }
+        )
+        return new File([res.data], att.filename, { type: att.mime_type ?? 'application/octet-stream' })
+      }))
+      setAttachments(prev => [...prev, ...files])
+      setAddedEngineerAttIds(prev => {
+        const n = new Set(prev); targets.forEach(t => n.add(t.id)); return n
+      })
+    } catch {
+      alert('技術者スキルシートの取得に失敗しました')
+    } finally {
+      setIncludingEngineerAttachments(false)
+    }
+  }
 
   // 対照表 自動挿入 (docs/480 Phase 3)
   const matchUser = useAuthStore(s => s.user)
@@ -148,7 +205,6 @@ function ProposalModal({ draft, engineerMailId, onClose }: { draft: ProposalDraf
   const [matchTableMd, setMatchTableMd] = useState<string | null>(null)
   const [matchLoading, setMatchLoading] = useState(false)
   const [matchError, setMatchError] = useState<string | null>(null)
-  const baseBodyRef = useRef(draft.body)
 
   const fetchMatchTable = async () => {
     if (!draft.project_mail_id) return null
@@ -170,18 +226,19 @@ function ProposalModal({ draft, engineerMailId, onClose }: { draft: ProposalDraf
     }
   }
 
+  // 対照表 toggle: 現在の本文をベースに挿入/除去 (toggle 再現性 + 編集保持)
   const handleToggleMatchTable = async (checked: boolean) => {
     setIncludeMatchTable(checked)
-    if (checked) {
-      const md = matchTableMd ?? (await fetchMatchTable())
-      if (md) {
-        setBody(insertMatchTableIntoBody(baseBodyRef.current, md))
-      } else {
-        setIncludeMatchTable(false)
-      }
-    } else {
-      setBody(baseBodyRef.current)
+    if (!checked) {
+      setBody(prev => removeMatchTableFromBody(prev))
+      return
     }
+    const md = matchTableMd ?? (await fetchMatchTable())
+    if (!md) {
+      setIncludeMatchTable(false)
+      return
+    }
+    setBody(prev => insertMatchTableIntoBody(removeMatchTableFromBody(prev), md))
   }
 
   const handleToNameChange = (name: string) => {
@@ -274,12 +331,54 @@ function ProposalModal({ draft, engineerMailId, onClose }: { draft: ProposalDraf
           )}
           <textarea
             value={body}
-            onChange={e => {
-              setBody(e.target.value)
-              if (!includeMatchTable) baseBodyRef.current = e.target.value
-            }}
+            onChange={e => setBody(e.target.value)}
             style={{ width: '100%', fontSize: 13, color: '#374151', lineHeight: 1.7, fontFamily: 'sans-serif', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', resize: 'vertical', minHeight: 280, boxSizing: 'border-box' }}
           />
+          {engineerAttachments && engineerAttachments.length > 0 && (() => {
+            const allAdded = engineerAttachments.every(a => addedEngineerAttIds.has(a.id))
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={includeEngineerAttachments}
+                  disabled={includingEngineerAttachments || allAdded}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    gap: 8, fontSize: 12, padding: '8px 12px', borderRadius: 6,
+                    border: `1px solid ${allAdded ? '#86efac' : '#bfdbfe'}`,
+                    background: allAdded ? '#dcfce7' : '#eff6ff',
+                    color: allAdded ? '#15803d' : '#1d4ed8',
+                    cursor: includingEngineerAttachments || allAdded ? 'default' : 'pointer',
+                    fontWeight: 600,
+                  }}
+                  title="技術者のスキルシート等を提案メールの添付に追加します"
+                >
+                  <span>
+                    {allAdded ? '✓ 技術者のスキルシートを送信添付に含めました' : `📎 技術者のスキルシート (${engineerAttachments.length}件) を送信添付に追加`}
+                  </span>
+                  {includingEngineerAttachments && <span style={{ fontSize: 11, fontWeight: 400 }}>取得中…</span>}
+                </button>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, fontSize: 11, color: '#6b7280', alignItems: 'center' }}>
+                  <span>確認DL:</span>
+                  {engineerAttachments.map(att => (
+                    <button
+                      key={att.id}
+                      type="button"
+                      onClick={() => downloadEngineerAttachment(engineerMailId, att)}
+                      title={`${att.mime_type ?? ''} / ${formatBytes(att.size)} (クリックでブラウザ保存)`}
+                      style={{
+                        fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                        background: '#fff', border: '1px solid #d1d5db', color: '#374151',
+                        cursor: 'pointer', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      📎 {att.filename}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
           <div
             onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
             onDragLeave={e => { e.preventDefault(); setIsDragging(false) }}
@@ -294,7 +393,20 @@ function ProposalModal({ draft, engineerMailId, onClose }: { draft: ProposalDraf
               {attachments.map((f, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', background: '#f3f4f6', borderRadius: 4 }}>
                   <span style={{ color: '#374151' }}>📄 {f.name} ({(f.size / 1024).toFixed(1)}KB)</span>
-                  <button onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer' }}>✕</button>
+                  <button
+                    onClick={() => {
+                      const removed = attachments[i]
+                      setAttachments(prev => prev.filter((_, idx) => idx !== i))
+                      // 技術者添付由来のファイルなら「追加済」マークも外す
+                      const eng = engineerAttachments?.find(a => a.filename === removed.name)
+                      if (eng) {
+                        setAddedEngineerAttIds(prev => {
+                          const n = new Set(prev); n.delete(eng.id); return n
+                        })
+                      }
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer' }}
+                  >✕</button>
                 </div>
               ))}
             </div>
@@ -783,6 +895,50 @@ function FreshPmsRow({ item, onPropose, generating, checked, onCheck }: {
   )
 }
 
+// ── 鮮度マッチング ローディング表示 ───────────────────
+function FreshLoadingIndicator({ phase, freshDays, progress, gridColumn }: {
+  phase: 'fetch' | 'match'
+  freshDays: number
+  progress: { done: number; total: number } | null
+  gridColumn?: string
+}) {
+  const pct = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : null
+  return (
+    <div style={{ gridColumn, padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+      <div style={{
+        width: 48, height: 48, borderRadius: '50%',
+        border: '4px solid #e5e7eb', borderTopColor: '#2563eb',
+        animation: 'fresh-spin 0.8s linear infinite',
+      }} />
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', textAlign: 'center' }}>
+        {phase === 'match' ? (
+          <>📊 対照表で必須要件×案件を除外中</>
+        ) : (
+          <>🔍 過去{freshDays}日のメール候補を取得中</>
+        )}
+      </div>
+      {phase === 'match' && progress && (
+        <>
+          <div style={{ fontSize: 12, color: '#6b7280' }}>
+            {progress.done} / {progress.total} 件 ({pct}%)
+          </div>
+          <div style={{ width: 320, maxWidth: '70vw', height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{
+              width: `${pct ?? 0}%`, height: '100%',
+              background: 'linear-gradient(90deg, #2563eb 0%, #60a5fa 100%)',
+              transition: 'width 0.3s ease',
+            }} />
+          </div>
+          <div style={{ fontSize: 11, color: '#9ca3af' }}>Claude API で 1 件あたり 5〜30 秒 (キャッシュ済は瞬時)</div>
+        </>
+      )}
+      <style>{`
+        @keyframes fresh-spin { to { transform: rotate(360deg); } }
+      `}</style>
+    </div>
+  )
+}
+
 // ── メインページ ──────────────────────────────────────
 export default function EngineerMailMatchingPage() {
   const params = useParams()
@@ -809,6 +965,10 @@ export default function EngineerMailMatchingPage() {
   const [generatingId, setGeneratingId] = useState<number | null>(null)
   const [showBulkSend, setShowBulkSend] = useState(false)
   const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
+  // 鮮度マッチング: 対照表で必須要件×案件を除外するか (デフォルト OFF — 過去30日×低 だと時間がかかるため)
+  const [useMatchFilter, setUseMatchFilter] = useState(false)
+  const [matchFilterLoading, setMatchFilterLoading] = useState(false)
+  const [matchFilterProgress, setMatchFilterProgress] = useState<{ done: number; total: number } | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -827,12 +987,53 @@ export default function EngineerMailMatchingPage() {
 
   useEffect(() => {
     if (!freshMode) return
+    let cancelled = false
     setFreshLoading(true)
+    setMatchFilterLoading(false)
+    setMatchFilterProgress(null)
     axios.get(`/api/v1/engineer-mails/${id}/fresh-project-mails`, { params: { days: freshDays, min_score: freshMinScore } })
-      .then(res => setFreshItems(res.data?.data ?? []))
-      .catch(() => setFreshItems([]))
-      .finally(() => setFreshLoading(false))
-  }, [id, freshMode, freshDays, freshMinScore])
+      .then(async res => {
+        if (cancelled) return
+        const items: FreshPms[] = res.data?.data ?? []
+        // 対照表フィルタ OFF / 機能 OFF / 候補ゼロ → そのまま表示
+        if (!requirementMatchingEnabled || !useMatchFilter || items.length === 0) {
+          setFreshItems(items)
+          return
+        }
+        // 対照表フィルタ ON → 各 PMS で対照表を並列取得し、必須×案件を一覧から除外
+        setMatchFilterLoading(true)
+        setMatchFilterProgress({ done: 0, total: items.length })
+        let done = 0
+        const results = await Promise.all(items.map(async item => {
+          try {
+            const mr = await axios.get(`/api/v1/project-mails/${item.project_mail_id}/requirement-match`, {
+              params: { ems_id: Number(id) },
+            })
+            const reqs: { type: string; label: string }[] = mr.data?.requirements_json ?? []
+            const matches: { label: string; judgment: string }[] = mr.data?.matches_json ?? []
+            const mustLabels = new Set(reqs.filter(r => r.type === 'must').map(r => r.label))
+            const hasMustCross = matches.some(m => m.judgment === 'cross' && mustLabels.has(m.label))
+            return { item, hasMustCross }
+          } catch {
+            // 対照表生成失敗時は除外せず表示 (営業判断に委ねる)
+            return { item, hasMustCross: false }
+          } finally {
+            done += 1
+            if (!cancelled) setMatchFilterProgress({ done, total: items.length })
+          }
+        }))
+        if (cancelled) return
+        setFreshItems(results.filter(r => !r.hasMustCross).map(r => r.item))
+      })
+      .catch(() => { if (!cancelled) setFreshItems([]) })
+      .finally(() => {
+        if (cancelled) return
+        setFreshLoading(false)
+        setMatchFilterLoading(false)
+        setMatchFilterProgress(null)
+      })
+    return () => { cancelled = true }
+  }, [id, freshMode, freshDays, freshMinScore, requirementMatchingEnabled, useMatchFilter])
 
   const toggleCheck = (pid: number) => {
     setChecked(prev => { const n = new Set(prev); n.has(pid) ? n.delete(pid) : n.add(pid); return n })
@@ -976,7 +1177,14 @@ export default function EngineerMailMatchingPage() {
       })()}
 
       {/* 個別提案モーダル */}
-      {proposalDraft && <ProposalModal draft={proposalDraft} engineerMailId={Number(id)} onClose={() => setProposalDraft(null)} />}
+      {proposalDraft && (
+        <ProposalModal
+          draft={proposalDraft}
+          engineerMailId={Number(id)}
+          onClose={() => setProposalDraft(null)}
+          engineerAttachments={mail.email?.attachments}
+        />
+      )}
 
       {/* ヘッダー */}
       <div style={{ background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)', color: '#fff', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -984,6 +1192,27 @@ export default function EngineerMailMatchingPage() {
         <div style={{ flex: 1, minWidth: 200 }}>
           <p style={{ fontSize: 11, opacity: 0.85, margin: 0 }}>技術者マッチング</p>
           <p style={{ fontSize: 15, fontWeight: 700, margin: '2px 0 0' }}>{mail.name ?? '（氏名未取得）'}{mail.age ? ` / ${mail.age}歳` : ''}{mail.affiliation ? ` / ${mail.affiliation}` : ''}</p>
+          {mail.email?.attachments && mail.email.attachments.length > 0 && (
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 5 }}>
+              {mail.email.attachments.map(att => (
+                <button
+                  key={att.id}
+                  type="button"
+                  onClick={() => downloadEngineerAttachment(Number(id), att)}
+                  title={`${att.mime_type ?? '不明'} / ${formatBytes(att.size)} (クリックでダウンロード)`}
+                  style={{
+                    fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                    background: 'rgba(255,255,255,0.22)', border: '1px solid rgba(255,255,255,0.4)',
+                    color: '#fff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, maxWidth: 240,
+                  }}
+                >
+                  <span>📎</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.filename}</span>
+                  <span style={{ opacity: 0.7 }}>({formatBytes(att.size)})</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {/* カード/リスト切替 */}
         <div style={{ display: 'flex', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
@@ -1031,6 +1260,20 @@ export default function EngineerMailMatchingPage() {
               <option value={60} style={{ color: '#000' }}>中 (60+)</option>
               <option value={50} style={{ color: '#000' }}>低 (50+)</option>
             </select>
+            {requirementMatchingEnabled && (
+              <label
+                title="対照表で必須要件×と判定された案件を一覧から除外します (件数が多いと時間がかかります)"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: useMatchFilter ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11, cursor: 'pointer', fontWeight: useMatchFilter ? 700 : 400 }}
+              >
+                <input
+                  type="checkbox"
+                  checked={useMatchFilter}
+                  onChange={e => setUseMatchFilter(e.target.checked)}
+                  style={{ accentColor: '#fff', cursor: 'pointer' }}
+                />
+                📊 対照表
+              </label>
+            )}
           </>
         )}
         <button
@@ -1073,7 +1316,12 @@ export default function EngineerMailMatchingPage() {
 
           {freshMode && (
             freshLoading ? (
-              <p style={{ color: '#6b7280', textAlign: 'center', padding: 40, gridColumn: '1/-1' }}>🔍 過去{freshDays}日のメール候補を取得中...</p>
+              <FreshLoadingIndicator
+                phase={matchFilterLoading ? 'match' : 'fetch'}
+                freshDays={freshDays}
+                progress={matchFilterProgress}
+                gridColumn="1/-1"
+              />
             ) : freshItems.length === 0 ? (
               <p style={{ color: '#6b7280', textAlign: 'center', padding: 40, gridColumn: '1/-1' }}>過去{freshDays}日のマッチする案件メールはありません</p>
             ) : (
@@ -1132,7 +1380,11 @@ export default function EngineerMailMatchingPage() {
 
           {freshMode && (
             freshLoading ? (
-              <p style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>🔍 過去{freshDays}日のメール候補を取得中...</p>
+              <FreshLoadingIndicator
+                phase={matchFilterLoading ? 'match' : 'fetch'}
+                freshDays={freshDays}
+                progress={matchFilterProgress}
+              />
             ) : freshItems.length === 0 ? (
               <p style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>過去{freshDays}日のマッチする案件メールはありません</p>
             ) : (

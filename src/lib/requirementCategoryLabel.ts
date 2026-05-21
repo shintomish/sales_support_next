@@ -129,21 +129,38 @@ export function formatMatchTableMarkdown(
 }
 
 /**
+ * insertMatchTableIntoBody が挿入したブロックを本文から除去する。
+ *  パターン: \n\n {separator(48 dashes)}\n {対照表テキスト}\n {separator}\n {notice}\n\n
+ * 一度挿入したものを toggle で確実に外せるよう、separator(─×48) で挟まれたブロックを 1 つ取り除く。
+ */
+export function removeMatchTableFromBody(body: string): string {
+  // ─ を 48 個連続したブロックで対照表を識別 (notice の改行も含めて削除)
+  const sep = '─'.repeat(48)
+  const re = new RegExp(`\\n*${sep}\\n[\\s\\S]*?\\n${sep}\\n[^\\n]*\\n\\n?`)
+  return body.replace(re, '\n').replace(/\n{3,}/g, '\n\n')
+}
+
+/**
  * 提案メール本文の「closing/署名」直前に対照表ブロックを挿入する。
- * "ご面談"・"お気軽にご返信"・"お忙しいところ"・"ご検討"・"何卒よろしくお願い"・"_/_/_/"
- * (署名区切り) を検出し、最初に現れるものの直前に挿入。検出できなければ末尾に追加。
+ *
+ * 検出順 (前にあるものから優先):
+ *  1. 署名区切り ("_/_/_/" / "━━━" / "─────")
+ *  2. 締め定型句 ("お忙しいところ" / "ご検討" / "何卒よろしくお願い")
+ *
+ * 注意: "お気軽にご返信" "ご面談" は「面談やスキルシートのご要望がございましたら、
+ *       お気軽にご返信ください。」のような **本文中の一文** に出てきやすく、
+ *       その直前に対照表を入れると文を分断してしまうため marker に含めない。
+ *       検出できなければ本文末尾に追加 (締めの文の後ろにくる)。
  */
 export function insertMatchTableIntoBody(baseBody: string, matchTableText: string): string {
   const markers = [
-    'ご面談',
-    'お気軽にご返信',
+    '_/_/_/',
+    '━━━',
+    '─────',
     'お忙しいところ',
     'ご検討いただけます',
     'ご検討のほど',
     '何卒よろしくお願い',
-    '_/_/_/',
-    '━━━',
-    '─────',
   ]
   let insertPos = baseBody.length
   for (const m of markers) {

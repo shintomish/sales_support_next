@@ -4,6 +4,11 @@ const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8090';
 const apiUrl  = new URL(apiBase);
 
 const nextConfig: NextConfig = {
+  // Claude 要件マッチングなど数十秒かかる API 用に dev rewrites のプロキシタイムアウトを延長
+  // (Next.js デフォルトは 30s で 499 切断される)
+  experimental: {
+    proxyTimeout: 180_000,
+  },
   async rewrites() {
     return [
       {

@@ -23,13 +23,21 @@ type Props = {
   initialOpen?: boolean
   /** 一括生成等で DB に対照表が用意済の場合 true → ボタンを緑色で強調 */
   prefetched?: boolean
+  /** 対照表結果の通知 (必須要件×が含まれるかを親で除外判定に使う) */
+  onResult?: (result: { hasMustCross: boolean; mustCrossLabels: string[] }) => void
+}
+
+function detectMustCross(requirements: Requirement[], matches: Match[]): { hasMustCross: boolean; mustCrossLabels: string[] } {
+  const mustLabels = new Set(requirements.filter(r => r.type === 'must').map(r => r.label))
+  const mustCrossLabels = matches.filter(m => m.judgment === 'cross' && mustLabels.has(m.label)).map(m => m.label)
+  return { hasMustCross: mustCrossLabels.length > 0, mustCrossLabels }
 }
 
 // docs/480 §6.1 案件側マッチング画面に組み込む対照表アコーディオン。
 // 「対照表」ボタンクリックで GET /v1/project-mails/{id}/requirement-match を呼び、
 // 結果を RequirementMatchTable で表示。ボタン押下時のみ Claude API が走る (コスト制御)。
 export default function RequirementMatchAccordion({
-  projectMailId, emsId, engineerId, label = '対照表', initialOpen = false, prefetched = false,
+  projectMailId, emsId, engineerId, label = '対照表', initialOpen = false, prefetched = false, onResult,
 }: Props) {
   const [open, setOpen] = useState(initialOpen)
   const [loading, setLoading] = useState(false)
@@ -52,6 +60,7 @@ export default function RequirementMatchAccordion({
         ? await axios.post(url, Object.fromEntries(params))
         : await axios.get(url)
       setData(res.data)
+      onResult?.(detectMustCross(res.data.requirements_json, res.data.matches_json))
     } catch (e: unknown) {
       const err = e as { response?: { status?: number; data?: { message?: string } } }
       if (err.response?.status === 403) {
@@ -90,7 +99,9 @@ export default function RequirementMatchAccordion({
           confidence: m.confidence,
         })),
       })
-      setData(prev => prev ? { ...prev, matches_json: next.map(m => ({ ...m, manual_override: true })) } : prev)
+      const nextMatches = next.map(m => ({ ...m, manual_override: true }))
+      setData(prev => prev ? { ...prev, matches_json: nextMatches } : prev)
+      if (data) onResult?.(detectMustCross(data.requirements_json, nextMatches))
     } catch {
       alert('保存に失敗しました')
     } finally {
@@ -103,21 +114,46 @@ export default function RequirementMatchAccordion({
       <button
         type="button"
         onClick={handleToggle}
+        disabled={loading}
         style={{
           fontSize: 11, padding: '4px 10px', borderRadius: 6,
-          border: `1px solid ${prefetched ? '#16a34a' : '#d1d5db'}`,
-          background: open ? '#dbeafe' : (prefetched ? '#dcfce7' : '#fff'),
-          color: prefetched ? '#15803d' : '#2563eb',
-          cursor: 'pointer', fontWeight: 600,
+          border: `1px solid ${loading ? '#2563eb' : (prefetched ? '#16a34a' : '#d1d5db')}`,
+          background: loading ? '#dbeafe' : (open ? '#dbeafe' : (prefetched ? '#dcfce7' : '#fff')),
+          color: loading ? '#1d4ed8' : (prefetched ? '#15803d' : '#2563eb'),
+          cursor: loading ? 'wait' : 'pointer', fontWeight: 600,
+          display: 'inline-flex', alignItems: 'center', gap: 4,
         }}
-        title={prefetched ? '対照表生成済 (クリックで展開)' : '案件要件と技術者スキルの ◯/△/× 対照表'}
+        title={loading ? 'Claude API で対照表生成中…' : (prefetched ? '対照表生成済 (クリックで展開)' : '案件要件と技術者スキルの ◯/△/× 対照表')}
       >
-        {open ? '▼ ' : '▶ '} {label}{prefetched && ' ✓'}
+        {loading ? (
+          <>
+            <span className="rm-spinner" style={{
+              display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+              border: '2px solid #93c5fd', borderTopColor: '#1d4ed8',
+              animation: 'rm-spin 0.7s linear infinite',
+            }} />
+            生成中…
+          </>
+        ) : (
+          <>{open ? '▼ ' : '▶ '} {label}{prefetched && ' ✓'}</>
+        )}
+        <style>{`
+          @keyframes rm-spin { to { transform: rotate(360deg); } }
+        `}</style>
       </button>
 
       {open && (
         <div style={{ marginTop: 8, padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-          {loading && <div style={{ fontSize: 12, color: '#6b7280', padding: 16 }}>📊 対照表を生成中... (Claude API)</div>}
+          {loading && (
+            <div style={{ fontSize: 12, color: '#1d4ed8', padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{
+                display: 'inline-block', width: 14, height: 14, borderRadius: '50%',
+                border: '2px solid #93c5fd', borderTopColor: '#1d4ed8',
+                animation: 'rm-spin 0.7s linear infinite',
+              }} />
+              対照表を生成中… (Claude API、最大2分程度)
+            </div>
+          )}
 
           {error && (
             <div style={{ fontSize: 12, color: '#dc2626', padding: 12, background: '#fee2e2', borderRadius: 6 }}>

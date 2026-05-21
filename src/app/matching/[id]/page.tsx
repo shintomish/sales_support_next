@@ -7,8 +7,41 @@ import OriginalMailAccordion from '@/components/OriginalMailAccordion'
 import RequirementMatchAccordion from '@/components/RequirementMatchAccordion'
 import { pickMailBody, buildEmailBody, type EmailBodyTemplate } from '@/lib/mailBody'
 import { isSameDomain, extractDomain } from '@/lib/mailDomain'
-import { formatMatchTableMarkdown, insertMatchTableIntoBody } from '@/lib/requirementCategoryLabel'
+import { formatMatchTableMarkdown, insertMatchTableIntoBody, removeMatchTableFromBody } from '@/lib/requirementCategoryLabel'
 import { useAuthStore } from '@/store/authStore'
+
+/**
+ * 技術者メール本文の挨拶文から **送信者 (BP 担当者)** の氏名を抽出する。
+ *   「いつもお世話になっております。株式会社キャリアビートの雨宮 昂平と申します。」
+ *   → "雨宮 昂平"
+ *
+ * 抽出できない場合は null。署名や宛先の人物名 (= 技術者本人) ではなく
+ * メールの発信者名を返すための関数。
+ */
+function extractSenderNameFromBody(body: string | null | undefined): string | null {
+  if (!body) return null
+  // 日本人氏名で許容する文字: 漢字・ひらがな・カタカナ・全角空白・半角スペース
+  // 区切り文字 (、。の/と/で/が/より など) や改行で終端
+  const nameChars = '[ぁ-んァ-ヶー一-龥々〆〤A-Za-z\\s　]'
+  const patterns: RegExp[] = [
+    // 「[会社名]の YY と申します/でございます」 (会社名が前にあるパターン優先)
+    new RegExp(`(?:株式会社|有限会社|合同会社|合資会社|（株）|\\(株\\)|㈱)[^\\s\\n、。の]{1,30}の\\s*(${nameChars}{2,15})\\s*(?:と申します|でございます)`),
+    // 「YY と申します」 (会社情報なし)
+    new RegExp(`(${nameChars}{2,15})\\s*と申します`),
+    // 「YY でございます」
+    new RegExp(`(${nameChars}{2,15})\\s*でございます`),
+  ]
+  for (const re of patterns) {
+    const m = body.match(re)
+    if (m && m[1]) {
+      const name = m[1].trim().replace(/\s+/g, ' ')
+      // 「営業」「弊社」など一般語は除外
+      if (/^(営業|弊社|当社|担当|担当者)$/.test(name)) continue
+      if (name.length >= 2) return name
+    }
+  }
+  return null
+}
 
 // PMS の構造化フィールドから「【案件情報】◇〜」ブロックを組み立てる
 // 個別提案/まとめて提案の両モードで同一フォーマットになるよう共通化
@@ -67,6 +100,13 @@ function BulkSendModal({
   const [isDragging, setIsDragging] = useState(false)
   const [domainWarn, setDomainWarn] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // BulkSendModal は技術者単体の添付には非対応 (複数技術者まとめ送信のため空で固定)
+  const engineerAttachments: EmailAttachment[] = []
+  const addedEngineerAttIds = new Set<number>()
+  const setAddedEngineerAttIds = (_: unknown) => {} // no-op (BulkSendModal では未使用)
+  const includingEngineerAttachments = false
+  const includeEngineerAttachments = async () => {}
+  const engineerMailIdForAtt: number | null = null
 
   const execSend = async () => {
     setSending(true)
@@ -223,16 +263,75 @@ function BulkSendModal({
               if (files.length) setAttachments(prev => [...prev, ...files])
               if (fileInputRef.current) fileInputRef.current.value = ''
             }} />
-            <button onClick={() => fileInputRef.current?.click()}
-              style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #93c5fd', background: '#fff', cursor: 'pointer', fontSize: 12, color: '#1d4ed8' }}>
-              ファイルを選択
-            </button>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button onClick={() => fileInputRef.current?.click()}
+                style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #93c5fd', background: '#fff', cursor: 'pointer', fontSize: 12, color: '#1d4ed8' }}>
+                ファイルを選択
+              </button>
+              {engineerAttachments.length > 0 && (() => {
+                const allAdded = engineerAttachments.every(a => addedEngineerAttIds.has(a.id))
+                return (
+                  <button
+                    type="button"
+                    onClick={includeEngineerAttachments}
+                    disabled={includingEngineerAttachments || allAdded}
+                    title="技術者メールに添付されていたスキルシート等を送信添付に含めます"
+                    style={{
+                      padding: '4px 12px', borderRadius: 6,
+                      border: `1px solid ${allAdded ? '#86efac' : '#bfdbfe'}`,
+                      background: allAdded ? '#dcfce7' : '#eff6ff',
+                      color: allAdded ? '#15803d' : '#1d4ed8',
+                      cursor: includingEngineerAttachments || allAdded ? 'default' : 'pointer',
+                      fontSize: 12, fontWeight: 600,
+                    }}
+                  >
+                    {includingEngineerAttachments
+                      ? '📎 取得中…'
+                      : allAdded
+                        ? '✓ 技術者スキルシート追加済'
+                        : `📎 技術者スキルシート (${engineerAttachments.length}件) を添付`}
+                  </button>
+                )
+              })()}
+            </div>
+            {engineerAttachments.length > 0 && engineerMailIdForAtt && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, fontSize: 11, color: '#6b7280', alignItems: 'center', marginTop: 6, justifyContent: 'center' }}>
+                <span>確認DL:</span>
+                {engineerAttachments.map(att => (
+                  <button
+                    key={att.id}
+                    type="button"
+                    onClick={() => downloadEngineerAttachment(engineerMailIdForAtt, att)}
+                    title={`${att.mime_type ?? ''} / ${formatBytes(att.size)} (クリックでブラウザ保存)`}
+                    style={{
+                      fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                      background: '#fff', border: '1px solid #d1d5db', color: '#374151',
+                      cursor: 'pointer', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    📎 {att.filename}
+                  </button>
+                ))}
+              </div>
+            )}
             {attachments.length > 0 && (
               <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {attachments.map((f, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, background: '#fff', borderRadius: 4, padding: '4px 8px', border: '1px solid #e5e7eb' }}>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {f.name} ({(f.size / 1024).toFixed(1)}KB)</span>
-                    <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', marginLeft: 8 }}>✕</button>
+                    <button
+                      onClick={() => {
+                        const removed = attachments[i]
+                        setAttachments(prev => prev.filter((_, j) => j !== i))
+                        const eng = engineerAttachments.find(a => a.filename === removed.name)
+                        if (eng) {
+                          setAddedEngineerAttIds(prev => {
+                            const n = new Set(prev); n.delete(eng.id); return n
+                          })
+                        }
+                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', marginLeft: 8 }}
+                    >✕</button>
                   </div>
                 ))}
               </div>
@@ -274,6 +373,37 @@ interface ProposalDraft {
   original_mail_label?: string
 }
 
+interface EmailAttachment {
+  id: number
+  filename: string
+  mime_type: string | null
+  size: number | null
+}
+
+function formatBytes(b: number | null | undefined): string {
+  if (!b) return '—'
+  if (b < 1024) return `${b}B`
+  if (b < 1024 * 1024) return `${Math.round(b / 1024)}KB`
+  return `${(b / 1024 / 1024).toFixed(1)}MB`
+}
+
+async function downloadEngineerAttachment(engineerMailId: number, att: EmailAttachment) {
+  try {
+    const res = await axios.get(
+      `/api/v1/engineer-mails/${engineerMailId}/attachment/${att.id}`,
+      { responseType: 'blob' }
+    )
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = att.filename
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    alert(`ダウンロードに失敗しました: ${att.filename}`)
+  }
+}
+
 function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () => void }) {
   const [copied, setCopied] = useState(false)
   const [sending, setSending] = useState(false)
@@ -286,6 +416,49 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // 技術者メール (EMS) の添付ファイル — 「📎 技術者のスキルシートを送信添付に追加」用
+  const [engineerAttachments, setEngineerAttachments] = useState<EmailAttachment[]>([])
+  const [includingEngineerAttachments, setIncludingEngineerAttachments] = useState(false)
+  const [addedEngineerAttIds, setAddedEngineerAttIds] = useState<Set<number>>(new Set())
+  const engineerMailIdForAtt: number | null = draft.engineer_mail_source_id ?? null
+
+  useEffect(() => {
+    if (!draft.engineer_mail_source_id) return
+    let cancelled = false
+    axios.get(`/api/v1/engineer-mails/${draft.engineer_mail_source_id}`)
+      .then(res => {
+        if (cancelled) return
+        setEngineerAttachments(res.data?.email?.attachments ?? [])
+      })
+      .catch(() => { if (!cancelled) setEngineerAttachments([]) })
+    return () => { cancelled = true }
+  }, [draft.engineer_mail_source_id])
+
+  const includeEngineerAttachments = async () => {
+    const emsId = draft.engineer_mail_source_id
+    if (!emsId) return
+    const targets = engineerAttachments.filter(a => !addedEngineerAttIds.has(a.id))
+    if (targets.length === 0) return
+    setIncludingEngineerAttachments(true)
+    try {
+      const files = await Promise.all(targets.map(async att => {
+        const res = await axios.get(
+          `/api/v1/engineer-mails/${emsId}/attachment/${att.id}`,
+          { responseType: 'blob' }
+        )
+        return new File([res.data], att.filename, { type: att.mime_type ?? 'application/octet-stream' })
+      }))
+      setAttachments(prev => [...prev, ...files])
+      setAddedEngineerAttIds(prev => {
+        const n = new Set(prev); targets.forEach(t => n.add(t.id)); return n
+      })
+    } catch {
+      alert('技術者スキルシートの取得に失敗しました')
+    } finally {
+      setIncludingEngineerAttachments(false)
+    }
+  }
+
   // 対照表 自動挿入 (docs/480 Phase 3)
   const matchUser = useAuthStore(s => s.user)
   const matchEnabled = !!matchUser?.tenant?.feature_requirement_matching && !!draft.engineer_mail_source_id
@@ -293,8 +466,6 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
   const [matchTableMd, setMatchTableMd] = useState<string | null>(null)
   const [matchLoading, setMatchLoading] = useState(false)
   const [matchError, setMatchError] = useState<string | null>(null)
-  // 元本文 (対照表挿入前) を保持し、checkbox toggle で復元できるように
-  const baseBodyRef = useRef(draft.body)
 
   const fetchMatchTable = async () => {
     if (!draft.engineer_mail_source_id) return null
@@ -316,19 +487,21 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
     }
   }
 
+  // 対照表 toggle: 現在の本文をベースに対照表ブロックを挿入/除去
+  // (baseBodyRef を使わないので、宛先名変更や本文編集が toggle で失われない)
   const handleToggleMatchTable = async (checked: boolean) => {
     setIncludeMatchTable(checked)
-    if (checked) {
-      const md = matchTableMd ?? (await fetchMatchTable())
-      if (md) {
-        // closing (ご面談/お忙しいところ/署名) の直前に挿入
-        setBody(insertMatchTableIntoBody(baseBodyRef.current, md))
-      } else {
-        setIncludeMatchTable(false)
-      }
-    } else {
-      setBody(baseBodyRef.current)
+    if (!checked) {
+      setBody(prev => removeMatchTableFromBody(prev))
+      return
     }
+    const md = matchTableMd ?? (await fetchMatchTable())
+    if (!md) {
+      setIncludeMatchTable(false)
+      return
+    }
+    // 既に対照表ブロックがあれば一旦除去してから挿入し直し (重複防止)
+    setBody(prev => insertMatchTableIntoBody(removeMatchTableFromBody(prev), md))
   }
 
   const handleToNameChange = (name: string) => {
@@ -455,11 +628,7 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
           )}
           <textarea
             value={body}
-            onChange={e => {
-              setBody(e.target.value)
-              // 対照表 OFF 時はユーザの編集を baseBody として記憶 (ON 時の挿入元になる)
-              if (!includeMatchTable) baseBodyRef.current = e.target.value
-            }}
+            onChange={e => setBody(e.target.value)}
             style={{ width: '100%', fontSize: 13, color: '#374151', lineHeight: 1.7, fontFamily: 'sans-serif', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', resize: 'vertical', minHeight: 280, boxSizing: 'border-box' }}
           />
 
@@ -487,16 +656,75 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
               if (files.length) setAttachments(prev => [...prev, ...files])
               if (fileInputRef.current) fileInputRef.current.value = ''
             }} />
-            <button onClick={() => fileInputRef.current?.click()}
-              style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #93c5fd', background: '#fff', cursor: 'pointer', fontSize: 12, color: '#1d4ed8' }}>
-              ファイルを選択
-            </button>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button onClick={() => fileInputRef.current?.click()}
+                style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #93c5fd', background: '#fff', cursor: 'pointer', fontSize: 12, color: '#1d4ed8' }}>
+                ファイルを選択
+              </button>
+              {engineerAttachments.length > 0 && (() => {
+                const allAdded = engineerAttachments.every(a => addedEngineerAttIds.has(a.id))
+                return (
+                  <button
+                    type="button"
+                    onClick={includeEngineerAttachments}
+                    disabled={includingEngineerAttachments || allAdded}
+                    title="技術者メールに添付されていたスキルシート等を送信添付に含めます"
+                    style={{
+                      padding: '4px 12px', borderRadius: 6,
+                      border: `1px solid ${allAdded ? '#86efac' : '#bfdbfe'}`,
+                      background: allAdded ? '#dcfce7' : '#eff6ff',
+                      color: allAdded ? '#15803d' : '#1d4ed8',
+                      cursor: includingEngineerAttachments || allAdded ? 'default' : 'pointer',
+                      fontSize: 12, fontWeight: 600,
+                    }}
+                  >
+                    {includingEngineerAttachments
+                      ? '📎 取得中…'
+                      : allAdded
+                        ? '✓ 技術者スキルシート追加済'
+                        : `📎 技術者スキルシート (${engineerAttachments.length}件) を添付`}
+                  </button>
+                )
+              })()}
+            </div>
+            {engineerAttachments.length > 0 && engineerMailIdForAtt && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, fontSize: 11, color: '#6b7280', alignItems: 'center', marginTop: 6, justifyContent: 'center' }}>
+                <span>確認DL:</span>
+                {engineerAttachments.map(att => (
+                  <button
+                    key={att.id}
+                    type="button"
+                    onClick={() => downloadEngineerAttachment(engineerMailIdForAtt, att)}
+                    title={`${att.mime_type ?? ''} / ${formatBytes(att.size)} (クリックでブラウザ保存)`}
+                    style={{
+                      fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                      background: '#fff', border: '1px solid #d1d5db', color: '#374151',
+                      cursor: 'pointer', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    📎 {att.filename}
+                  </button>
+                ))}
+              </div>
+            )}
             {attachments.length > 0 && (
               <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {attachments.map((f, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, background: '#fff', borderRadius: 4, padding: '4px 8px', border: '1px solid #e5e7eb' }}>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {f.name} ({(f.size / 1024).toFixed(1)}KB)</span>
-                    <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', marginLeft: 8 }}>✕</button>
+                    <button
+                      onClick={() => {
+                        const removed = attachments[i]
+                        setAttachments(prev => prev.filter((_, j) => j !== i))
+                        const eng = engineerAttachments.find(a => a.filename === removed.name)
+                        if (eng) {
+                          setAddedEngineerAttIds(prev => {
+                            const n = new Set(prev); n.delete(eng.id); return n
+                          })
+                        }
+                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', marginLeft: 8 }}
+                    >✕</button>
                   </div>
                 ))}
               </div>
@@ -1578,7 +1806,10 @@ export default function MatchingPage() {
 
   // 鮮度マッチング: EMS から提案メール草稿を生成
   const handleGenerateProposalFromEms = (item: FreshEms) => {
-    const greeting = item.name ? `${item.name} 様` : '●● 様'
+    // 宛先名: メール本文の挨拶文 (「株式会社XXのYYと申します」等) から送信者名を抽出
+    // 抽出できなければ from_address のローカル部分を使う (item.name は技術者本人なので使わない)
+    const recipientName = extractSenderNameFromBody(item.email_body)
+    const greeting = recipientName ? `${recipientName} 様` : '営業ご担当者様'
     const skillLine = (item.skills || []).slice(0, 5).join('／') || '—'
     const priceLine = item.unit_price_min || item.unit_price_max
       ? `${item.unit_price_min ?? ''}〜${item.unit_price_max ?? ''}万円`
@@ -1589,7 +1820,7 @@ export default function MatchingPage() {
       subject: `【案件のご提案】${mail?.title ?? ''}`,
       body: wrappedBody,
       to_address: item.email_from_address ?? '',
-      to_name: item.name ?? '',
+      to_name: recipientName ?? '',
       engineer_name: item.name ?? '（氏名未取得）',
       project_mail_id: Number(id),
       engineer_mail_source_id: item.engineer_mail_source_id,
