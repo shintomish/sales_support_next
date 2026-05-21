@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 import OriginalMailAccordion from '@/components/OriginalMailAccordion'
+import RequirementMatchAccordion from '@/components/RequirementMatchAccordion'
 import { pickMailBody, buildEmailBody, extractRecipientName, type EmailBodyTemplate } from '@/lib/mailBody'
 import { isSameDomain, extractDomain } from '@/lib/mailDomain'
+import { useAuthStore } from '@/store/authStore'
 
 // ── 型定義 ──────────────────────────────────────────
 interface EngineerMail {
@@ -471,12 +473,14 @@ function ProjectCard({ project, onPropose, generating, checked, onCheck }: {
 }
 
 // ── 鮮度マッチング: PMS リスト ────────────────────────
-function FreshPmsCard({ item, onPropose, generating, checked, onCheck }: {
+function FreshPmsCard({ item, onPropose, generating, checked, onCheck, engineerMailId, requirementMatchingEnabled }: {
   item: FreshPms
   onPropose: (p: FreshPms) => void
   generating: boolean
   checked: boolean
   onCheck: (id: number) => void
+  engineerMailId: number
+  requirementMatchingEnabled: boolean
 }) {
   const color = rankColor(item.score)
   const badgeMap: Record<string, { label: string; color: string }> = {
@@ -559,6 +563,14 @@ function FreshPmsCard({ item, onPropose, generating, checked, onCheck }: {
           {generating ? '生成中…' : '📧 個別提案'}
         </button>
       </div>
+      {requirementMatchingEnabled && (
+        <div style={{ padding: '0 14px 12px' }}>
+          <RequirementMatchAccordion
+            projectMailId={item.project_mail_id}
+            emsId={engineerMailId}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -712,6 +724,10 @@ export default function EngineerMailMatchingPage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
+
+  // docs/480 要件マッチング feature flag
+  const user = useAuthStore(s => s.user)
+  const requirementMatchingEnabled = !!user?.tenant?.feature_requirement_matching
 
   const [mail, setMail] = useState<EngineerMail | null>(null)
   const [projects, setProjects] = useState<MatchedProject[]>([])
@@ -1005,6 +1021,8 @@ export default function EngineerMailMatchingPage() {
                   generating={false}
                   checked={freshChecked.has(i.project_mail_id)}
                   onCheck={toggleFreshCheck}
+                  engineerMailId={Number(id)}
+                  requirementMatchingEnabled={requirementMatchingEnabled}
                 />
               ))
             )

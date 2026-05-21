@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 import OriginalMailAccordion from '@/components/OriginalMailAccordion'
+import RequirementMatchAccordion from '@/components/RequirementMatchAccordion'
 import { pickMailBody, buildEmailBody, type EmailBodyTemplate } from '@/lib/mailBody'
 import { isSameDomain, extractDomain } from '@/lib/mailDomain'
+import { useAuthStore } from '@/store/authStore'
 
 // PMS の構造化フィールドから「【案件情報】◇〜」ブロックを組み立てる
 // 個別提案/まとめて提案の両モードで同一フォーマットになるよう共通化
@@ -1102,6 +1104,8 @@ function FreshEmsList({
   onPropose,
   checked,
   onCheck,
+  projectMailId,
+  requirementMatchingEnabled,
 }: {
   loading: boolean
   items: FreshEms[]
@@ -1110,6 +1114,8 @@ function FreshEmsList({
   onPropose: (item: FreshEms) => void
   checked: Set<number>
   onCheck: (emsId: number) => void
+  projectMailId: number
+  requirementMatchingEnabled: boolean
 }) {
   if (loading) {
     return (
@@ -1329,6 +1335,12 @@ function FreshEmsList({
                   {item.badge === 'proposed' ? '提案済' : '提案メール作成'}
                 </button>
               </div>
+              {requirementMatchingEnabled && (
+                <RequirementMatchAccordion
+                  projectMailId={projectMailId}
+                  emsId={item.engineer_mail_source_id}
+                />
+              )}
             </div>
           )
         })}
@@ -1342,6 +1354,10 @@ export default function MatchingPage() {
   const params = useParams()
   const router = useRouter()
   const id = params?.id as string
+
+  // docs/480 要件マッチング feature flag
+  const user = useAuthStore(s => s.user)
+  const requirementMatchingEnabled = !!user?.tenant?.feature_requirement_matching
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1761,6 +1777,8 @@ export default function MatchingPage() {
             onPropose={handleGenerateProposalFromEms}
             checked={freshChecked}
             onCheck={toggleFreshCheck}
+            projectMailId={Number(id)}
+            requirementMatchingEnabled={requirementMatchingEnabled}
           />
         ) : engineers.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 48, color: '#9ca3af' }}>

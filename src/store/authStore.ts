@@ -14,6 +14,7 @@ interface User {
     slug: string;
     plan: string;
     ses_enabled: boolean;
+    feature_requirement_matching?: boolean;
   };
 }
 
