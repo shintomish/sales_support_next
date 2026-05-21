@@ -83,8 +83,9 @@ export function confidenceLabel(c: string | null | undefined): string {
 }
 
 /**
- * 対照表を Markdown 表 (Phase 3 の提案メール本文挿入用) に変換。
- * スキル対照表と契約条件チェックを 2 つの見出しで分離する。
+ * 対照表をプレーンテキストの箇条書き形式に整形 (提案メール本文挿入用)。
+ * Markdown テーブルだとプレーンテキストメールクライアントで読みにくいため、
+ * 「判定マーク + [必須/尚可] ラベル + 要件名 → 根拠」の縦長レイアウトを採用。
  */
 export function formatMatchTableMarkdown(
   requirements: Array<{ type: string; label: string; category: string }>,
@@ -100,23 +101,58 @@ export function formatMatchTableMarkdown(
     if (!r) continue
     const mustWant = r.type === 'must' ? '必須' : '尚可'
     const mark = judgmentMark(m.judgment)
-    const evidence = (m.evidence ?? '').replace(/\|/g, '\\|').slice(0, 80)
-    const row = `| ${r.label} | ${mustWant} | ${mark} | ${evidence} |`
+    const evidence = (m.evidence ?? '').replace(/[\r\n]+/g, ' ').trim()
+    const lines = [
+      `  ${mark} [${mustWant}] ${r.label}`,
+    ]
+    if (evidence) {
+      lines.push(`       根拠: ${evidence}`)
+    }
+    const block = lines.join('\n')
     if (isSkillCategory(r.category)) {
-      skillRows.push(row)
+      skillRows.push(block)
     } else {
-      contractRows.push(row)
+      contractRows.push(block)
     }
   }
 
-  const header = '| 要件 | 必須/尚可 | 判定 | 根拠 |\n|------|----------|:---:|------|'
-
+  const sep = '─'.repeat(40)
   let out = ''
   if (skillRows.length > 0) {
-    out += '## スキル対照表\n\n' + header + '\n' + skillRows.join('\n') + '\n\n'
+    out += `■ スキル対照表\n${sep}\n${skillRows.join('\n\n')}\n`
   }
   if (contractRows.length > 0) {
-    out += '## 契約条件チェック\n\n' + header + '\n' + contractRows.join('\n') + '\n'
+    if (out) out += '\n'
+    out += `■ 契約条件チェック\n${sep}\n${contractRows.join('\n\n')}\n`
   }
   return out.trim()
+}
+
+/**
+ * 提案メール本文の「closing/署名」直前に対照表ブロックを挿入する。
+ * "ご面談"・"お気軽にご返信"・"お忙しいところ"・"ご検討"・"何卒よろしくお願い"・"_/_/_/"
+ * (署名区切り) を検出し、最初に現れるものの直前に挿入。検出できなければ末尾に追加。
+ */
+export function insertMatchTableIntoBody(baseBody: string, matchTableText: string): string {
+  const markers = [
+    'ご面談',
+    'お気軽にご返信',
+    'お忙しいところ',
+    'ご検討いただけます',
+    'ご検討のほど',
+    '何卒よろしくお願い',
+    '_/_/_/',
+    '━━━',
+    '─────',
+  ]
+  let insertPos = baseBody.length
+  for (const m of markers) {
+    const i = baseBody.indexOf(m)
+    if (i >= 0 && i < insertPos) insertPos = i
+  }
+  const head = baseBody.slice(0, insertPos).trimEnd()
+  const tail = baseBody.slice(insertPos)
+  const separator = '─'.repeat(48)
+  const notice = '※ 本対照表は AI による自動判定の参考情報です。最終的な適性は貴社にてご判断ください。'
+  return `${head}\n\n${separator}\n${matchTableText}\n${separator}\n${notice}\n\n${tail}`
 }

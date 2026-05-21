@@ -7,7 +7,7 @@ import OriginalMailAccordion from '@/components/OriginalMailAccordion'
 import RequirementMatchAccordion from '@/components/RequirementMatchAccordion'
 import { pickMailBody, buildEmailBody, type EmailBodyTemplate } from '@/lib/mailBody'
 import { isSameDomain, extractDomain } from '@/lib/mailDomain'
-import { formatMatchTableMarkdown } from '@/lib/requirementCategoryLabel'
+import { formatMatchTableMarkdown, insertMatchTableIntoBody } from '@/lib/requirementCategoryLabel'
 import { useAuthStore } from '@/store/authStore'
 
 // PMS の構造化フィールドから「【案件情報】◇〜」ブロックを組み立てる
@@ -321,8 +321,8 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
     if (checked) {
       const md = matchTableMd ?? (await fetchMatchTable())
       if (md) {
-        // 既存 body の末尾を baseBody に置換した上で対照表を追記
-        setBody(`${baseBodyRef.current}\n\n----------------------------------------------------------------\n${md}\n\n※ 本対照表は AI による自動判定の参考情報です。最終的な適性は貴社にてご判断ください。`)
+        // closing (ご面談/お忙しいところ/署名) の直前に挿入
+        setBody(insertMatchTableIntoBody(baseBodyRef.current, md))
       } else {
         setIncludeMatchTable(false)
       }

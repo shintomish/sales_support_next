@@ -7,7 +7,7 @@ import OriginalMailAccordion from '@/components/OriginalMailAccordion'
 import RequirementMatchAccordion from '@/components/RequirementMatchAccordion'
 import { pickMailBody, buildEmailBody, extractRecipientName, type EmailBodyTemplate } from '@/lib/mailBody'
 import { isSameDomain, extractDomain } from '@/lib/mailDomain'
-import { formatMatchTableMarkdown } from '@/lib/requirementCategoryLabel'
+import { formatMatchTableMarkdown, insertMatchTableIntoBody } from '@/lib/requirementCategoryLabel'
 import { useAuthStore } from '@/store/authStore'
 
 // ── 型定義 ──────────────────────────────────────────
@@ -175,7 +175,7 @@ function ProposalModal({ draft, engineerMailId, onClose }: { draft: ProposalDraf
     if (checked) {
       const md = matchTableMd ?? (await fetchMatchTable())
       if (md) {
-        setBody(`${baseBodyRef.current}\n\n----------------------------------------------------------------\n${md}\n\n※ 本対照表は AI による自動判定の参考情報です。最終的な適性は貴社にてご判断ください。`)
+        setBody(insertMatchTableIntoBody(baseBodyRef.current, md))
       } else {
         setIncludeMatchTable(false)
       }
