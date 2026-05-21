@@ -103,7 +103,8 @@ function BulkSendModal({
   // BulkSendModal は技術者単体の添付には非対応 (複数技術者まとめ送信のため空で固定)
   const engineerAttachments: EmailAttachment[] = []
   const addedEngineerAttIds = new Set<number>()
-  const setAddedEngineerAttIds = (_: unknown) => {} // no-op (BulkSendModal では未使用)
+  // 型を明示しておくと TS が prev: Set<number> を推論できる (no-op のため実行時は呼ばれない)
+  const setAddedEngineerAttIds: (updater: (prev: Set<number>) => Set<number>) => void = () => {}
   const includingEngineerAttachments = false
   const includeEngineerAttachments = async () => {}
   const engineerMailIdForAtt: number | null = null
