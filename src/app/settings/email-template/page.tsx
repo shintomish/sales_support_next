@@ -11,11 +11,18 @@ interface EmailBodyTemplate {
   position: string;
   email: string;
   mobile: string;
+  sender_display_name?: string;
 }
 
 const EMPTY: EmailBodyTemplate = {
-  name: '', name_en: '', department: '', position: '', email: '', mobile: '',
+  name: '', name_en: '', department: '', position: '', email: '', mobile: '', sender_display_name: '',
 };
+
+// 送信者名 (From ヘッダ表示名) のプリセット候補。custom 入力も可。
+const SENDER_PRESETS = [
+  { value: 'Aizen Solution SES Support', label: 'Aizen Solution SES Support （英文）' },
+  { value: 'アイゼン・ソリューション (営業)', label: 'アイゼン・ソリューション (営業)（和文）' },
+];
 
 function buildPreview(form: EmailBodyTemplate) {
   return `●● 様
@@ -169,6 +176,47 @@ export default function EmailTemplatePage() {
               placeholder="080-3268-9820"
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          <div className="border-t border-gray-200 pt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              ⑦ 送信者名（From ヘッダ表示名）
+              <span className="text-xs text-gray-500 font-normal ml-2">提案・一斉配信メールの From: に使用</span>
+            </label>
+            <div className="space-y-2">
+              {SENDER_PRESETS.map(preset => (
+                <label key={preset.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="sender_display_name_preset"
+                    value={preset.value}
+                    checked={form.sender_display_name === preset.value}
+                    onChange={e => setForm(f => ({ ...f, sender_display_name: e.target.value }))}
+                  />
+                  <span>{preset.label}</span>
+                  <span className="text-xs text-gray-400 font-mono">{preset.value} &lt;outsource@aizen-sol.co.jp&gt;</span>
+                </label>
+              ))}
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="sender_display_name_preset"
+                  value=""
+                  checked={!form.sender_display_name || !SENDER_PRESETS.some(p => p.value === form.sender_display_name)}
+                  onChange={() => setForm(f => ({ ...f, sender_display_name: '' }))}
+                />
+                <span>カスタム / 未指定 (env 既定値を使う)</span>
+              </label>
+              {form.sender_display_name && !SENDER_PRESETS.some(p => p.value === form.sender_display_name) && (
+                <input
+                  type="text"
+                  value={form.sender_display_name}
+                  onChange={e => setForm(f => ({ ...f, sender_display_name: e.target.value }))}
+                  placeholder="カスタム表示名を入力"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              )}
+            </div>
           </div>
 
           <button

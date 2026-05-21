@@ -1516,19 +1516,18 @@ export default function DeliveriesPage() {
                         sortField={campSortBy}
                         sortOrder={campSortDir}
                         onSort={(f) => handleCampSort(f as CampSortBy)}
-                        className={`px-4 py-3 ${col === 'subject' ? '' : col === 'project_title' ? 'w-24' : col === 'sent_at' ? 'w-[130px] whitespace-nowrap' : ''}`}
+                        className={`px-4 py-3 ${col === 'subject' ? '' : col === 'project_title' ? 'w-32' : col === 'sent_at' ? 'w-[130px] whitespace-nowrap' : col === 'sent_by' ? 'w-[110px] whitespace-nowrap' : ''}`}
                       />
                       {col === 'sent_at' && (
                         <th className="px-4 py-3 text-left w-[110px] whitespace-nowrap">再送信日時</th>
                       )}
                     </Fragment>
                   ))}
-                  <th className="px-2 py-3 text-center whitespace-nowrap">分類</th>
-                  <th className="px-2 py-3 text-center whitespace-nowrap">送信数</th>
-                  <th className="px-2 py-3 text-center whitespace-nowrap">成功</th>
-                  <th className="px-2 py-3 text-center whitespace-nowrap">失敗</th>
-                  <th className="px-2 py-3 text-center whitespace-nowrap">返信率</th>
-                  <th className="px-2 py-3 text-center whitespace-nowrap">詳細</th>
+                  <th className="px-2 py-3 text-center whitespace-nowrap w-16">分類</th>
+                  <th className="px-2 py-3 text-center whitespace-nowrap w-16">送信数</th>
+                  <th className="px-2 py-3 text-center whitespace-nowrap w-12">失敗</th>
+                  <th className="px-2 py-3 text-center whitespace-nowrap w-16">返信</th>
+                  <th className="px-2 py-3 text-center whitespace-nowrap w-14">詳細</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -1566,12 +1565,12 @@ export default function DeliveriesPage() {
                             )
                           })() : '—'}
                         </td>
-                        <td className="px-4 py-3 text-gray-800 whitespace-nowrap">{camp.sent_by ?? '-'}</td>
+                        <td className="px-4 py-3 text-gray-800 whitespace-nowrap text-xs">{camp.sent_by ?? '-'}</td>
                         <td className="px-4 py-3">
-                          <div className="truncate max-w-[200px] text-gray-800" title={camp.subject}>{camp.subject}</div>
+                          <div className="text-gray-800 text-sm leading-snug break-words" title={camp.subject}>{camp.subject}</div>
                         </td>
-                        <td className="px-4 py-3 w-24">
-                          <div className="truncate max-w-[88px] text-gray-500 text-xs" title={camp.project_title ?? camp.engineer_mail_title ?? ''}>{camp.project_title ?? camp.engineer_mail_title ?? '-'}</div>
+                        <td className="px-4 py-3 w-32">
+                          <div className="text-gray-500 text-xs leading-snug break-words" title={camp.project_title ?? camp.engineer_mail_title ?? ''}>{camp.project_title ?? camp.engineer_mail_title ?? '-'}</div>
                         </td>
                         <td className="px-2 py-3 text-center whitespace-nowrap">
                           {camp.engineer_mail_source_id != null
@@ -1587,17 +1586,13 @@ export default function DeliveriesPage() {
                               : <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">配信</span>
                           }
                         </td>
-                        <td className="px-2 py-3 text-center text-gray-700 whitespace-nowrap">{camp.total_count}</td>
-                        <td className="px-2 py-3 text-center text-green-600 font-medium whitespace-nowrap">{camp.success_count}</td>
+                        <td className="px-2 py-3 text-center text-gray-700 whitespace-nowrap" title={`成功 ${camp.success_count} 件`}>{camp.total_count}</td>
                         <td className="px-2 py-3 text-center text-red-500 whitespace-nowrap">{camp.failed_count}</td>
                         <td className="px-2 py-3 text-center whitespace-nowrap">
-                          {camp.replied_count != null && camp.success_count > 0 ? (
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span className="text-blue-600 font-medium text-xs">
-                                {(camp.replied_count / camp.success_count * 100).toFixed(2)}%
-                              </span>
-                              <span className="text-gray-400 text-xs">{camp.replied_count}件</span>
-                            </div>
+                          {camp.replied_count != null && camp.replied_count > 0 ? (
+                            <span className="text-blue-600 font-medium text-xs" title={`返信率 ${camp.success_count > 0 ? (camp.replied_count / camp.success_count * 100).toFixed(2) : 0}%`}>
+                              {camp.replied_count}件
+                            </span>
                           ) : (
                             <span className="text-gray-300 text-xs">—</span>
                           )}
