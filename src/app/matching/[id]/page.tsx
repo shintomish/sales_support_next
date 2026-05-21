@@ -1169,6 +1169,7 @@ function FreshEmsList({
   onCheck,
   projectMailId,
   requirementMatchingEnabled,
+  matchedEmsIds,
 }: {
   loading: boolean
   items: FreshEms[]
@@ -1179,6 +1180,7 @@ function FreshEmsList({
   onCheck: (emsId: number) => void
   projectMailId: number
   requirementMatchingEnabled: boolean
+  matchedEmsIds: Set<number>
 }) {
   if (loading) {
     return (
@@ -1224,6 +1226,7 @@ function FreshEmsList({
             <tbody>
               {sorted.map(item => {
                 const c = rankColor(item.score)
+                const hasMatch = matchedEmsIds.has(item.engineer_mail_source_id)
                 const badgeLabel =
                   item.badge === 'proposed' ? '提案済' :
                   item.badge === 'registered' ? '登録済' : '新規'
@@ -1235,7 +1238,7 @@ function FreshEmsList({
                   ? `${item.unit_price_min ?? '?'}〜${item.unit_price_max ?? '?'}万`
                   : '—'
                 return (
-                  <tr key={item.engineer_mail_source_id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <tr key={item.engineer_mail_source_id} style={{ borderBottom: '1px solid #f1f5f9', background: hasMatch ? '#f0fdf4' : undefined }}>
                     <td style={{ padding: '8px 6px', textAlign: 'center' }}>
                       <input
                         type="checkbox"
@@ -1251,9 +1254,16 @@ function FreshEmsList({
                       </span>
                     </td>
                     <td style={{ padding: '8px 10px' }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, background: badgeColor.bg, color: badgeColor.color, borderRadius: 4, padding: '2px 6px' }}>
-                        {badgeLabel}
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, background: badgeColor.bg, color: badgeColor.color, borderRadius: 4, padding: '2px 6px', display: 'inline-block', width: 'fit-content' }}>
+                          {badgeLabel}
+                        </span>
+                        {hasMatch && (
+                          <span style={{ fontSize: 10, fontWeight: 600, background: '#dcfce7', color: '#15803d', borderRadius: 4, padding: '2px 6px', display: 'inline-block', width: 'fit-content' }}>
+                            📊 対照表
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '8px 10px', color: '#111827' }}>
                       <div style={{ fontWeight: 600 }}>{item.name ?? '（未取得）'}</div>
@@ -1309,6 +1319,7 @@ function FreshEmsList({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
         {sorted.map(item => {
           const c = rankColor(item.score)
+          const hasMatch = matchedEmsIds.has(item.engineer_mail_source_id)
           const badgeLabel =
             item.badge === 'proposed' ? '提案済' :
             item.badge === 'registered' ? '登録済（未提案）' : '新規'
@@ -1324,15 +1335,20 @@ function FreshEmsList({
               key={item.engineer_mail_source_id}
               style={{
                 background: '#fff',
-                border: `1px solid ${c.border}`,
+                border: `1px solid ${hasMatch ? '#16a34a' : c.border}`,
                 borderRadius: 10,
                 padding: 14,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 8,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                boxShadow: hasMatch ? '0 0 0 2px rgba(22,163,74,0.15), 0 1px 3px rgba(0,0,0,0.05)' : '0 1px 3px rgba(0,0,0,0.05)',
               }}
             >
+              {hasMatch && (
+                <div style={{ display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: 4, border: '1px solid #86efac' }}>
+                  📊 対照表 生成済
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <input
                   type="checkbox"
@@ -1402,6 +1418,7 @@ function FreshEmsList({
                 <RequirementMatchAccordion
                   projectMailId={projectMailId}
                   emsId={item.engineer_mail_source_id}
+                  prefetched={hasMatch}
                 />
               )}
             </div>
@@ -1425,6 +1442,8 @@ export default function MatchingPage() {
   // 進捗パネル: 各 EMS ごとの状態
   type BatchProgressItem = { ems_id: number; name: string; status: 'pending' | 'running' | 'done' | 'error'; error?: string }
   const [batchProgress, setBatchProgress] = useState<BatchProgressItem[]>([])
+  // バッチ生成済 EMS ID (カード/対照表ボタンの強調表示用)
+  const matchedEmsIds = new Set(batchProgress.filter(p => p.status === 'done').map(p => p.ems_id))
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1947,6 +1966,7 @@ export default function MatchingPage() {
             onCheck={toggleFreshCheck}
             projectMailId={Number(id)}
             requirementMatchingEnabled={requirementMatchingEnabled}
+            matchedEmsIds={matchedEmsIds}
           />
         ) : engineers.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 48, color: '#9ca3af' }}>

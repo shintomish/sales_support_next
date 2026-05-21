@@ -21,13 +21,15 @@ type Props = {
   label?: string
   /** デフォルト閉じた状態 */
   initialOpen?: boolean
+  /** 一括生成等で DB に対照表が用意済の場合 true → ボタンを緑色で強調 */
+  prefetched?: boolean
 }
 
 // docs/480 §6.1 案件側マッチング画面に組み込む対照表アコーディオン。
 // 「対照表」ボタンクリックで GET /v1/project-mails/{id}/requirement-match を呼び、
 // 結果を RequirementMatchTable で表示。ボタン押下時のみ Claude API が走る (コスト制御)。
 export default function RequirementMatchAccordion({
-  projectMailId, emsId, engineerId, label = '対照表', initialOpen = false,
+  projectMailId, emsId, engineerId, label = '対照表', initialOpen = false, prefetched = false,
 }: Props) {
   const [open, setOpen] = useState(initialOpen)
   const [loading, setLoading] = useState(false)
@@ -103,12 +105,14 @@ export default function RequirementMatchAccordion({
         onClick={handleToggle}
         style={{
           fontSize: 11, padding: '4px 10px', borderRadius: 6,
-          border: '1px solid #d1d5db', background: open ? '#dbeafe' : '#fff',
-          color: '#2563eb', cursor: 'pointer', fontWeight: 600,
+          border: `1px solid ${prefetched ? '#16a34a' : '#d1d5db'}`,
+          background: open ? '#dbeafe' : (prefetched ? '#dcfce7' : '#fff'),
+          color: prefetched ? '#15803d' : '#2563eb',
+          cursor: 'pointer', fontWeight: 600,
         }}
-        title="案件要件と技術者スキルの ◯/△/× 対照表"
+        title={prefetched ? '対照表生成済 (クリックで展開)' : '案件要件と技術者スキルの ◯/△/× 対照表'}
       >
-        {open ? '▼ ' : '▶ '} {label}
+        {open ? '▼ ' : '▶ '} {label}{prefetched && ' ✓'}
       </button>
 
       {open && (
