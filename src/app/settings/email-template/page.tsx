@@ -50,6 +50,8 @@ export default function EmailTemplatePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  // ユーザがプレビューを直接編集したかを追跡。false の間はフォーム変更時に自動同期する。
+  const [previewEdited, setPreviewEdited] = useState(false);
 
   useEffect(() => {
     axios.get('/api/v1/email-body-templates/me')
@@ -57,14 +59,31 @@ export default function EmailTemplatePage() {
         if (res.data) {
           const loaded = { ...EMPTY, ...res.data };
           setForm(loaded);
-          // body_text が保存済みならそちらを優先、なければフォームから生成
-          setPreviewText(res.data.body_text || buildPreview(loaded));
+          // body_text 保存済 = 過去にプレビューを手動編集した可能性 → 手動編集モードで再開
+          if (res.data.body_text) {
+            setPreviewText(res.data.body_text);
+            const wouldGenerate = buildPreview(loaded);
+            // 既存 body_text が今のフォームから自動生成可能な形と一致するなら手動編集なし扱い
+            setPreviewEdited(res.data.body_text !== wouldGenerate);
+          } else {
+            setPreviewText(buildPreview(loaded));
+          }
         }
       })
       .finally(() => setLoading(false));
   }, []);
 
-  const syncPreview = () => setPreviewText(buildPreview(form));
+  // フォーム変更時、プレビューが未編集なら自動同期 (バグ #1: フォーム変更が body_text に反映されない問題対策)
+  useEffect(() => {
+    if (!loading && !previewEdited) {
+      setPreviewText(buildPreview(form));
+    }
+  }, [form, previewEdited, loading]);
+
+  const syncPreview = () => {
+    setPreviewText(buildPreview(form));
+    setPreviewEdited(false); // 同期したので「未編集」状態に戻す
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,10 +194,15 @@ export default function EmailTemplatePage() {
           </div>
           <textarea
             value={previewText}
-            onChange={e => setPreviewText(e.target.value)}
+            onChange={e => { setPreviewText(e.target.value); setPreviewEdited(true); }}
             className="flex-1 bg-gray-50 border border-gray-200 rounded-md p-4 text-xs text-gray-700 leading-relaxed font-mono resize-none"
             style={{ minHeight: 420 }}
           />
+          {previewEdited && (
+            <p className="text-xs text-amber-600 mt-1">
+              ⚠️ プレビューを手動編集しています。フォーム変更は自動反映されません (「↩ フォームから反映」で再同期可)
+            </p>
+          )}
         </div>
       </div>
     </div>
