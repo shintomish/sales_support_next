@@ -1421,6 +1421,7 @@ export default function MatchingPage() {
   // docs/480 要件マッチング feature flag
   const user = useAuthStore(s => s.user)
   const requirementMatchingEnabled = !!user?.tenant?.feature_requirement_matching
+  const [batchMatching, setBatchMatching] = useState(false)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1484,6 +1485,34 @@ export default function MatchingPage() {
       setFreshChecked(new Set())
     } else {
       setFreshChecked(new Set(selectableFreshItems.map(i => i.engineer_mail_source_id)))
+    }
+  }
+
+  // docs/480 §10 Phase 4: スコア上位 5 件に対照表を一括生成 (Claude 呼出は最大 5 件)
+  const handleBatchMatch = async () => {
+    if (selectableFreshItems.length === 0) return
+    const topIds = [...selectableFreshItems]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map(i => i.engineer_mail_source_id)
+    if (!confirm(`スコア上位 ${topIds.length} 件に対照表を生成します (Claude API 呼出)。よろしいですか?`)) return
+    setBatchMatching(true)
+    try {
+      const res = await axios.post(`/api/v1/project-mails/${id}/requirement-match-batch`, {
+        ems_ids: topIds,
+      })
+      const ok = (res.data?.results ?? []).filter((r: { error?: string }) => !r.error).length
+      const fail = (res.data?.results ?? []).filter((r: { error?: string }) => !!r.error).length
+      alert(`対照表生成: 成功 ${ok}件 / 失敗 ${fail}件\n\n各カードの ▶ 対照表 ボタンで結果が表示されます。`)
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string }; status?: number } }
+      if (err.response?.status === 422) {
+        alert(err.response?.data?.message ?? '一括生成に失敗しました')
+      } else {
+        alert('一括生成に失敗しました')
+      }
+    } finally {
+      setBatchMatching(false)
     }
   }
 
@@ -1769,6 +1798,16 @@ export default function MatchingPage() {
               >
                 📤 まとめて提案{freshChecked.size > 0 ? `（${freshChecked.size}名）` : ''}
               </button>
+              {requirementMatchingEnabled && (
+                <button
+                  onClick={handleBatchMatch}
+                  disabled={batchMatching || selectableFreshItems.length === 0}
+                  title="スコア上位 5 件に対照表を一括生成 (Claude 呼出)"
+                  style={{ fontSize: 12, background: batchMatching ? '#9ca3af' : 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: 6, padding: '5px 12px', cursor: batchMatching || selectableFreshItems.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600, flexShrink: 0, opacity: selectableFreshItems.length === 0 ? 0.5 : 1 }}
+                >
+                  {batchMatching ? '⏳ 生成中...' : '📊 上位 5 件に対照表'}
+                </button>
+              )}
             </>
           ) : (
             <>
