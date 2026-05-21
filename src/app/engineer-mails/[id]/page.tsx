@@ -7,6 +7,7 @@ import OriginalMailAccordion from '@/components/OriginalMailAccordion'
 import RequirementMatchAccordion from '@/components/RequirementMatchAccordion'
 import { pickMailBody, buildEmailBody, extractRecipientName, type EmailBodyTemplate } from '@/lib/mailBody'
 import { isSameDomain, extractDomain } from '@/lib/mailDomain'
+import { formatMatchTableMarkdown } from '@/lib/requirementCategoryLabel'
 import { useAuthStore } from '@/store/authStore'
 
 // ── 型定義 ──────────────────────────────────────────
@@ -140,6 +141,49 @@ function ProposalModal({ draft, engineerMailId, onClose }: { draft: ProposalDraf
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // 対照表 自動挿入 (docs/480 Phase 3)
+  const matchUser = useAuthStore(s => s.user)
+  const matchEnabled = !!matchUser?.tenant?.feature_requirement_matching && !!draft.project_mail_id
+  const [includeMatchTable, setIncludeMatchTable] = useState(false)
+  const [matchTableMd, setMatchTableMd] = useState<string | null>(null)
+  const [matchLoading, setMatchLoading] = useState(false)
+  const [matchError, setMatchError] = useState<string | null>(null)
+  const baseBodyRef = useRef(draft.body)
+
+  const fetchMatchTable = async () => {
+    if (!draft.project_mail_id) return null
+    setMatchLoading(true)
+    setMatchError(null)
+    try {
+      const res = await axios.get(`/api/v1/project-mails/${draft.project_mail_id}/requirement-match`, {
+        params: { ems_id: engineerMailId },
+      })
+      const md = formatMatchTableMarkdown(res.data.requirements_json, res.data.matches_json)
+      setMatchTableMd(md)
+      return md
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number } }
+      setMatchError(err.response?.status === 403 ? '機能無効' : '対照表取得失敗')
+      return null
+    } finally {
+      setMatchLoading(false)
+    }
+  }
+
+  const handleToggleMatchTable = async (checked: boolean) => {
+    setIncludeMatchTable(checked)
+    if (checked) {
+      const md = matchTableMd ?? (await fetchMatchTable())
+      if (md) {
+        setBody(`${baseBodyRef.current}\n\n----------------------------------------------------------------\n${md}\n\n※ 本対照表は AI による自動判定の参考情報です。最終的な適性は貴社にてご判断ください。`)
+      } else {
+        setIncludeMatchTable(false)
+      }
+    } else {
+      setBody(baseBodyRef.current)
+    }
+  }
+
   const handleToNameChange = (name: string) => {
     setToName(name)
     setBody(prev => {
@@ -215,7 +259,27 @@ function ProposalModal({ draft, engineerMailId, onClose }: { draft: ProposalDraf
         </div>
         <div style={{ padding: '16px 20px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <OriginalMailAccordion body={draft.original_mail_body} label={draft.original_mail_label ?? '元メール本文'} />
-          <textarea value={body} onChange={e => setBody(e.target.value)} style={{ width: '100%', fontSize: 13, color: '#374151', lineHeight: 1.7, fontFamily: 'sans-serif', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', resize: 'vertical', minHeight: 280, boxSizing: 'border-box' }} />
+          {matchEnabled && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#374151', background: '#eff6ff', padding: '6px 10px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
+              <input
+                type="checkbox"
+                checked={includeMatchTable}
+                onChange={e => handleToggleMatchTable(e.target.checked)}
+                disabled={matchLoading}
+              />
+              <span>📊 対照表を本文に含める</span>
+              {matchLoading && <span style={{ color: '#6b7280', fontSize: 11 }}>(取得中...)</span>}
+              {matchError && <span style={{ color: '#dc2626', fontSize: 11 }}>({matchError})</span>}
+            </label>
+          )}
+          <textarea
+            value={body}
+            onChange={e => {
+              setBody(e.target.value)
+              if (!includeMatchTable) baseBodyRef.current = e.target.value
+            }}
+            style={{ width: '100%', fontSize: 13, color: '#374151', lineHeight: 1.7, fontFamily: 'sans-serif', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', resize: 'vertical', minHeight: 280, boxSizing: 'border-box' }}
+          />
           <div
             onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
             onDragLeave={e => { e.preventDefault(); setIsDragging(false) }}
