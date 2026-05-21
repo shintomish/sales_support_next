@@ -1422,6 +1422,9 @@ export default function MatchingPage() {
   const user = useAuthStore(s => s.user)
   const requirementMatchingEnabled = !!user?.tenant?.feature_requirement_matching
   const [batchMatching, setBatchMatching] = useState(false)
+  // 進捗パネル: 各 EMS ごとの状態
+  type BatchProgressItem = { ems_id: number; name: string; status: 'pending' | 'running' | 'done' | 'error'; error?: string }
+  const [batchProgress, setBatchProgress] = useState<BatchProgressItem[]>([])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1488,32 +1491,39 @@ export default function MatchingPage() {
     }
   }
 
-  // docs/480 §10 Phase 4: スコア上位 5 件に対照表を一括生成 (Claude 呼出は最大 5 件)
+  // docs/480 §10 Phase 4: スコア上位 5 件に対照表を一括生成 (個別 GET を逐次実行で進捗表示)
   const handleBatchMatch = async () => {
     if (selectableFreshItems.length === 0) return
-    const topIds = [...selectableFreshItems]
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5)
-      .map(i => i.engineer_mail_source_id)
-    if (!confirm(`スコア上位 ${topIds.length} 件に対照表を生成します (Claude API 呼出)。よろしいですか?`)) return
+    const top = [...selectableFreshItems].sort((a, b) => b.score - a.score).slice(0, 5)
+    if (!confirm(`スコア上位 ${top.length} 件に対照表を生成します (Claude API 呼出・約 ${top.length * 8}秒)。よろしいですか?`)) return
+
+    // 初期状態: 全件 pending
+    const initial: BatchProgressItem[] = top.map(i => ({
+      ems_id: i.engineer_mail_source_id,
+      name: i.name ?? `EMS#${i.engineer_mail_source_id}`,
+      status: 'pending',
+    }))
+    setBatchProgress(initial)
     setBatchMatching(true)
-    try {
-      const res = await axios.post(`/api/v1/project-mails/${id}/requirement-match-batch`, {
-        ems_ids: topIds,
-      })
-      const ok = (res.data?.results ?? []).filter((r: { error?: string }) => !r.error).length
-      const fail = (res.data?.results ?? []).filter((r: { error?: string }) => !!r.error).length
-      alert(`対照表生成: 成功 ${ok}件 / 失敗 ${fail}件\n\n各カードの ▶ 対照表 ボタンで結果が表示されます。`)
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { message?: string }; status?: number } }
-      if (err.response?.status === 422) {
-        alert(err.response?.data?.message ?? '一括生成に失敗しました')
-      } else {
-        alert('一括生成に失敗しました')
+
+    // 逐次 GET (cache を効かせるため並列ではなく順次)
+    for (let i = 0; i < top.length; i++) {
+      const target = top[i]
+      setBatchProgress(prev => prev.map((p, idx) => idx === i ? { ...p, status: 'running' } : p))
+      try {
+        await axios.get(`/api/v1/project-mails/${id}/requirement-match`, {
+          params: { ems_id: target.engineer_mail_source_id },
+          timeout: 120000,
+        })
+        setBatchProgress(prev => prev.map((p, idx) => idx === i ? { ...p, status: 'done' } : p))
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } }; message?: string }
+        const msg = err.response?.data?.message ?? err.message ?? '失敗'
+        setBatchProgress(prev => prev.map((p, idx) => idx === i ? { ...p, status: 'error', error: msg } : p))
       }
-    } finally {
-      setBatchMatching(false)
     }
+    setBatchMatching(false)
+    // 結果はパネルに残す。閉じるのはユーザ操作で。
   }
 
 
@@ -1867,6 +1877,62 @@ export default function MatchingPage() {
           )}
         </div>
       </div>
+
+      {/* 一括判定 進捗パネル (docs/480 Phase 4) */}
+      {batchProgress.length > 0 && (
+        <div style={{ margin: '12px 20px 0', padding: 12, background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontWeight: 700, color: '#374151' }}>
+              📊 対照表 一括生成
+              {(() => {
+                const done = batchProgress.filter(p => p.status === 'done').length
+                const err = batchProgress.filter(p => p.status === 'error').length
+                const total = batchProgress.length
+                return <span style={{ marginLeft: 12, color: '#6b7280', fontWeight: 400 }}>{done}/{total} 完了{err > 0 ? `・${err} 失敗` : ''}</span>
+              })()}
+            </span>
+            {!batchMatching && (
+              <button onClick={() => setBatchProgress([])} style={{ fontSize: 11, padding: '3px 10px', border: '1px solid #d1d5db', background: '#fff', borderRadius: 4, cursor: 'pointer', color: '#6b7280' }}>
+                ✕ 閉じる
+              </button>
+            )}
+          </div>
+          {/* 進捗バー */}
+          <div style={{ height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden', marginBottom: 10 }}>
+            <div
+              style={{
+                width: `${(batchProgress.filter(p => p.status === 'done' || p.status === 'error').length / batchProgress.length) * 100}%`,
+                height: '100%',
+                background: batchProgress.some(p => p.status === 'error') ? '#f59e0b' : '#16a34a',
+                transition: 'width 0.3s',
+              }}
+            />
+          </div>
+          {/* 各 item の状態 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {batchProgress.map(p => (
+              <div key={p.ems_id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 24, textAlign: 'center', fontSize: 14 }}>
+                  {p.status === 'pending' && '⋯'}
+                  {p.status === 'running' && <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⏳</span>}
+                  {p.status === 'done' && '✅'}
+                  {p.status === 'error' && '❌'}
+                </span>
+                <span style={{ fontSize: 11, color: '#6b7280', minWidth: 80 }}>EMS #{p.ems_id}</span>
+                <span style={{ fontSize: 12, color: p.status === 'error' ? '#dc2626' : '#374151', flex: 1 }}>
+                  {p.name}
+                  {p.status === 'error' && p.error && <span style={{ marginLeft: 8, fontSize: 10 }}>({p.error})</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+          {!batchMatching && batchProgress.every(p => p.status === 'done' || p.status === 'error') && (
+            <div style={{ marginTop: 10, padding: '6px 10px', background: '#eff6ff', borderRadius: 4, fontSize: 11, color: '#1e40af' }}>
+              💡 各カードの ▶ 対照表 ボタンで結果を確認できます (DB キャッシュ済 / Claude 呼出ゼロ)
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 技術者リスト */}
       <div style={{ padding: '20px 20px 40px' }}>
