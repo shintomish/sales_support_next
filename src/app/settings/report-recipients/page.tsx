@@ -15,7 +15,7 @@ interface Recipient {
   created_at: string;
 }
 
-const REPORT_TYPE = 'daily_sales';
+const REPORT_TYPE = 'daily_delivery_report';
 
 export default function ReportRecipientsPage() {
   const [items, setItems]       = useState<Recipient[]>([]);
