@@ -34,7 +34,7 @@ export default function NotificationToast({ tasks }: Props) {
   const shown = tasks.slice(0, 3); // 最大3件表示
 
   return (
-    <div className="fixed top-4 right-4 z-50 w-80 animate-in slide-in-from-right-4 fade-in duration-300">
+    <div className="fixed top-4 right-4 z-[200] w-80 animate-in slide-in-from-right-4 fade-in duration-300">
       <div className="bg-white border border-red-200 rounded-xl shadow-lg overflow-hidden">
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-4 py-3 bg-red-50 border-b border-red-100">
