@@ -319,7 +319,7 @@ export default function Sidebar() {
           type="button"
           onClick={() => setMobileOpen(true)}
           aria-label="メニューを開く"
-          className="md:hidden fixed top-3 left-3 z-50 w-11 h-11 rounded-md bg-gray-900 text-white shadow-lg flex items-center justify-center text-2xl leading-none hover:bg-gray-800 transition-colors"
+          className="md:hidden fixed top-3 left-3 z-[160] w-11 h-11 rounded-md bg-gray-900 text-white shadow-lg flex items-center justify-center text-2xl leading-none hover:bg-gray-800 transition-colors"
         >
           ≡
         </button>
@@ -329,7 +329,7 @@ export default function Sidebar() {
       {mobileOpen && (
         <div
           onClick={() => setMobileOpen(false)}
-          className="md:hidden fixed inset-0 bg-black/50 z-30"
+          className="md:hidden fixed inset-0 bg-black/50 z-[140]"
           aria-hidden="true"
         />
       )}
@@ -341,7 +341,7 @@ export default function Sidebar() {
           // 幅は mobile は常に w-64 (collapsed は PC 専用概念)。
           `${collapsed ? 'md:w-16' : 'md:w-64'} w-64 ` +
           `transition-all duration-300 h-screen ` +
-          `fixed inset-y-0 left-0 z-40 ` +
+          `fixed inset-y-0 left-0 z-[150] ` +
           `${mobileOpen ? 'translate-x-0' : '-translate-x-full'} ` +
           `md:sticky md:top-0 md:translate-x-0 md:z-auto md:inset-auto ` +
           `bg-gray-900 text-white flex flex-col`
