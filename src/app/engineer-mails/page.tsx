@@ -211,6 +211,7 @@ function buildReplyBody(recipientName: string, originalBody: string, tpl: EmailB
 // ── 定数 ─────────────────────────────────────────────────
 
 const STATUS_TABS = [
+  { value: '',           label: '全て',    color: 'text-white bg-gray-700 border-gray-700' },
   { value: 'review',     label: '要確認',  color: 'text-yellow-700 bg-yellow-50 border-yellow-300' },
   { value: 'new',        label: '新着',    color: 'text-teal-700 bg-teal-50 border-teal-300' },
   { value: 'registered', label: '登録済',  color: 'text-blue-700 bg-blue-50 border-blue-300' },
@@ -245,10 +246,10 @@ const AFFILIATION_OPTIONS = [
 ]
 
 const SCORE_FILTERS = [
-  { value: 'all',  label: '全て',    scoreMin: 0,  scoreMax: 100 },
-  { value: 'high', label: '高 80+',  scoreMin: 80, scoreMax: 100 },
-  { value: 'mid',  label: '中 60-',  scoreMin: 60, scoreMax: 79  },
-  { value: 'low',  label: '低 ～39', scoreMin: 0,  scoreMax: 39  },
+  { value: 'all',  label: 'ScoreALL', scoreMin: 0,  scoreMax: 100 },
+  { value: 'high', label: '高 80+',   scoreMin: 80, scoreMax: 100 },
+  { value: 'mid',  label: '中 60-',   scoreMin: 60, scoreMax: 79  },
+  { value: 'low',  label: '低 ～39',  scoreMin: 0,  scoreMax: 39  },
 ]
 
 // 元メール本文 ▼アコーディオン
@@ -288,9 +289,13 @@ export default function EngineerMailsPage() {
   const searchParams = useSearchParams()
   const [items, setItems] = useState<Paginated | null>(null)
   const [selected, setSelected] = useState<EngineerMail | null>(null)
-  const [statusFilter, setStatusFilter] = useState('review')
+  // デフォルトは「全て」(ステータス指定なし) で受信日順表示
+  const [statusFilter, setStatusFilter] = useState('')
   const [scoreFilter, setScoreFilter] = useState('all')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState('')               // 入力欄の値 (未確定)
+  const [appliedSearch, setAppliedSearch] = useState('') // Enter/🔍 で確定された値
+  const [searchBody, setSearchBody] = useState(false)    // 本文も検索
+  const [listLoading, setListLoading] = useState(false)  // 一覧取得中
   const [page, setPage] = useState(1)
   const [rescoring, setRescoring] = useState(false)
   const [scoreMsg, setScoreMsg] = useState('')
@@ -335,18 +340,24 @@ export default function EngineerMailsPage() {
 
   const fetchList = useCallback(async () => {
     const sf = SCORE_FILTERS.find(f => f.value === scoreFilter) ?? SCORE_FILTERS[0]
-    const res = await axios.get('/api/v1/engineer-mails', {
-      params: {
-        status:    statusFilter,
-        search:    search || undefined,
-        page,
-        per_page:  30,
-        score_min: sf.scoreMin,
-        score_max: sf.scoreMax,
-      }
-    })
-    setItems(res.data)
-  }, [statusFilter, scoreFilter, search, page])
+    setListLoading(true)
+    try {
+      const res = await axios.get('/api/v1/engineer-mails', {
+        params: {
+          status:      statusFilter,
+          search:      appliedSearch || undefined,
+          search_body: appliedSearch && searchBody ? 1 : undefined,
+          page,
+          per_page:    30,
+          score_min:   sf.scoreMin,
+          score_max:   sf.scoreMax,
+        }
+      })
+      setItems(res.data)
+    } finally {
+      setListLoading(false)
+    }
+  }, [statusFilter, scoreFilter, appliedSearch, searchBody, page])
 
   useEffect(() => { fetchList() }, [fetchList])
 
@@ -720,16 +731,39 @@ export default function EngineerMailsPage() {
                   onClick={() => { setScoreFilter(sf.value); setPage(1); setExpandedId(null); setSelected(null) }}
                   className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
                     scoreFilter === sf.value
-                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      ? sf.value === 'all'
+                        ? 'bg-gray-700 text-white border-gray-700'
+                        : 'bg-indigo-600 text-white border-indigo-600'
                       : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
                   }`}>
                   {sf.label}
                 </button>
               ))}
             </div>
-            <input type="text" placeholder="検索"
-              value={search} onChange={e => { setSearch(e.target.value); setPage(1); if (!e.target.value) { setSelected(null); setForm({}); setMatchedProjects([]) } }}
-              className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500 w-48" />
+            <form
+              onSubmit={e => { e.preventDefault(); setAppliedSearch(search.trim()); setPage(1) }}
+              className="flex gap-1.5 items-center"
+            >
+              <input type="text"
+                placeholder={searchBody ? '検索 (本文含む)' : '検索'}
+                value={search}
+                onChange={e => {
+                  setSearch(e.target.value)
+                  if (!e.target.value) { setAppliedSearch(''); setPage(1); setSelected(null); setForm({}); setMatchedProjects([]) }
+                }}
+                className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500 w-48" />
+              <button type="submit" disabled={listLoading} title="検索 (Enter)"
+                className="px-2.5 py-1.5 bg-teal-600 text-white text-xs rounded-md hover:bg-teal-700 disabled:opacity-50 min-w-[36px] flex items-center justify-center">
+                {listLoading
+                  ? <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  : '🔍'}
+              </button>
+              <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer whitespace-nowrap">
+                <input type="checkbox" checked={searchBody}
+                  onChange={e => { setSearchBody(e.target.checked); setPage(1) }} className="rounded" />
+                本文も
+              </label>
+            </form>
             <button onClick={handleRescoreAll} disabled={rescoring}
               className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
               {rescoring && <Spinner size={11} />}
@@ -758,6 +792,7 @@ export default function EngineerMailsPage() {
               expanded={expandedId === item.id}
               expandedDetail={expandedId === item.id ? expandedItem : null}
               expandLoading={expandedId === item.id && expandLoading}
+              appliedSearch={appliedSearch}
               onExpand={() => handleExpand(item)}
               onQuickStatus={handleQuickStatus}
             />
@@ -795,9 +830,41 @@ export default function EngineerMailsPage() {
           </div>
           {scoreMsg && <p className="text-xs text-teal-700 font-medium">{scoreMsg}</p>}
 
-          <input type="text" placeholder="氏名・スキル・最寄り駅で検索"
-            value={search} onChange={e => { setSearch(e.target.value); setPage(1); if (!e.target.value) { setSelected(null); setForm({}); setMatchedProjects([]) } }}
-            className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+          <form
+            onSubmit={e => { e.preventDefault(); setAppliedSearch(search.trim()); setPage(1) }}
+            className="flex gap-1.5"
+          >
+            <input type="text"
+              placeholder={searchBody ? '氏名・スキル・最寄り駅・本文で検索' : '氏名・スキル・最寄り駅で検索'}
+              value={search}
+              onChange={e => {
+                setSearch(e.target.value)
+                if (!e.target.value) { setAppliedSearch(''); setPage(1); setSelected(null); setForm({}); setMatchedProjects([]) }
+              }}
+              className="flex-1 text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+            <button type="submit" disabled={listLoading} title="検索 (Enter)"
+              className="px-3 py-1.5 bg-teal-600 text-white text-sm rounded-md hover:bg-teal-700 disabled:opacity-50 min-w-[44px] flex items-center justify-center">
+              {listLoading
+                ? <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : '🔍'}
+            </button>
+          </form>
+          <div className="flex items-center gap-3 text-xs text-gray-600 -mt-1">
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" checked={searchBody}
+                onChange={e => { setSearchBody(e.target.checked); setPage(1) }} className="rounded" />
+              本文も検索
+            </label>
+            {search !== appliedSearch && search.trim() !== '' && (
+              <span className="text-amber-600">⏎ Enter または 🔍 で実行</span>
+            )}
+            {appliedSearch && !listLoading && items && (
+              <span className="text-gray-500">
+                「<span className="font-semibold text-gray-700">{appliedSearch}</span>」
+                <span className="font-semibold text-teal-700"> {items.total.toLocaleString()} 件</span> Hit
+              </span>
+            )}
+          </div>
 
           <ProcessingBar
             active={rescoring}
@@ -826,7 +893,9 @@ export default function EngineerMailsPage() {
                 onClick={() => { setScoreFilter(sf.value); setPage(1) }}
                 className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
                   scoreFilter === sf.value
-                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    ? sf.value === 'all'
+                      ? 'bg-gray-700 text-white border-gray-700'
+                      : 'bg-indigo-600 text-white border-indigo-600'
                     : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
                 }`}>
                 {sf.label}
@@ -1402,11 +1471,14 @@ export default function EngineerMailsPage() {
                     <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans">
                       {highlightBody(
                         selected.email.body_text,
-                        selected.skills ?? []
+                        [
+                          ...(appliedSearch ? [appliedSearch] : []),
+                          ...(selected.skills ?? []),
+                        ].filter(Boolean)
                       )}
                     </pre>
                   ) : selected.email?.body_html ? (
-                    <EmailHtmlFrame html={selected.email.body_html} />
+                    <EmailHtmlFrame html={selected.email.body_html} highlight={appliedSearch} />
                   ) : (
                     <p className="text-sm text-gray-400">(本文なし)</p>
                   )}
@@ -1578,6 +1650,7 @@ function ReviewRow({
   expanded,
   expandedDetail,
   expandLoading,
+  appliedSearch,
   onExpand,
   onQuickStatus,
 }: {
@@ -1585,6 +1658,7 @@ function ReviewRow({
   expanded: boolean
   expandedDetail: EngineerMail | null
   expandLoading: boolean
+  appliedSearch: string
   onExpand: () => void
   onQuickStatus: (id: number, status: string) => void
 }) {
@@ -1723,7 +1797,7 @@ function ReviewRow({
                   <div>
                     <p className="text-xs font-semibold text-gray-500 mb-1.5">メール本文</p>
                     <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto font-mono">
-                      {highlightBody(body, expandedDetail.skills ?? [])}
+                      {highlightBody(body, [...(appliedSearch ? [appliedSearch] : []), ...(expandedDetail.skills ?? [])].filter(Boolean))}
                       {raw.length > 1500 && <span className="text-gray-400">…（以下省略）</span>}
                     </div>
                   </div>
