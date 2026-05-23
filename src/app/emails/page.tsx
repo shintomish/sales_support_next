@@ -59,7 +59,8 @@ export default function EmailsPage() {
   const router = useRouter()
   const [emails, setEmails] = useState<PaginatedEmails | null>(null)
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState('')           // 入力欄の値 (未確定)
+  const [appliedSearch, setAppliedSearch] = useState('') // 実際に API に投げる値 (Enter/🔍 で確定)
   const [unreadOnly, setUnreadOnly] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState<'' | 'project' | 'engineer'>('project')
   const [page, setPage] = useState(1)
@@ -68,6 +69,7 @@ export default function EmailsPage() {
   const [markingAllRead, setMarkingAllRead] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [searchBody, setSearchBody] = useState(false)
+  const [listLoading, setListLoading] = useState(false) // 一覧取得中インジケータ
 
   const fetchEmailsRef = useRef<() => void>(() => {})
 
@@ -89,19 +91,24 @@ export default function EmailsPage() {
 
   // メール一覧取得
   const fetchEmails = useCallback(async () => {
-    const res = await axios.get('/api/v1/emails', {
-      params: {
-        search,
-        search_body: searchBody ? 1 : undefined,
-        unread:   unreadOnly ? 1 : undefined,
-        category: categoryFilter || undefined,
-        page,
-        per_page: 30,
-      }
-    })
-    setEmails(res.data)
-    setNewEmailCount(0)
-  }, [search, searchBody, unreadOnly, categoryFilter, page])
+    setListLoading(true)
+    try {
+      const res = await axios.get('/api/v1/emails', {
+        params: {
+          search: appliedSearch || undefined,
+          search_body: searchBody ? 1 : undefined,
+          unread:   unreadOnly ? 1 : undefined,
+          category: categoryFilter || undefined,
+          page,
+          per_page: 30,
+        }
+      })
+      setEmails(res.data)
+      setNewEmailCount(0)
+    } finally {
+      setListLoading(false)
+    }
+  }, [appliedSearch, searchBody, unreadOnly, categoryFilter, page])
 
   useEffect(() => { fetchEmailsRef.current = fetchEmails }, [fetchEmails])
   useEffect(() => { fetchEmails() }, [fetchEmails])
@@ -111,12 +118,12 @@ export default function EmailsPage() {
     const channel = supabase
       .channel('emails-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'emails' }, () => {
-        if (page === 1 && !search && !unreadOnly) fetchEmailsRef.current()
+        if (page === 1 && !appliedSearch && !unreadOnly) fetchEmailsRef.current()
         else setNewEmailCount(c => c + 1)
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [page, search, unreadOnly])
+  }, [page, appliedSearch, unreadOnly])
 
   // 全件既読
   const handleMarkAllRead = async () => {
@@ -191,9 +198,52 @@ export default function EmailsPage() {
 
           {syncMessage && <p className="text-xs text-green-600 mb-2">{syncMessage}</p>}
 
-          <input type="text" placeholder={searchBody ? '差出人・件名・本文で検索' : '差出人・件名で検索'} value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); if (!e.target.value) setSelectedEmail(null) }}
-            className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <form
+            onSubmit={e => {
+              e.preventDefault()
+              setAppliedSearch(search.trim())
+              setPage(1)
+            }}
+            className="flex gap-1.5"
+          >
+            <input
+              type="text"
+              placeholder={searchBody ? '差出人・件名・本文で検索' : '差出人・件名で検索'}
+              value={search}
+              onChange={e => {
+                setSearch(e.target.value)
+                // 入力欄を空にしたら即時クリア (確定検索を解除)
+                if (!e.target.value) {
+                  setAppliedSearch('')
+                  setPage(1)
+                  setSelectedEmail(null)
+                }
+              }}
+              className="flex-1 text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="submit"
+              disabled={listLoading}
+              title="検索 (Enter)"
+              className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 min-w-[44px] flex items-center justify-center"
+            >
+              {listLoading
+                ? <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : '🔍'}
+            </button>
+          </form>
+          {search !== appliedSearch && search.trim() !== '' && (
+            <p className="text-xs text-amber-600 mt-1">
+              ⏎ Enter または 🔍 で検索を実行してください
+            </p>
+          )}
+          {appliedSearch && !listLoading && emails && (
+            <p className="text-xs text-gray-600 mt-1">
+              「<span className="font-semibold text-gray-800">{appliedSearch}</span>」 で
+              <span className="font-semibold text-blue-700"> {emails.total.toLocaleString()} 件</span> Hit
+              {searchBody && <span className="ml-1 text-gray-400">（本文も検索）</span>}
+            </p>
+          )}
 
           <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -224,8 +274,14 @@ export default function EmailsPage() {
         </div>
 
         {/* メールリスト */}
-        <div className="flex-1 overflow-y-auto">
-          {emails?.data.length === 0 && (
+        <div className="flex-1 overflow-y-auto relative">
+          {listLoading && (
+            <div className="absolute inset-x-0 top-0 z-10 bg-white/80 backdrop-blur-sm py-2 flex items-center justify-center gap-2 border-b border-gray-100">
+              <span className="inline-block w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs text-gray-600">検索中...</span>
+            </div>
+          )}
+          {!listLoading && emails?.data.length === 0 && (
             <div className="p-8 text-center text-sm text-gray-500">
               メールがありません。
             </div>
@@ -372,10 +428,10 @@ export default function EmailsPage() {
               {/* 本文 */}
               <div className="bg-white rounded-lg border border-gray-200 p-5">
                 {selectedEmail.body_html ? (
-                  <EmailHtmlFrame html={selectedEmail.body_html} />
+                  <EmailHtmlFrame html={selectedEmail.body_html} highlight={appliedSearch} />
                 ) : (
                   <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans">
-                    {selectedEmail.body_text || '(本文なし)'}
+                    <HighlightedText text={selectedEmail.body_text || '(本文なし)'} term={appliedSearch} />
                   </pre>
                 )}
               </div>
@@ -429,6 +485,32 @@ function fileIcon(mimeType: string | null, filename?: string): string {
   if (m.includes('text') || ['txt', 'md', 'csv'].includes(ext))
     return '📝'
   return '📄'
+}
+
+// 検索ワードを <mark> で強調する小コンポーネント (案件番号や名前など 1 ワード想定)
+function HighlightedText({ text, term }: { text: string; term?: string }) {
+  if (!term || !term.trim()) return <>{text}</>
+  const t = term.trim()
+  const lcText = text.toLowerCase()
+  const lcTerm = t.toLowerCase()
+  const parts: React.ReactNode[] = []
+  let i = 0
+  let key = 0
+  while (i < text.length) {
+    const idx = lcText.indexOf(lcTerm, i)
+    if (idx === -1) {
+      parts.push(text.slice(i))
+      break
+    }
+    if (idx > i) parts.push(text.slice(i, idx))
+    parts.push(
+      <mark key={key++} className="bg-yellow-200 text-inherit px-0.5 rounded-sm">
+        {text.slice(idx, idx + t.length)}
+      </mark>
+    )
+    i = idx + t.length
+  }
+  return <>{parts}</>
 }
 
 function formatFileSize(bytes: number): string {
