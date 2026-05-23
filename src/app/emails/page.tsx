@@ -62,7 +62,7 @@ export default function EmailsPage() {
   const [search, setSearch] = useState('')           // 入力欄の値 (未確定)
   const [appliedSearch, setAppliedSearch] = useState('') // 実際に API に投げる値 (Enter/🔍 で確定)
   const [unreadOnly, setUnreadOnly] = useState(false)
-  const [categoryFilter, setCategoryFilter] = useState<'' | 'project' | 'engineer'>('project')
+  const [categoryFilter, setCategoryFilter] = useState<'' | 'project' | 'engineer' | 'other'>('project')
   const [page, setPage] = useState(1)
   const [syncMessage, setSyncMessage] = useState('')
   const [newEmailCount, setNewEmailCount] = useState(0)
@@ -269,6 +269,13 @@ export default function EmailsPage() {
                 onChange={e => { setCategoryFilter(e.target.checked ? 'engineer' : ''); setPage(1); setSelectedEmail(null) }}
                 className="rounded accent-purple-500" />
               <span className="text-purple-700">技術者</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox"
+                checked={categoryFilter === 'other'}
+                onChange={e => { setCategoryFilter(e.target.checked ? 'other' : ''); setPage(1); setSelectedEmail(null) }}
+                className="rounded accent-gray-500" />
+              <span className="text-gray-600">その他</span>
             </label>
           </div>
         </div>
