@@ -585,31 +585,51 @@ export default function EngineerMailsPage() {
     } catch { /* ignore */ }
   }
 
-  // 全件再スコアリング（バッチ処理で進捗表示）
+  // 全件再スコアリング（非同期ジョブ。バックエンドの Schedule tick が処理し進捗をポーリング）
+  const pollRescoreStatus = () => {
+    axios.get('/api/v1/engineer-mails/rescore-status').then(res => {
+      const job = res.data.job
+      if (job && (job.status === 'pending' || job.status === 'processing')) {
+        setRescoring(true)
+        setScoreMsg(`再スコア中: ${job.processed_count ?? 0} / ${job.total_count ?? 0}件`)
+        setTimeout(pollRescoreStatus, 3000)
+      } else if (job && job.status === 'completed') {
+        setRescoring(false)
+        setScoreMsg(`完了: ${job.total_count}件を再スコアリングしました`)
+        fetchList()
+      } else if (job && job.status === 'failed') {
+        setRescoring(false)
+        setScoreMsg(`再スコアリングに失敗しました${job.error_message ? ': ' + job.error_message : ''}`)
+      } else {
+        setRescoring(false)
+      }
+    }).catch(() => { setRescoring(false) })
+  }
+
   const handleRescoreAll = async () => {
     if (!confirm('全件を再スコアリングします。よろしいですか？')) return
-    setRescoring(true); setScoreMsg('')
+    setRescoring(true); setScoreMsg('再スコアリングを開始しています...')
     try {
-      let total = 0
-      let offset = 0
-      while (true) {
-        const res = await axios.post('/api/v1/engineer-mails/rescore-all', { offset })
-        total += res.data.count ?? 0
-        const remaining = res.data.remaining ?? 0
-        setScoreMsg(`再スコア: ${total}件完了 / 残り: ${remaining}件`)
-        if (remaining === 0 || res.data.count === 0) break
-        offset = res.data.offset ?? (offset + (res.data.count ?? 0))
-      }
-      setScoreMsg(`完了: ${total}件を再スコアリングしました`)
-      fetchList()
-      if (selected) {
-        const refreshed = await axios.get(`/api/v1/engineer-mails/${selected.id}`)
-        setSelected(refreshed.data)
-        setForm(refreshed.data)
-      }
-    } catch { setScoreMsg('再スコアリングに失敗しました') }
-    finally { setRescoring(false) }
+      await axios.post('/api/v1/engineer-mails/rescore-all', {})
+      pollRescoreStatus()
+    } catch {
+      setScoreMsg('再スコアリングの開始に失敗しました')
+      setRescoring(false)
+    }
   }
+
+  // ページ表示時、進行中の再スコアジョブがあれば進捗表示を復帰（ブラウザを閉じても継続するため）
+  useEffect(() => {
+    axios.get('/api/v1/engineer-mails/rescore-status').then(res => {
+      const job = res.data.job
+      if (job && (job.status === 'pending' || job.status === 'processing')) {
+        setRescoring(true)
+        setScoreMsg(`再スコア中: ${job.processed_count ?? 0} / ${job.total_count ?? 0}件`)
+        setTimeout(pollRescoreStatus, 3000)
+      }
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // 保存
   const handleSave = async () => {
