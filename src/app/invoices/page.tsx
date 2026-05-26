@@ -136,6 +136,22 @@ export default function InvoicesPage() {
     }
   };
 
+  const handleDelete = async (id: number, invoiceNumber: string, status: 'draft' | 'issued') => {
+    const statusLabel = status === 'issued' ? '発行済' : '下書き';
+    if (!confirm(`${invoiceNumber}（${statusLabel}）を削除します。\n誤発行のリカバリ用です。よろしいですか？`)) return;
+    setBusyId(id);
+    try {
+      await apiClient.delete(`/api/v1/invoices/${id}`);
+      fetchData();
+      showToast('削除しました', 'success');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '削除に失敗しました';
+      showToast(msg, 'error');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleReject = async (id: number) => {
     const comment = prompt('却下理由を入力してください');
     if (!comment) return;
@@ -289,6 +305,14 @@ export default function InvoicesPage() {
                   disabled={busyId === r.id}
                   className="text-xs text-indigo-600 hover:underline disabled:opacity-50"
                 >複写</button>
+                {!r.approved && (
+                  <button
+                    onClick={() => handleDelete(r.id, r.invoice_number, r.status)}
+                    disabled={busyId === r.id}
+                    className="text-xs text-rose-600 hover:underline disabled:opacity-50"
+                    title="承認済の請求書は削除できません"
+                  >削除</button>
+                )}
               </div>
               <div className="flex gap-2">
                 {(r.approval_status === 'draft' || r.approval_status === 'rejected') && (
@@ -334,7 +358,7 @@ export default function InvoicesPage() {
                 <SortableHeader label="状態"     field="status"         sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-center w-[80px]" />
                 <SortableHeader label="承認"     field="approval"       sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-center w-[100px]" />
                 <th className="px-2 py-3 text-center font-semibold w-[70px]">PDF</th>
-                <th className="px-2 py-3 text-center font-semibold w-[110px]">操作</th>
+                <th className="px-2 py-3 text-center font-semibold w-[150px]">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -407,6 +431,14 @@ export default function InvoicesPage() {
                         className="text-xs text-indigo-600 hover:underline disabled:opacity-50"
                         title="当月扱いで複写して下書き作成"
                       >複写</button>
+                      {!r.approved && (
+                        <button
+                          onClick={() => handleDelete(r.id, r.invoice_number, r.status)}
+                          disabled={busyId === r.id}
+                          className="text-xs text-rose-600 hover:underline disabled:opacity-50"
+                          title="承認済の請求書は削除できません"
+                        >削除</button>
+                      )}
                     </div>
                   </td>
                 </tr>
