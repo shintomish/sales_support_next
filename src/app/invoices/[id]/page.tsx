@@ -43,6 +43,7 @@ interface SendHistoryRow {
 interface Invoice {
   id: number;
   doc_type: 'invoice' | 'estimate' | 'purchase_order';
+  language: 'ja' | 'en' | null;
   invoice_number: string;
   acknowledgement_no: string | null;
   acknowledgement_pdf_path: string | null;
@@ -196,6 +197,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
   // (O) 支払条件 = (G) 支払期限文言から「現金」を除いたもの
   const paymentCondition = paymentTermsText.replace('現金', '');
+
+  // 英文 (Refinitiv) PDF テンプレートは納期/納入場所/支払期限文言/作業期間/作業場所/作業担当者/
+  // 納品物/業務交通費 説明/支払条件/備考 を出力しない (Out-INV-RFJ-202605-001.pdf で検証済)。
+  // 編集画面ではこれらを「グレーアウト＋注記」で示し、ユーザーの編集自体は妨げない。
+  const isEnglish = invoice?.language === 'en';
+  const enNote = '英文 PDF には出力されません';
 
   const buildPayload = (newStatus?: 'draft' | 'issued'): Record<string, unknown> => {
     const payload: Record<string, unknown> = {
@@ -726,13 +733,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
         {/* 左側ヘッダー (E)(F)(G) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-          <Field label="納期">
+          <Field label="納期" dimmed={isEnglish} note={enNote}>
             <Input value={deliveryDateText} onChange={(e) => setDeliveryDateText(e.target.value)} placeholder="御社ご指定日" />
           </Field>
-          <Field label="納入場所">
+          <Field label="納入場所" dimmed={isEnglish} note={enNote}>
             <Input value={deliveryPlaceText} onChange={(e) => setDeliveryPlaceText(e.target.value)} placeholder="御社ご指定場所" />
           </Field>
-          <Field label="支払期限文言">
+          <Field label="支払期限文言" dimmed={isEnglish} note={enNote}>
             <Input value={paymentTermsText} onChange={(e) => setPaymentTermsText(e.target.value)}
               placeholder="月末締め翌々月20日現金お支払" />
           </Field>
@@ -743,28 +750,28 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <Field label="件名">
             <Input value={subjectName} onChange={(e) => setSubjectName(e.target.value)} />
           </Field>
-          <Field label="作業期間">
+          <Field label="作業期間" dimmed={isEnglish} note={enNote}>
             <Input value={workPeriodText} onChange={(e) => setWorkPeriodText(e.target.value)}
               placeholder="2026年4月1日～2026年4月30日" />
           </Field>
-          <Field label="作業場所">
+          <Field label="作業場所" dimmed={isEnglish} note={enNote}>
             <Input value={workLocation} onChange={(e) => setWorkLocation(e.target.value)} />
           </Field>
-          <Field label="作業担当者">
+          <Field label="作業担当者" dimmed={isEnglish} note={enNote}>
             <Input value={engineerNameSnapshot} onChange={(e) => setEngineerNameSnapshot(e.target.value)}
               placeholder="未入力の場合はPDFに印字されません" />
           </Field>
-          <Field label="納品物">
+          <Field label="納品物" dimmed={isEnglish} note={enNote}>
             <Input value={deliveryItemsText} onChange={(e) => setDeliveryItemsText(e.target.value)}
               placeholder="作業報告書" />
           </Field>
-          <Field label="業務交通費 説明">
+          <Field label="業務交通費 説明" dimmed={isEnglish} note={enNote}>
             <textarea value={transportationNoteText} onChange={(e) => setTransportationNoteText(e.target.value)}
               rows={2}
               className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
               placeholder="お客様指示の基、移動が発生した場合は別途実費にてご請求" />
           </Field>
-          <Field label="支払条件 (PDF表示用・自動派生)">
+          <Field label="支払条件 (PDF表示用・自動派生)" dimmed={isEnglish} note={enNote}>
             <Input value={paymentCondition} disabled className="bg-gray-50 text-gray-500" />
           </Field>
         </div>
@@ -857,7 +864,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* 備考 */}
-        <Field label="備考（PDF下段に追記表示）">
+        <Field label="備考（PDF下段に追記表示）" dimmed={isEnglish} note={enNote}>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
             className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white" />
         </Field>
@@ -1246,10 +1253,21 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, dimmed, note }: {
+  label: string;
+  children: React.ReactNode;
+  /** 英文 PDF など、ラベルだけ薄く＋注記を出すモード。入力欄自体は編集可のまま */
+  dimmed?: boolean;
+  note?: string;
+}) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-gray-700 mb-1">{label}</label>
+      <label className={`block text-xs font-semibold mb-1 ${dimmed ? 'text-gray-400' : 'text-gray-700'}`}>
+        {label}
+        {dimmed && note && (
+          <span className="ml-2 font-normal text-[10px] text-amber-600">⚠ {note}</span>
+        )}
+      </label>
       {children}
     </div>
   );
