@@ -7,6 +7,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { supabase } from '@/lib/supabase'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
+import SelfMailsView from '@/components/SelfMailsView'
 
 // ── 型定義 ────────────────────────────────────────────────
 
@@ -67,6 +68,7 @@ export default function EmailsPage() {
   const [syncMessage, setSyncMessage] = useState('')
   const [newEmailCount, setNewEmailCount] = useState(0)
   const [markingAllRead, setMarkingAllRead] = useState(false)
+  const [selfMode, setSelfMode] = useState(false) // 自社(category=self)を担当者別に表示するモード（営業打ち合わせ §要望1）
   const [detailLoading, setDetailLoading] = useState(false)
   const [searchBody, setSearchBody] = useState(false)
   const [listLoading, setListLoading] = useState(false) // 一覧取得中インジケータ
@@ -172,6 +174,16 @@ export default function EmailsPage() {
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {selfMode ? (
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex items-center gap-3 p-3 border-b border-gray-200 bg-white">
+            <button onClick={() => setSelfMode(false)} className="text-sm text-blue-600 hover:underline">← メール一覧に戻る</button>
+            <span className="text-sm font-semibold text-gray-800">自社メール（担当者別）</span>
+          </div>
+          <div className="flex-1 min-h-0"><SelfMailsView /></div>
+        </div>
+      ) : (
+      <>
 
       {/* 左ペイン: 一覧 (mobile では選択時に非表示) */}
       <div className={`${selectedEmail ? 'hidden md:flex' : 'flex'} w-full md:w-96 bg-white border-r border-gray-200 flex-col`}>
@@ -276,6 +288,13 @@ export default function EmailsPage() {
                 onChange={e => { setCategoryFilter(e.target.checked ? 'other' : ''); setPage(1); setSelectedEmail(null) }}
                 className="rounded accent-gray-500" />
               <span className="text-gray-600">その他</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox"
+                checked={selfMode}
+                onChange={e => { setSelfMode(e.target.checked); setSelectedEmail(null) }}
+                className="rounded accent-teal-500" />
+              <span className="text-teal-700">自社</span>
             </label>
           </div>
         </div>
@@ -450,6 +469,8 @@ export default function EmailsPage() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   )
 }
