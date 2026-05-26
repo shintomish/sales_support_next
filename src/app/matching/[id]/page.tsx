@@ -1696,7 +1696,7 @@ export default function MatchingPage() {
   // 鮮度マッチング機能（過去N日メール）
   const [freshMode, setFreshMode] = useState(false)
   const [freshDays, setFreshDays] = useState<number>(3)
-  const [freshMinScore, setFreshMinScore] = useState<number>(70)
+  const [freshMinScore, setFreshMinScore] = useState<number>(60) // 既定=中(60)。営業打ち合わせ §4.4+§2.2: 情報不足の1点化でスコアが下がるため既定を高(70)→中(60)
   const [freshItems, setFreshItems] = useState<FreshEms[]>([])
   const [freshLoading, setFreshLoading] = useState(false)
   const [freshChecked, setFreshChecked] = useState<Set<number>>(new Set())

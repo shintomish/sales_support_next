@@ -317,7 +317,7 @@ export default function EngineerMailsPage() {
   // 鮮度マッチング: 過去N日の案件メールから候補抽出
   const [freshMode, setFreshMode] = useState(false)
   const [freshDays, setFreshDays] = useState<number>(3)
-  const [freshMinScore, setFreshMinScore] = useState<number>(70)
+  const [freshMinScore, setFreshMinScore] = useState<number>(60) // 既定=中(60)。営業打ち合わせ §4.4+§2.2: 情報不足の1点化でスコアが下がるため既定を高(70)→中(60)
   const [freshPms, setFreshPms] = useState<FreshPms[]>([])
   const [freshLoading, setFreshLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
