@@ -10,6 +10,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
 
+type Attachment = { id: number; filename: string; mime_type: string | null; size: number | null }
 type MailRow = {
   id: number
   subject: string | null
@@ -20,6 +21,14 @@ type MailRow = {
   body_text: string | null
   received_at: string
   is_read: boolean
+  attachments_count?: number
+}
+
+function formatSize(n: number | null): string {
+  if (!n) return ''
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 type Owner = { owner: string; count: number }
 type Paginated = { data: MailRow[]; current_page: number; last_page: number; total: number }
@@ -37,6 +46,7 @@ export default function SelfMailsView() {
   const [search, setSearch] = useState('')           // 入力中（未確定）
   const [appliedSearch, setAppliedSearch] = useState('') // Enter/🔍 で確定
   const [searchBody, setSearchBody] = useState(false)  // 本文も検索
+  const [attachments, setAttachments] = useState<Attachment[]>([]) // 選択メールの添付（詳細取得で埋める）
 
   useEffect(() => {
     axios.get('/api/v1/emails/self-owners')
@@ -60,6 +70,27 @@ export default function SelfMailsView() {
   }, [sel, page, appliedSearch, searchBody])
 
   useEffect(() => { fetchList() }, [fetchList])
+
+  // 行選択: 本文は一覧データに含まれるが添付一覧は詳細取得が必要
+  const openMail = (m: MailRow) => {
+    setSelected(m)
+    setAttachments([])
+    if (m.attachments_count && m.attachments_count > 0) {
+      axios.get(`/api/v1/emails/${m.id}`)
+        .then(res => setAttachments(res.data.attachments ?? []))
+        .catch(() => {})
+    }
+  }
+
+  const downloadAttachment = async (emailId: number, att: Attachment) => {
+    const res = await axios.get(`/api/v1/emails/${emailId}/attachments/${att.id}/download`, { responseType: 'blob' })
+    const url = URL.createObjectURL(new Blob([res.data], { type: att.mime_type ?? 'application/octet-stream' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = att.filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="flex h-full min-h-0">
@@ -108,7 +139,7 @@ export default function SelfMailsView() {
           {list?.data.map(m => (
             <button
               key={m.id}
-              onClick={() => setSelected(m)}
+              onClick={() => openMail(m)}
               className={`w-full text-left px-3 py-2 border-b border-gray-100 hover:bg-gray-50 ${selected?.id === m.id ? 'bg-teal-50' : ''}`}
             >
               <div className="flex items-center gap-2">
@@ -118,7 +149,7 @@ export default function SelfMailsView() {
                   {formatDistanceToNow(new Date(m.received_at), { addSuffix: true, locale: ja })}
                 </span>
               </div>
-              <p className="text-sm text-gray-800 truncate mt-0.5">{m.subject || '(件名なし)'}</p>
+              <p className="text-sm text-gray-800 truncate mt-0.5">{m.attachments_count ? '📎 ' : ''}{m.subject || '(件名なし)'}</p>
             </button>
           ))}
           {list && list.data.length === 0 && !loading && (
@@ -140,6 +171,26 @@ export default function SelfMailsView() {
           <div>
             <p className="text-sm font-semibold text-gray-900 mb-1">{selected.subject || '(件名なし)'}</p>
             <p className="text-xs text-gray-500 mb-3">{selected.from_name} &lt;{selected.from_address}&gt;</p>
+            {attachments.length > 0 && (
+              <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-xs font-medium text-amber-700 mb-2">📎 添付ファイル（{attachments.length}件）</p>
+                <div className="space-y-1.5">
+                  {attachments.map(att => (
+                    <div key={att.id} className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-gray-700 truncate">
+                        {att.filename}{att.size ? `（${formatSize(att.size)}）` : ''}
+                      </span>
+                      <button
+                        onClick={() => downloadAttachment(selected.id, att)}
+                        className="flex-shrink-0 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 border border-blue-200 rounded hover:bg-blue-50"
+                      >
+                        DL
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {selected.body_html
               ? <EmailHtmlFrame html={selected.body_html} />
               : <pre className="text-sm whitespace-pre-wrap text-gray-800 font-sans">{selected.body_text}</pre>}
