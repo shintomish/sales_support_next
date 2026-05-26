@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, use } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,13 +72,19 @@ export default function TimesheetsPage({ params }: { params: Promise<{ id: strin
   const dealId = Number(id);
 
   const months = recentMonths();
-  // デフォルトは前月（当月-1）。請求集計画面と揃える
+  // デフォルトは前月（当月-1）。請求集計画面と揃える。
+  // 一覧 /timesheets から ?year_month= 付きで遷移してきた場合はそれを優先（months に含まれる場合のみ）
+  const searchParams = useSearchParams();
+  const ymFromQuery = searchParams.get('year_month');
+  const initialMonth = ymFromQuery && months.includes(ymFromQuery)
+    ? ymFromQuery
+    : (months[1] ?? months[0]);
   const [deal,    setDeal]    = useState<Deal | null>(null);
   const [records, setRecords] = useState<Record<string, WorkRecord>>({});
   const [contract, setContract] = useState<ContractSettlement | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string>(months[1] ?? months[0]);
+  const [selectedMonth, setSelectedMonth] = useState<string>(initialMonth);
 
   const fetchData = useCallback(async () => {
     setLoading(true);

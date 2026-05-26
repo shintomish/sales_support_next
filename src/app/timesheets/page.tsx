@@ -210,7 +210,7 @@ export default function TimesheetsPage() {
                     </td>
                     <td className="px-2 py-3 text-center">
                       <Link
-                        href={`/ses-contracts/${r.deal_id}/timesheets`}
+                        href={`/ses-contracts/${r.deal_id}/timesheets?year_month=${yearMonth}`}
                         title="勤務表を編集"
                         className="text-xs px-2 py-1 rounded text-blue-600 hover:bg-blue-100"
                       >✏️ 編集</Link>
