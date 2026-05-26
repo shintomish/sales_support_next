@@ -35,10 +35,11 @@ interface PaginatedRes {
   total: number;
 }
 
+/** 対象月候補: 当月+1 〜 当月-12 (新しい順 14ヶ月)。先頭 '' は「全期間」 */
 const recentMonths = (): string[] => {
   const arr: string[] = [''];
   const now = new Date();
-  for (let i = 0; i < 12; i++) {
+  for (let i = -1; i < 13; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     arr.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }

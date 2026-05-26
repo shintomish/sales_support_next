@@ -54,11 +54,11 @@ interface Totals {
 const yen = (n: number | null | undefined) =>
   n == null ? '-' : `¥${Number(n).toLocaleString()}`;
 
-/** 直近12ヶ月の YYYY-MM 配列を新しい順で返す */
+/** 対象月候補: 当月+1 〜 当月-12 (新しい順 14ヶ月) */
 const recentMonths = (): string[] => {
   const arr: string[] = [];
   const now = new Date();
-  for (let i = 0; i < 12; i++) {
+  for (let i = -1; i < 13; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     arr.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }

@@ -36,10 +36,11 @@ interface PaginatedRes {
 
 const yen = (n: string | number) => `¥${Number(n).toLocaleString()}`;
 
+/** 対象月候補: 当月+1 〜 当月-12 (新しい順 14ヶ月)。先頭 '' は「全期間」 */
 const recentMonths = (): string[] => {
   const arr: string[] = [''];
   const now = new Date();
-  for (let i = 0; i < 12; i++) {
+  for (let i = -1; i < 13; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     arr.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
@@ -222,7 +223,7 @@ export default function EstimatesPage() {
   };
 
   const handleDuplicate = async (id: number) => {
-    if (!confirm('この見積書を当月扱いで複写して下書きを作成します。よろしいですか？')) return;
+    if (!confirm('この見積書を翌月扱いで複写して下書きを作成します。よろしいですか？')) return;
     setBusyId(id);
     try {
       const res = await apiClient.post<{ id: number }>(`/api/v1/invoices/${id}/duplicate`);
@@ -386,7 +387,7 @@ export default function EstimatesPage() {
                         onClick={() => handleDuplicate(r.id)}
                         disabled={busyId === r.id}
                         className="text-xs text-indigo-600 hover:underline disabled:opacity-50"
-                        title="当月扱いで複写して下書き作成"
+                        title="翌月扱いで複写して下書き作成"
                       >複写</button>
                     </div>
                   </td>
