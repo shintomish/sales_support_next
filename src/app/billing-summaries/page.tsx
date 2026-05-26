@@ -449,6 +449,7 @@ interface ParsedPo {
   po_number: string | null;
   total_amount: number | null;
   description: string | null;
+  period_months: number | null;
   requested_delivery_date: string | null;
   amount_based_receipt: string | null;
   purchase_request_line: string | null;
@@ -463,7 +464,7 @@ interface ParsedPo {
 }
 
 const EMPTY_PARSED: ParsedPo = {
-  po_number: '', total_amount: null, description: '', requested_delivery_date: '',
+  po_number: '', total_amount: null, description: '', period_months: null, requested_delivery_date: '',
   amount_based_receipt: '', purchase_request_line: '', requester: '', request_number: '',
   plant_id: '', plant_name: '', tr_plant_id: '', ship_to_address_name: '',
   classification_domain: '', classification_code: '',
@@ -542,6 +543,15 @@ function RefinitivImportModal({
     } finally { setParsing(false); }
   };
 
+  // 単月請求額 = PO 合計 ÷ 期間月数（小数切り上げ。残額は最終月で吸収する運用は未対応）
+  const monthlyAmount: number | null = (() => {
+    if (!parsed) return null;
+    const total = parsed.total_amount ?? 0;
+    const months = parsed.period_months ?? 0;
+    if (total <= 0 || months <= 0) return null;
+    return Math.round(total / months);
+  })();
+
   const handleIssue = async () => {
     if (!parsed || !dealId || !parsed.po_number) {
       setError('SES契約 と PO番号 は必須です');
@@ -558,6 +568,7 @@ function RefinitivImportModal({
         year_month: yearMonth,
         po_number: parsed.po_number,
         vendor_metadata,
+        monthly_amount: monthlyAmount,
       });
       onIssued(res.data.id);
     } catch (err: unknown) {
@@ -665,6 +676,34 @@ function RefinitivImportModal({
                 <div className="md:col-span-2">
                   <label className="block text-[11px] text-gray-500 mb-0.5">明細説明</label>
                   <Input value={parsed.description ?? ''} onChange={(e) => updateField('description', e.target.value)} />
+                </div>
+                {/* 金額計算: PO 合計 ÷ 期間月数 = 単月請求額。基本月額行の単価として反映される。 */}
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">PO 合計金額 (JPY)</label>
+                  <Input
+                    type="number"
+                    value={parsed.total_amount ?? ''}
+                    onChange={(e) => updateField('total_amount', e.target.value === '' ? null : Number(e.target.value))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-0.5">
+                    期間月数 <span className="text-gray-400">(description から自動判定。例: Apr-Jun2026 → 3)</span>
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={parsed.period_months ?? ''}
+                    onChange={(e) => updateField('period_months', e.target.value === '' ? null : Number(e.target.value))}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] text-gray-500 mb-0.5">
+                    単月請求額 (PO 合計 ÷ 期間月数 — 請求書の基本月額として反映)
+                  </label>
+                  <div className={`px-3 py-2 rounded border text-sm ${monthlyAmount !== null ? 'bg-amber-50 border-amber-300 text-amber-900 font-semibold' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
+                    {monthlyAmount !== null ? `¥${monthlyAmount.toLocaleString()} / 月` : '— (合計金額と期間月数を入力してください)'}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-[11px] text-gray-500 mb-0.5">金額による受入</label>
