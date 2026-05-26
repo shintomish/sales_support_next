@@ -68,8 +68,8 @@ const recentMonths = (): string[] => {
 export default function BillingSummariesPage() {
   const router = useRouter();
   const months = recentMonths();
-  // デフォルトは前月（当月 -1）。請求対象の中心が前月になるため
-  const [yearMonth, setYearMonth] = useState<string>(months[1] ?? months[0]);
+  // デフォルトは当月。Refinitiv 取込モーダルの請求月初期値にも伝播する
+  const [yearMonth, setYearMonth] = useState<string>(months[0]);
   const [group,     setGroup]     = useState<GroupType>('deal');
   const [q,         setQ]         = useState<string>('');
   const [items,     setItems]     = useState<(DealRow | CustomerRow)[]>([]);

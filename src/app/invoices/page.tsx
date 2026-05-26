@@ -58,11 +58,9 @@ const recentMonths = (): string[] => {
   return arr;
 };
 
-/** 当月-1 の YYYY-MM を返す（請求集計画面と同じ既定値） */
-const previousMonth = (): string => {
+/** 当月の YYYY-MM を返す */
+const currentMonth = (): string => {
   const d = new Date();
-  d.setDate(1);
-  d.setMonth(d.getMonth() - 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
@@ -78,7 +76,7 @@ export default function InvoicesPage() {
   const initialApproval = (searchParams.get('approval_status') as ApprovalStatus | null) ?? '';
 
   const [items, setItems]         = useState<InvoiceListItem[]>([]);
-  const [yearMonth, setYearMonth] = useState<string>(previousMonth());
+  const [yearMonth, setYearMonth] = useState<string>(currentMonth());
   const [status, setStatus]       = useState<'' | 'draft' | 'issued'>('');
   const [approvalStatus, setApprovalStatus] = useState<'' | ApprovalStatus>(initialApproval);
   const [q, setQ]                 = useState('');
