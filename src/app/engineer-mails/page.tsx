@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import axios from '@/lib/axios'
+import { useAuthStore } from '@/store/authStore'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
@@ -585,6 +586,11 @@ export default function EngineerMailsPage() {
     } catch { /* ignore */ }
   }
 
+  // 全件再スコアは誤操作で数千件処理が走る/本番DB一斉更新のリスクがあるため、
+  // 管理者(tenant_admin/super_admin)のみに表示する（営業=tenant_user には非表示）。
+  const currentUser = useAuthStore((s) => s.user)
+  const isAdmin = currentUser?.role === 'tenant_admin' || currentUser?.role === 'super_admin'
+
   // 全件再スコアリング（非同期ジョブ。バックエンドの Schedule tick が処理し進捗をポーリング）
   const pollRescoreStatus = () => {
     axios.get('/api/v1/engineer-mails/rescore-status').then(res => {
@@ -784,11 +790,13 @@ export default function EngineerMailsPage() {
                 本文も
               </label>
             </form>
+            {isAdmin && (
             <button onClick={handleRescoreAll} disabled={rescoring}
               className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
               {rescoring && <Spinner size={11} />}
               {rescoring ? '再スコア中...' : '全件再スコア'}
             </button>
+            )}
           </div>
           <ProcessingBar
             active={rescoring}
@@ -841,11 +849,13 @@ export default function EngineerMailsPage() {
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-semibold text-gray-900">技術者メール</h1>
             <div className="flex gap-1.5">
+              {isAdmin && (
               <button onClick={handleRescoreAll} disabled={rescoring}
                 className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
                 {rescoring && <Spinner size={11} />}
                 {rescoring ? '再スコア中...' : '全件再スコア'}
               </button>
+              )}
             </div>
           </div>
           {scoreMsg && <p className="text-xs text-teal-700 font-medium">{scoreMsg}</p>}
