@@ -307,6 +307,9 @@ export default function SelfMailsView() {
           <div>
             <p className="text-sm font-semibold text-gray-900 mb-1">{selected.subject || '(件名なし)'}</p>
             <p className="text-xs text-gray-500 mb-1">{selected.from_name} &lt;{selected.from_address}&gt;</p>
+            <p className="text-xs text-gray-400 mb-1">
+              {new Date(selected.received_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </p>
             {selected.reply_to_campaign_id && (
               <a
                 href={`/deliveries/${selected.reply_to_campaign_id}`}
