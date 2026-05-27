@@ -279,7 +279,7 @@ export default function SelfMailsView() {
                 {!m.is_read && <span className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0" />}
                 <span className="text-xs text-gray-500 truncate">{m.from_name || m.from_address}</span>
                 <span className="text-[10px] text-gray-400 ml-auto flex-shrink-0">
-                  {formatDistanceToNow(new Date(m.received_at), { addSuffix: true, locale: ja })}
+                  {new Date(m.received_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
               <p className="text-sm text-gray-800 truncate mt-0.5">{m.attachments_count ? '📎 ' : ''}{m.subject || '(件名なし)'}</p>
