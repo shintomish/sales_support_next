@@ -312,7 +312,7 @@ export default function SelfMailsView() {
             </p>
             {selected.reply_to_campaign_id && (
               <a
-                href={`/deliveries/${selected.reply_to_campaign_id}`}
+                href={`/deliveries/campaigns/${selected.reply_to_campaign_id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block mb-3 text-xs text-teal-700 hover:text-teal-900 hover:underline"
