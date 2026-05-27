@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/authStore'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
+import SelfMailsView from '@/components/SelfMailsView'
 
 // ── 型定義 ─────────────────────────────────────────────────
 
@@ -292,6 +293,8 @@ export default function EngineerMailsPage() {
   const [selected, setSelected] = useState<EngineerMail | null>(null)
   // デフォルトは「全て」(ステータス指定なし) で受信日順表示
   const [statusFilter, setStatusFilter] = useState('')
+  // 自社(@aizen-sol.co.jp 宛)を担当者別に表示するモード (営業打ち合わせ 2026-05-25 §要望1)
+  const [selfMode, setSelfMode] = useState(false)
   const [scoreFilter, setScoreFilter] = useState('all')
   const [search, setSearch] = useState('')               // 入力欄の値 (未確定)
   const [appliedSearch, setAppliedSearch] = useState('') // Enter/🔍 で確定された値
@@ -725,6 +728,22 @@ export default function EngineerMailsPage() {
 
   const set = (key: keyof EngineerMail, val: unknown) => setForm(f => ({ ...f, [key]: val }))
 
+  // ── 自社モード（@aizen-sol.co.jp 宛・担当者別） ────────────
+  // 営業打ち合わせ 2026-05-25 §要望1: 自社メールを担当者別に閲覧
+  if (selfMode) {
+    return (
+      <div className="flex h-screen bg-gray-50">
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex items-center gap-3 p-3 border-b border-gray-200 bg-white">
+            <button onClick={() => setSelfMode(false)} className="text-sm text-teal-600 hover:underline">← 技術者メール一覧に戻る</button>
+            <span className="text-sm font-semibold text-gray-800">自社メール（担当者別）</span>
+          </div>
+          <div className="flex-1 min-h-0"><SelfMailsView /></div>
+        </div>
+      </div>
+    )
+  }
+
   // ── 要確認モード ──────────────────────────────────────────
   if (statusFilter === 'review') {
     return (
@@ -884,6 +903,12 @@ export default function EngineerMailsPage() {
               <input type="checkbox" checked={searchBody}
                 onChange={e => { setSearchBody(e.target.checked); setPage(1) }} className="rounded" />
               本文も検索
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" checked={selfMode}
+                onChange={e => { setSelfMode(e.target.checked); setSelected(null) }}
+                className="rounded accent-teal-500" />
+              <span className="text-teal-700">自社</span>
             </label>
             {search !== appliedSearch && search.trim() !== '' && (
               <span className="text-amber-600">⏎ Enter または 🔍 で実行</span>
