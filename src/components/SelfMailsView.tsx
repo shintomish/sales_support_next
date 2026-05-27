@@ -1,10 +1,11 @@
 'use client'
 
-// 「自社」タブの共有ビュー（営業打ち合わせ 2026-05-25 §要望1）。
+// 「自社」タブの共有ビュー（営業打ち合わせ 2026-05-25 §要望1 + E-4 2026-05-27）。
 // 自社 = to_address が当社 xxx@aizen-sol.co.jp（catch-all の outsource@ は除外＝その他扱い、[spam] も除外）。
 // 宛先（担当者 = to のローカル部）で絞り込み、件名・送信者・本文で検索できる。
-// /emails・/project-mails・/engineer-mails の3画面で使い回す。返信導線は E-2。
-import { useState, useEffect, useCallback } from 'react'
+// /emails・/project-mails・/engineer-mails の3画面で使い回す。
+// E-4: 右ペインに返信フォーム（Cc/Bcc/添付対応）。POST /api/v1/emails/{id}/reply で送信。
+import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from '@/lib/axios'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
@@ -24,17 +25,78 @@ type MailRow = {
   attachments_count?: number
 }
 
+// メール署名テンプレート（/api/v1/email-body-templates/me から取得）
+type EmailBodyTemplate = {
+  name: string
+  name_en: string | null
+  department: string | null
+  position: string | null
+  email: string | null
+  mobile: string | null
+  body_text?: string | null
+}
+
 function formatSize(n: number | null): string {
   if (!n) return ''
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
   return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
+
+// project-mails / engineer-mails 同等の署名生成。テンプレ body_text に「（本文）」マーカーがあれば
+// その後ろを署名として使う。なければ固定フォーマットで生成。
+function buildSignature(tpl: EmailBodyTemplate | null): string {
+  if (!tpl) return ''
+  if (tpl.body_text) {
+    const idx = tpl.body_text.indexOf('（本文）')
+    if (idx >= 0) return tpl.body_text.slice(idx + '（本文）'.length).replace(/^\s*\n/, '')
+  }
+  return `_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+　　株式会社アイゼン・ソリューション
+　${tpl.department ?? ''}
+　${tpl.position ?? ''}
+　${tpl.name}${tpl.name_en ? `（${tpl.name_en}）` : ''}
+
+　〒332-0017
+　埼玉県川口市栄町3-12-11 コスモ川口栄町2F
+　Tel：048-253-3922　Fax：048-271-9355
+
+　E-Mail：${tpl.email ?? ''}
+　Mobile：${tpl.mobile ?? ''}
+
+　URL:https://www.aizen-sol.co.jp
+_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
+}
+
+// 返信本文の初期値: 宛名 + > 引用 + 署名
+function buildReplyBody(recipientName: string, originalBody: string, tpl: EmailBodyTemplate | null): string {
+  const greeting = recipientName ? `${recipientName}様\n\n\n` : ''
+  const quoted = originalBody
+    ? originalBody.replace(/\r\n/g, '\n').split('\n').map(l => `> ${l}`).join('\n')
+    : ''
+  const sig = buildSignature(tpl)
+  return `${greeting}${quoted}${sig ? `\n\n${sig}` : ''}`
+}
+
+// "a@x.com, b@y.com  c@z.com" → ["a@x.com", "b@y.com", "c@z.com"]（空要素除去）
+function parseRecipients(raw: string): string[] {
+  return raw.split(/[\s,;]+/).map(s => s.trim()).filter(s => s.length > 0)
+}
+
 type Owner = { owner: string; count: number }
 type Paginated = { data: MailRow[]; current_page: number; last_page: number; total: number }
 
 // 選択値: 'self:'=自社全担当者 / 'self:<owner>'=自社の特定担当者
 const ALL_SELF = 'self:'
+
+type ReplyForm = {
+  to: string
+  cc: string         // カンマ/スペース区切り入力
+  bcc: string        // カンマ/スペース区切り入力
+  subject: string
+  body: string
+  files: File[]
+}
 
 export default function SelfMailsView() {
   const [owners, setOwners] = useState<Owner[]>([])
@@ -47,10 +109,21 @@ export default function SelfMailsView() {
   const [appliedSearch, setAppliedSearch] = useState('') // Enter/🔍 で確定
   const [searchBody, setSearchBody] = useState(false)  // 本文も検索
   const [attachments, setAttachments] = useState<Attachment[]>([]) // 選択メールの添付（詳細取得で埋める）
+  // 返信フォーム (E-4)
+  const [replyForm, setReplyForm] = useState<ReplyForm | null>(null)
+  const [replySending, setReplySending] = useState(false)
+  const [replyMsg, setReplyMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
+  const [dropOver, setDropOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     axios.get('/api/v1/emails/self-owners')
       .then(res => setOwners(res.data.owners ?? []))
+      .catch(() => {})
+    // 返信本文に挿入する署名テンプレート
+    axios.get('/api/v1/email-body-templates/me')
+      .then(res => { if (res.data) setEmailTemplate(res.data) })
       .catch(() => {})
   }, [])
 
@@ -72,13 +145,70 @@ export default function SelfMailsView() {
   useEffect(() => { fetchList() }, [fetchList])
 
   // 行選択: 本文は一覧データに含まれるが添付一覧は詳細取得が必要
+  // 別メール選択時は返信フォームを閉じる (誤送信防止)
   const openMail = (m: MailRow) => {
     setSelected(m)
     setAttachments([])
+    setReplyForm(null)
+    setReplyMsg(null)
     if (m.attachments_count && m.attachments_count > 0) {
       axios.get(`/api/v1/emails/${m.id}`)
         .then(res => setAttachments(res.data.attachments ?? []))
         .catch(() => {})
+    }
+  }
+
+  // 返信フォームを開く (E-4)
+  const openReply = () => {
+    if (!selected) return
+    setReplyMsg(null)
+    setReplyForm({
+      to: selected.from_address ?? '',
+      cc: '',
+      bcc: '',
+      subject: (selected.subject ?? '').startsWith('Re:') ? (selected.subject ?? '') : `Re: ${selected.subject ?? ''}`,
+      body: buildReplyBody(selected.from_name ?? '', selected.body_text ?? '', emailTemplate),
+      files: [],
+    })
+  }
+
+  const addReplyFiles = (filesList: FileList | File[] | null) => {
+    if (!filesList) return
+    const arr = Array.from(filesList)
+    setReplyForm(f => f ? { ...f, files: [...f.files, ...arr] } : f)
+  }
+
+  const removeReplyFile = (index: number) => {
+    setReplyForm(f => f ? { ...f, files: f.files.filter((_, i) => i !== index) } : f)
+  }
+
+  // 返信送信 (POST /api/v1/emails/{id}/reply, multipart)
+  const sendReply = async () => {
+    if (!selected || !replyForm) return
+    if (!replyForm.to.trim()) { setReplyMsg({ type: 'err', text: '宛先(to)を入力してください' }); return }
+    if (!replyForm.subject.trim()) { setReplyMsg({ type: 'err', text: '件名を入力してください' }); return }
+    if (!replyForm.body.trim()) { setReplyMsg({ type: 'err', text: '本文を入力してください' }); return }
+
+    setReplySending(true)
+    setReplyMsg(null)
+    try {
+      const fd = new FormData()
+      fd.append('to', replyForm.to.trim())
+      fd.append('subject', replyForm.subject)
+      fd.append('body', replyForm.body)
+      for (const cc of parseRecipients(replyForm.cc)) fd.append('cc[]', cc)
+      for (const bcc of parseRecipients(replyForm.bcc)) fd.append('bcc[]', bcc)
+      for (const file of replyForm.files) fd.append('attachments[]', file)
+      await axios.post(`/api/v1/emails/${selected.id}/reply`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      setReplyMsg({ type: 'ok', text: '返信を送信しました' })
+      setReplyForm(null)
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } }
+      setReplyMsg({ type: 'err', text: err.response?.data?.message ?? '送信に失敗しました' })
+    } finally {
+      setReplySending(false)
     }
   }
 
@@ -194,6 +324,139 @@ export default function SelfMailsView() {
             {selected.body_html
               ? <EmailHtmlFrame html={selected.body_html} />
               : <pre className="text-sm whitespace-pre-wrap text-gray-800 font-sans">{selected.body_text}</pre>}
+
+            {/* 返信エリア (E-4 2026-05-27) */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              {replyMsg && (
+                <p className={`text-xs mb-2 ${replyMsg.type === 'ok' ? 'text-green-700' : 'text-red-600'}`}>
+                  {replyMsg.text}
+                </p>
+              )}
+              {!replyForm ? (
+                <button
+                  onClick={openReply}
+                  className="text-xs px-3 py-1.5 bg-teal-600 text-white rounded-md hover:bg-teal-700"
+                >
+                  ↩ 返信
+                </button>
+              ) : (
+                <div className="space-y-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-gray-700">返信</p>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-500 w-12 flex-shrink-0">To</label>
+                    <input
+                      type="email"
+                      value={replyForm.to}
+                      onChange={e => setReplyForm(f => f ? { ...f, to: e.target.value } : f)}
+                      className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-500 w-12 flex-shrink-0">Cc</label>
+                    <input
+                      type="text"
+                      value={replyForm.cc}
+                      onChange={e => setReplyForm(f => f ? { ...f, cc: e.target.value } : f)}
+                      placeholder="カンマ区切り (任意)"
+                      className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-500 w-12 flex-shrink-0">Bcc</label>
+                    <input
+                      type="text"
+                      value={replyForm.bcc}
+                      onChange={e => setReplyForm(f => f ? { ...f, bcc: e.target.value } : f)}
+                      placeholder="カンマ区切り (任意)"
+                      className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-500 w-12 flex-shrink-0">件名</label>
+                    <input
+                      type="text"
+                      value={replyForm.subject}
+                      onChange={e => setReplyForm(f => f ? { ...f, subject: e.target.value } : f)}
+                      className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    />
+                  </div>
+                  <textarea
+                    value={replyForm.body}
+                    onChange={e => setReplyForm(f => f ? { ...f, body: e.target.value } : f)}
+                    rows={12}
+                    className="w-full text-xs font-mono border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  />
+
+                  {/* 添付ファイル (D&D 対応) */}
+                  <div
+                    onDragOver={e => { e.preventDefault(); e.stopPropagation(); if (!dropOver) setDropOver(true) }}
+                    onDragEnter={e => { e.preventDefault(); e.stopPropagation(); setDropOver(true) }}
+                    onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setDropOver(false) }}
+                    onDrop={e => {
+                      e.preventDefault(); e.stopPropagation(); setDropOver(false)
+                      if (e.dataTransfer?.files?.length) addReplyFiles(e.dataTransfer.files)
+                    }}
+                    className={`space-y-1.5 rounded border-2 border-dashed p-2 transition-colors ${
+                      dropOver ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500">
+                        添付ファイル ({replyForm.files.length})
+                        <span className="ml-2 text-gray-400">— ここにファイルをドロップ</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        + ファイル追加
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={e => { addReplyFiles(e.target.files); if (e.target) e.target.value = '' }}
+                      />
+                    </div>
+                    {replyForm.files.length > 0 && (
+                      <ul className="space-y-1">
+                        {replyForm.files.map((file, i) => (
+                          <li key={i} className="flex items-center justify-between text-xs bg-white border border-gray-200 rounded px-2 py-1">
+                            <span className="truncate">{file.name}（{formatSize(file.size)}）</span>
+                            <button
+                              type="button"
+                              onClick={() => removeReplyFile(i)}
+                              className="flex-shrink-0 text-red-500 hover:text-red-700 ml-2"
+                            >×</button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={sendReply}
+                      disabled={replySending}
+                      className="text-xs px-3 py-1.5 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:opacity-50"
+                    >
+                      {replySending ? '送信中...' : '送信'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setReplyForm(null); setReplyMsg(null) }}
+                      disabled={replySending}
+                      className="text-xs px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      キャンセル
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <p className="text-xs text-gray-400">メールを選択してください</p>
