@@ -7,7 +7,6 @@ import { useAuthStore } from '@/store/authStore'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
-import SelfMailsView from '@/components/SelfMailsView'
 
 // ── 型定義 ─────────────────────────────────────────────────
 
@@ -293,8 +292,6 @@ export default function EngineerMailsPage() {
   const [selected, setSelected] = useState<EngineerMail | null>(null)
   // デフォルトは「全て」(ステータス指定なし) で受信日順表示
   const [statusFilter, setStatusFilter] = useState('')
-  // 自社(@aizen-sol.co.jp 宛)を担当者別に表示するモード (営業打ち合わせ 2026-05-25 §要望1)
-  const [selfMode, setSelfMode] = useState(false)
   const [scoreFilter, setScoreFilter] = useState('all')
   const [search, setSearch] = useState('')               // 入力欄の値 (未確定)
   const [appliedSearch, setAppliedSearch] = useState('') // Enter/🔍 で確定された値
@@ -333,7 +330,23 @@ export default function EngineerMailsPage() {
   const [threadItems, setThreadItems] = useState<ThreadItem[]>([])
   const [threadLoading, setThreadLoading] = useState(false)
   const [threadExpanded, setThreadExpanded] = useState<number | null>(null)
-  const [replyForm, setReplyForm] = useState<{ name: string; to: string; subject: string; body: string } | null>(null)
+  const [replyForm, setReplyForm] = useState<{ name: string; to: string; subject: string; body: string; files: File[] } | null>(null)
+  const [replyDropOver, setReplyDropOver] = useState(false)
+  const replyFileInputRef = useRef<HTMLInputElement>(null)
+  // 返信添付ヘルパー（E-2 2026-05-27 追加）
+  const addReplyFiles = (filesList: FileList | File[] | null) => {
+    if (!filesList) return
+    const arr = Array.from(filesList)
+    setReplyForm(f => f ? { ...f, files: [...f.files, ...arr] } : f)
+  }
+  const removeReplyFile = (index: number) => {
+    setReplyForm(f => f ? { ...f, files: f.files.filter((_, i) => i !== index) } : f)
+  }
+  const formatFileSize = (n: number): string => {
+    if (n < 1024) return `${n} B`
+    if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+    return `${(n / 1024 / 1024).toFixed(1)} MB`
+  }
   const [replySending, setReplySending] = useState(false)
 
   useEffect(() => {
@@ -437,17 +450,29 @@ export default function EngineerMailsPage() {
     finally { setThreadLoading(false) }
   }
 
-  // 返信送信
+  // 返信送信（添付ありの場合 multipart/form-data, なければ JSON）
   const handleReply = async () => {
     if (!selected || !replyForm) return
     setReplySending(true)
     try {
-      await axios.post(`/api/v1/engineer-mails/${selected.id}/send-proposal`, {
-        to: replyForm.to,
-        to_name: replyForm.name || undefined,
-        subject: replyForm.subject,
-        body: replyForm.body,
-      })
+      if (replyForm.files.length > 0) {
+        const fd = new FormData()
+        fd.append('to', replyForm.to)
+        if (replyForm.name) fd.append('to_name', replyForm.name)
+        fd.append('subject', replyForm.subject)
+        fd.append('body', replyForm.body)
+        for (const file of replyForm.files) fd.append('attachments[]', file)
+        await axios.post(`/api/v1/engineer-mails/${selected.id}/send-proposal`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+      } else {
+        await axios.post(`/api/v1/engineer-mails/${selected.id}/send-proposal`, {
+          to: replyForm.to,
+          to_name: replyForm.name || undefined,
+          subject: replyForm.subject,
+          body: replyForm.body,
+        })
+      }
       setReplyForm(null)
       fetchThread(selected.id)
     } catch { /* silent */ }
@@ -728,22 +753,6 @@ export default function EngineerMailsPage() {
 
   const set = (key: keyof EngineerMail, val: unknown) => setForm(f => ({ ...f, [key]: val }))
 
-  // ── 自社モード（@aizen-sol.co.jp 宛・担当者別） ────────────
-  // 営業打ち合わせ 2026-05-25 §要望1: 自社メールを担当者別に閲覧
-  if (selfMode) {
-    return (
-      <div className="flex h-screen bg-gray-50">
-        <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex items-center gap-3 p-3 border-b border-gray-200 bg-white">
-            <button onClick={() => setSelfMode(false)} className="text-sm text-teal-600 hover:underline">← 技術者メール一覧に戻る</button>
-            <span className="text-sm font-semibold text-gray-800">自社メール（担当者別）</span>
-          </div>
-          <div className="flex-1 min-h-0"><SelfMailsView /></div>
-        </div>
-      </div>
-    )
-  }
-
   // ── 要確認モード ──────────────────────────────────────────
   if (statusFilter === 'review') {
     return (
@@ -903,12 +912,6 @@ export default function EngineerMailsPage() {
               <input type="checkbox" checked={searchBody}
                 onChange={e => { setSearchBody(e.target.checked); setPage(1) }} className="rounded" />
               本文も検索
-            </label>
-            <label className="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" checked={selfMode}
-                onChange={e => { setSelfMode(e.target.checked); setSelected(null) }}
-                className="rounded accent-teal-500" />
-              <span className="text-teal-700">自社</span>
             </label>
             {search !== appliedSearch && search.trim() !== '' && (
               <span className="text-amber-600">⏎ Enter または 🔍 で実行</span>
@@ -1479,6 +1482,54 @@ export default function EngineerMailsPage() {
                       <textarea value={replyForm.body} onChange={e => setReplyForm(f => f ? { ...f, body: e.target.value } : f)}
                         rows={6} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 font-mono" />
                     </div>
+                    {/* 添付ファイル (E-2 2026-05-27 D&D + 選択) */}
+                    <div
+                      onDragOver={e => { e.preventDefault(); e.stopPropagation(); if (!replyDropOver) setReplyDropOver(true) }}
+                      onDragEnter={e => { e.preventDefault(); e.stopPropagation(); setReplyDropOver(true) }}
+                      onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setReplyDropOver(false) }}
+                      onDrop={e => {
+                        e.preventDefault(); e.stopPropagation(); setReplyDropOver(false)
+                        if (e.dataTransfer?.files?.length) addReplyFiles(e.dataTransfer.files)
+                      }}
+                      className={`rounded-lg border-2 border-dashed p-2 transition-colors ${
+                        replyDropOver ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">
+                          添付ファイル ({replyForm.files.length})
+                          <span className="ml-2 text-gray-400">— ここにファイルをドロップ</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => replyFileInputRef.current?.click()}
+                          className="text-xs text-teal-600 hover:underline"
+                        >
+                          + ファイル追加
+                        </button>
+                        <input
+                          ref={replyFileInputRef}
+                          type="file"
+                          multiple
+                          className="hidden"
+                          onChange={e => { addReplyFiles(e.target.files); if (e.target) e.target.value = '' }}
+                        />
+                      </div>
+                      {replyForm.files.length > 0 && (
+                        <ul className="space-y-1 mt-1.5">
+                          {replyForm.files.map((file, i) => (
+                            <li key={i} className="flex items-center justify-between text-xs bg-white border border-gray-200 rounded px-2 py-1">
+                              <span className="truncate">{file.name}（{formatFileSize(file.size)}）</span>
+                              <button
+                                type="button"
+                                onClick={() => removeReplyFile(i)}
+                                className="flex-shrink-0 text-red-500 hover:text-red-700 ml-2"
+                              >×</button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <button onClick={handleReply} disabled={replySending || !replyForm.to || !replyForm.subject || !replyForm.body}
                         className="text-sm bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 disabled:opacity-50 font-medium">
@@ -1502,6 +1553,7 @@ export default function EngineerMailsPage() {
                         to: lastReceived?.from ?? selected.email?.from_address ?? '',
                         subject: `Re: ${latest?.subject ?? selected.email?.subject ?? ''}`,
                         body: buildReplyBody(recipientName, quotedSource, emailTemplate),
+                        files: [],
                       })
                     }}
                       className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg hover:bg-teal-700 font-medium">
