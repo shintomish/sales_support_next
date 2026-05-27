@@ -1515,6 +1515,7 @@ export default function DeliveriesPage() {
               <thead className="bg-gray-50 text-gray-600 sticky top-0 z-10">
                 <tr>
                   <th className="px-2 py-3 w-8" />
+                  <th className="px-2 py-3 text-left text-xs w-16 whitespace-nowrap">#</th>
                   {(
                     [
                       { col: 'sent_at' as CampSortBy, label: '送信日時' },
@@ -1557,6 +1558,7 @@ export default function DeliveriesPage() {
                         <td className="px-2 py-3 text-center text-gray-400 text-xs">
                           <span className={`inline-block transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
                         </td>
+                        <td className="px-2 py-3 text-gray-500 text-xs whitespace-nowrap">#{camp.id}</td>
                         <td className="px-4 py-3 text-gray-600 text-xs leading-tight">
                           {camp.sent_at ? (() => {
                             const d = new Date(camp.sent_at)
@@ -1635,7 +1637,7 @@ export default function DeliveriesPage() {
                       </tr>
                       {isExpanded && (
                         <tr className="bg-gray-50">
-                          <td colSpan={12} className="px-6 py-4 border-t border-gray-200">
+                          <td colSpan={13} className="px-6 py-4 border-t border-gray-200">
                             {isDetailLoading && (
                               <div className="text-xs text-gray-400">読み込み中...</div>
                             )}
@@ -1794,7 +1796,7 @@ export default function DeliveriesPage() {
                 })}
                 {campaigns?.data.length === 0 && (
                   <tr>
-                    <td colSpan={12} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={13} className="px-4 py-8 text-center text-gray-400">
                       キャンペーン履歴がありません。
                     </td>
                   </tr>
