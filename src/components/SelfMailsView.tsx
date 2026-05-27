@@ -23,6 +23,9 @@ type MailRow = {
   received_at: string
   is_read: boolean
   attachments_count?: number
+  // 一斉配信(delivery_campaigns) への返信の場合、紐付け元 campaign 情報（バックエンド EmailController::index が付与）
+  reply_to_campaign_id?: number | null
+  reply_to_campaign_subject?: string | null
 }
 
 // メール署名テンプレート（/api/v1/email-body-templates/me から取得）
@@ -280,6 +283,9 @@ export default function SelfMailsView() {
                 </span>
               </div>
               <p className="text-sm text-gray-800 truncate mt-0.5">{m.attachments_count ? '📎 ' : ''}{m.subject || '(件名なし)'}</p>
+              {m.reply_to_campaign_id && (
+                <p className="text-[10px] text-teal-700 truncate mt-0.5">↳ 一斉配信 #{m.reply_to_campaign_id} への返信</p>
+              )}
             </button>
           ))}
           {list && list.data.length === 0 && !loading && (
@@ -300,7 +306,19 @@ export default function SelfMailsView() {
         {selected ? (
           <div>
             <p className="text-sm font-semibold text-gray-900 mb-1">{selected.subject || '(件名なし)'}</p>
-            <p className="text-xs text-gray-500 mb-3">{selected.from_name} &lt;{selected.from_address}&gt;</p>
+            <p className="text-xs text-gray-500 mb-1">{selected.from_name} &lt;{selected.from_address}&gt;</p>
+            {selected.reply_to_campaign_id && (
+              <a
+                href={`/deliveries/${selected.reply_to_campaign_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mb-3 text-xs text-teal-700 hover:text-teal-900 hover:underline"
+              >
+                ↳ 一斉配信 #{selected.reply_to_campaign_id}
+                {selected.reply_to_campaign_subject ? `「${selected.reply_to_campaign_subject}」` : ''} への返信
+              </a>
+            )}
+            {!selected.reply_to_campaign_id && <div className="mb-2" />}
             {attachments.length > 0 && (
               <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <p className="text-xs font-medium text-amber-700 mb-2">📎 添付ファイル（{attachments.length}件）</p>
