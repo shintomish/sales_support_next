@@ -202,9 +202,9 @@ export default function DashboardPage() {
             {pieData.length === 0 ? (
               <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">データなし</div>
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="42%" outerRadius={72} dataKey="value"
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart margin={{ top: 0, right: 32, bottom: 0, left: 32 }}>
+                  <Pie data={pieData} cx="50%" cy="42%" outerRadius={56} dataKey="value"
                     label={({ name, value }) => `${name}:${value}`} labelLine={true} fontSize={11}>
                     {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   </Pie>
