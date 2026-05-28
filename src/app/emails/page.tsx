@@ -127,17 +127,60 @@ export default function EmailsPage() {
     return () => { supabase.removeChannel(channel) }
   }, [page, appliedSearch, unreadOnly])
 
-  // 全件既読
+  // 全件既読 (非同期ジョブ化 / rescore-all と同パターン)
+  // POST /mark-all-read で job 登録 → /mark-read-status をポーリングして進捗表示
+  const pollMarkReadStatus = useCallback(() => {
+    axios.get('/api/v1/emails/mark-read-status').then(res => {
+      const job = res.data.job
+      if (job && (job.status === 'pending' || job.status === 'processing')) {
+        setMarkingAllRead(true)
+        setSyncMessage(`既読化中: ${job.processed_count ?? 0} / ${job.total_count ?? 0}件`)
+        setTimeout(pollMarkReadStatus, 3000)
+      } else if (job && job.status === 'completed') {
+        setMarkingAllRead(false)
+        setSyncMessage(`完了: ${job.total_count}件を既読にしました`)
+        fetchEmailsRef.current()
+        window.dispatchEvent(new CustomEvent('emails:mark-all-read'))
+      } else if (job && job.status === 'failed') {
+        setMarkingAllRead(false)
+        setSyncMessage(`既読処理に失敗しました${job.error_message ? ': ' + job.error_message : ''}`)
+      } else {
+        setMarkingAllRead(false)
+      }
+    }).catch(() => { setMarkingAllRead(false) })
+  }, [])
+
   const handleMarkAllRead = async () => {
     setMarkingAllRead(true)
+    setSyncMessage('既読化を開始しています...')
     try {
       const res = await axios.post('/api/v1/emails/mark-all-read')
-      await fetchEmails()
-      setSyncMessage(res.data.message)
-      window.dispatchEvent(new CustomEvent('emails:mark-all-read'))
-    } catch { setSyncMessage('既読処理に失敗しました') }
-    finally { setMarkingAllRead(false) }
+      if (res.data.job) {
+        // 202: ジョブ登録成功 → ポーリング開始
+        pollMarkReadStatus()
+      } else {
+        // 200 count=0: 未読 0 件
+        setMarkingAllRead(false)
+        setSyncMessage(res.data.message)
+      }
+    } catch {
+      setSyncMessage('既読処理に失敗しました')
+      setMarkingAllRead(false)
+    }
   }
+
+  // ページ表示時、進行中の既読ジョブがあれば進捗表示を復帰（ブラウザを閉じても継続するため）
+  useEffect(() => {
+    axios.get('/api/v1/emails/mark-read-status').then(res => {
+      const job = res.data.job
+      if (job && (job.status === 'pending' || job.status === 'processing')) {
+        setMarkingAllRead(true)
+        setSyncMessage(`既読化中: ${job.processed_count ?? 0} / ${job.total_count ?? 0}件`)
+        setTimeout(pollMarkReadStatus, 3000)
+      }
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // 2026-05-14: Kagoya IMAP 一本化により Gmail handleConnect / handleDisconnect / handleSync は削除。
   // メール取込は Laravel scheduler (sync-kagoya-pop3 / 15分毎) が担当。
