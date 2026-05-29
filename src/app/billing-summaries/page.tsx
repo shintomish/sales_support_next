@@ -599,21 +599,36 @@ function RefinitivImportModal({
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">注文書 PDF</label>
             <div
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
+              onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true); }}
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true); }}
+              onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); }}
               onDrop={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 setDragOver(false);
                 const dropped = e.dataTransfer.files?.[0];
-                if (dropped && dropped.type === 'application/pdf') {
+                if (!dropped) {
+                  setError('ファイルを取得できませんでした');
+                  return;
+                }
+                // Windows/WSL では type が空文字や application/octet-stream になる場合があるため
+                // 拡張子フォールバックを併用する。
+                const isPdf = dropped.type === 'application/pdf'
+                  || dropped.name.toLowerCase().endsWith('.pdf');
+                if (isPdf) {
                   setFile(dropped);
                   setParsed(null);
                   setError(null);
-                } else if (dropped) {
-                  setError('PDFファイルをドロップしてください');
+                } else {
+                  setError(`PDFファイルをドロップしてください (検出: ${dropped.type || 'unknown'} / ${dropped.name})`);
                 }
               }}
-              onClick={() => !(parsing || issuing) && document.getElementById('refinitiv-pdf-input')?.click()}
+              onClick={() => {
+                // ドラッグ中の click 誤発火を防ぐ (drop の代わりに file picker が開く問題)
+                if (dragOver) return;
+                if (parsing || issuing) return;
+                document.getElementById('refinitiv-pdf-input')?.click();
+              }}
               className={`border-2 border-dashed rounded-md px-4 py-6 text-center text-sm cursor-pointer transition-colors ${
                 dragOver
                   ? 'border-amber-400 bg-amber-50 text-amber-700'
