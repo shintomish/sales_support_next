@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import Link from 'next/link'
 import axios from '@/lib/axios'
 import { useAuthStore } from '@/store/authStore'
 import { formatDistanceToNow } from 'date-fns'
@@ -173,6 +174,10 @@ function scoreRank(score: number) {
 export default function ProjectMailsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
+  // /project-mails/manual で手動登録モード (E-3 別枠化 2026-05-29)。
+  // 既定 (/project-mails) は通常メール取込のみ表示。
+  const sourceMode: 'imap' | 'manual' = pathname?.endsWith('/manual') ? 'manual' : 'imap'
   const [items, setItems] = useState<Paginated | null>(null)
   const [selected, setSelected] = useState<ProjectMail | null>(null)
   // デフォルトは「全て」(ステータス指定なし) で受信日順表示
@@ -191,6 +196,9 @@ export default function ProjectMailsPage() {
   const [form, setForm] = useState<Partial<ProjectMail>>({})
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
+  // 手動登録モーダル (E-3 営業打ち合わせ 2026-05-25)
+  const [showCreate, setShowCreate] = useState(false)
   const [showBody, setShowBody] = useState(false)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [expandedItem, setExpandedItem] = useState<ProjectMail | null>(null)
@@ -240,13 +248,14 @@ export default function ProjectMailsPage() {
           per_page:    30,
           score_min:   sf.scoreMin,
           score_max:   sf.scoreMax,
+          source:      sourceMode,
         }
       })
       setItems(res.data)
     } finally {
       setListLoading(false)
     }
-  }, [statusFilter, scoreFilter, appliedSearch, searchBody, page])
+  }, [statusFilter, scoreFilter, appliedSearch, searchBody, page, sourceMode])
 
   useEffect(() => { fetchList() }, [fetchList])
 
@@ -621,20 +630,44 @@ export default function ProjectMailsPage() {
       <div className={`${selected ? 'hidden md:flex' : 'flex'} w-full md:w-96 bg-white border-r border-gray-200 flex-col`}>
         <div className="p-4 border-b border-gray-200 space-y-3">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-gray-900">案件メール</h1>
+            <h1 className="text-lg font-semibold text-gray-900">
+              {sourceMode === 'manual' ? '手動登録 案件' : '案件メール'}
+            </h1>
             <div className="flex gap-1.5">
-              {isAdmin && (<>
-              <button onClick={handleRescoreAll} disabled={rescoring || extracting}
-                className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
-                {rescoring && <Spinner size={11} />}
-                {rescoring ? '再スコア中...' : '全件再スコア'}
-              </button>
-              <button onClick={handleReextractAll} disabled={extracting || rescoring}
-                className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1.5 rounded-md hover:bg-blue-100 disabled:opacity-50 flex items-center gap-1.5">
-                {extracting && <Spinner size={11} />}
-                {extracting ? '抽出中...' : '情報抽出'}
-              </button>
-              </>)}
+              {sourceMode === 'manual' ? (
+                <>
+                  <Link href="/project-mails"
+                    className="text-xs bg-white text-gray-600 border border-gray-300 px-2.5 py-1.5 rounded-md hover:bg-gray-50 flex items-center gap-1.5"
+                    title="通常の案件メール一覧へ">
+                    ← 通常メール
+                  </Link>
+                  <button onClick={() => setShowCreate(true)}
+                    className="text-xs bg-green-600 text-white border border-green-600 px-2.5 py-1.5 rounded-md hover:bg-green-700 flex items-center gap-1.5"
+                    title="LINE や個別メールから受け取った案件を手動登録">
+                    <span className="text-sm leading-none">+</span> 新規登録
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link href="/project-mails/manual"
+                    className="text-xs bg-green-50 text-green-700 border border-green-200 px-2.5 py-1.5 rounded-md hover:bg-green-100 flex items-center gap-1.5"
+                    title="手動登録した案件の一覧 (LINE/個別メールから登録)">
+                    🗂 手動登録一覧
+                  </Link>
+                  {isAdmin && (<>
+                  <button onClick={handleRescoreAll} disabled={rescoring || extracting}
+                    className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
+                    {rescoring && <Spinner size={11} />}
+                    {rescoring ? '再スコア中...' : '全件再スコア'}
+                  </button>
+                  <button onClick={handleReextractAll} disabled={extracting || rescoring}
+                    className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1.5 rounded-md hover:bg-blue-100 disabled:opacity-50 flex items-center gap-1.5">
+                    {extracting && <Spinner size={11} />}
+                    {extracting ? '抽出中...' : '情報抽出'}
+                  </button>
+                  </>)}
+                </>
+              )}
             </div>
           </div>
           {scoreMsg && <p className="text-xs text-blue-700 font-medium">{scoreMsg}</p>}
@@ -1177,6 +1210,17 @@ export default function ProjectMailsPage() {
           </div>
         )}
       </div>
+
+      {showCreate && (
+        <ManualProjectModal
+          onClose={() => setShowCreate(false)}
+          onCreated={(pms) => {
+            setShowCreate(false)
+            fetchList()
+            handleSelect(pms)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -1219,6 +1263,244 @@ function FormRow({ label, children }: { label: string; children: React.ReactNode
     <div>
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
       {children}
+    </div>
+  )
+}
+
+// ── 手動登録モーダル (E-3) ────────────────────────────────
+type ManualProjectForm = {
+  customer_name: string
+  title: string
+  sales_contact: string
+  phone: string
+  from_address: string
+  required_skills: string
+  preferred_skills: string
+  work_location: string
+  unit_price_min: string
+  unit_price_max: string
+  start_date: string
+  contract_type: string
+  remote_ok: '' | 'true' | 'false'
+  age_limit: string
+  supply_chain: string
+  body_text: string
+}
+
+function ManualProjectModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void
+  onCreated: (pms: ProjectMail) => void
+}) {
+  const [f, setF] = useState<ManualProjectForm>({
+    customer_name: '', title: '', sales_contact: '', phone: '', from_address: '',
+    required_skills: '', preferred_skills: '', work_location: '',
+    unit_price_min: '', unit_price_max: '', start_date: '', contract_type: '',
+    remote_ok: '', age_limit: '', supply_chain: '', body_text: '',
+  })
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const set = <K extends keyof ManualProjectForm>(k: K, v: ManualProjectForm[K]) =>
+    setF(p => ({ ...p, [k]: v }))
+
+  const splitSkills = (s: string) =>
+    s.split(/[,、，\n]/).map(x => x.trim()).filter(Boolean)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!f.customer_name.trim() || !f.title.trim()) {
+      setError('顧客名とタイトルは必須です')
+      return
+    }
+    setSubmitting(true); setError(null)
+    try {
+      const payload: Record<string, unknown> = {
+        customer_name: f.customer_name.trim(),
+        title:         f.title.trim(),
+      }
+      if (f.sales_contact.trim()) payload.sales_contact = f.sales_contact.trim()
+      if (f.phone.trim())         payload.phone         = f.phone.trim()
+      if (f.from_address.trim())  payload.from_address  = f.from_address.trim()
+      if (f.work_location.trim()) payload.work_location = f.work_location.trim()
+      if (f.start_date.trim())    payload.start_date    = f.start_date.trim()
+      if (f.contract_type)        payload.contract_type = f.contract_type
+      if (f.age_limit.trim())     payload.age_limit     = f.age_limit.trim()
+      const req = splitSkills(f.required_skills);  if (req.length) payload.required_skills  = req
+      const pref = splitSkills(f.preferred_skills); if (pref.length) payload.preferred_skills = pref
+      if (f.unit_price_min) payload.unit_price_min = Number(f.unit_price_min)
+      if (f.unit_price_max) payload.unit_price_max = Number(f.unit_price_max)
+      if (f.remote_ok)      payload.remote_ok      = f.remote_ok === 'true'
+      if (f.supply_chain)   payload.supply_chain   = Number(f.supply_chain)
+      if (f.body_text.trim()) payload.body_text    = f.body_text.trim()
+
+      const res = await axios.post('/api/v1/project-mails/manual', payload)
+      onCreated(res.data)
+    } catch (err) {
+      const e = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }
+      const msg = e.response?.data?.message
+                ?? Object.values(e.response?.data?.errors ?? {}).flat()[0]
+                ?? '登録に失敗しました'
+      setError(msg)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+         onClick={onClose}>
+      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+           onClick={e => e.stopPropagation()}>
+        <form onSubmit={handleSubmit}>
+          <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
+            <h2 className="text-lg font-semibold text-gray-900">案件メール 新規登録</h2>
+            <button type="button" onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          </div>
+
+          <div className="px-5 py-4 space-y-3">
+            <p className="text-xs text-gray-500">
+              LINE や個別メールで受け取った案件情報を登録します。スコアは入力内容から自動計算されます。
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormRow label="顧客名 *">
+                <input type="text" required value={f.customer_name}
+                  onChange={e => set('customer_name', e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+              <FormRow label="担当者">
+                <input type="text" value={f.sales_contact}
+                  onChange={e => set('sales_contact', e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+            </div>
+
+            <FormRow label="タイトル / 件名 *">
+              <input type="text" required value={f.title}
+                onChange={e => set('title', e.target.value)}
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+            </FormRow>
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormRow label="送信元メール">
+                <input type="email" value={f.from_address}
+                  onChange={e => set('from_address', e.target.value)}
+                  placeholder="customer@example.com"
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+              <FormRow label="電話番号">
+                <input type="text" value={f.phone}
+                  onChange={e => set('phone', e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+            </div>
+
+            <FormRow label="必須スキル (カンマ・改行区切り)">
+              <textarea rows={2} value={f.required_skills}
+                onChange={e => set('required_skills', e.target.value)}
+                placeholder="Java, Spring, MySQL"
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+            </FormRow>
+
+            <FormRow label="尚可スキル">
+              <textarea rows={2} value={f.preferred_skills}
+                onChange={e => set('preferred_skills', e.target.value)}
+                placeholder="AWS, Docker"
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+            </FormRow>
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormRow label="勤務地">
+                <input type="text" value={f.work_location}
+                  onChange={e => set('work_location', e.target.value)}
+                  placeholder="東京 / 大阪 / リモート"
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+              <FormRow label="リモート可否">
+                <select value={f.remote_ok}
+                  onChange={e => set('remote_ok', e.target.value as ManualProjectForm['remote_ok'])}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5">
+                  <option value="">不明</option>
+                  <option value="true">可</option>
+                  <option value="false">不可</option>
+                </select>
+              </FormRow>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <FormRow label="単価下限 (万円)">
+                <input type="number" value={f.unit_price_min}
+                  onChange={e => set('unit_price_min', e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+              <FormRow label="単価上限 (万円)">
+                <input type="number" value={f.unit_price_max}
+                  onChange={e => set('unit_price_max', e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+              <FormRow label="商流 (n次)">
+                <select value={f.supply_chain}
+                  onChange={e => set('supply_chain', e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5">
+                  <option value="">不明</option>
+                  <option value="1">1次</option>
+                  <option value="2">2次</option>
+                  <option value="3">3次</option>
+                </select>
+              </FormRow>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <FormRow label="開始時期">
+                <input type="text" value={f.start_date}
+                  onChange={e => set('start_date', e.target.value)}
+                  placeholder="即日 / 2026-06"
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+              <FormRow label="契約形態">
+                <select value={f.contract_type}
+                  onChange={e => set('contract_type', e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5">
+                  <option value="">未指定</option>
+                  <option value="準委任">準委任</option>
+                  <option value="派遣">派遣</option>
+                  <option value="請負">請負</option>
+                </select>
+              </FormRow>
+              <FormRow label="年齢制限">
+                <input type="text" value={f.age_limit}
+                  onChange={e => set('age_limit', e.target.value)}
+                  placeholder="〜45歳"
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+            </div>
+
+            <FormRow label="メモ・備考 (本文に追記されます)">
+              <textarea rows={3} value={f.body_text}
+                onChange={e => set('body_text', e.target.value)}
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+            </FormRow>
+
+            {error && <p className="text-sm text-red-600">{error}</p>}
+          </div>
+
+          <div className="px-5 py-3 border-t border-gray-200 flex justify-end gap-2 sticky bottom-0 bg-white">
+            <button type="button" onClick={onClose}
+              className="px-4 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">
+              キャンセル
+            </button>
+            <button type="submit" disabled={submitting}
+              className="px-4 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1.5">
+              {submitting && <Spinner size={11} />}
+              {submitting ? '登録中...' : '登録'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import Link from 'next/link'
 import axios from '@/lib/axios'
 import { useAuthStore } from '@/store/authStore'
 import { formatDistanceToNow } from 'date-fns'
@@ -288,6 +289,9 @@ function scoreRank(score: number) {
 export default function EngineerMailsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
+  // /engineer-mails/manual で手動登録モード (E-3 別枠化 2026-05-29)。
+  const sourceMode: 'imap' | 'manual' = pathname?.endsWith('/manual') ? 'manual' : 'imap'
   const [items, setItems] = useState<Paginated | null>(null)
   const [selected, setSelected] = useState<EngineerMail | null>(null)
   // デフォルトは「全て」(ステータス指定なし) で受信日順表示
@@ -306,6 +310,9 @@ export default function EngineerMailsPage() {
   const [skillInput, setSkillInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
+  // 手動登録モーダル (E-3 営業打ち合わせ 2026-05-25)
+  const [showCreate, setShowCreate] = useState(false)
   const [showBody, setShowBody] = useState(false)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [expandedItem, setExpandedItem] = useState<EngineerMail | null>(null)
@@ -368,13 +375,14 @@ export default function EngineerMailsPage() {
           per_page:    30,
           score_min:   sf.scoreMin,
           score_max:   sf.scoreMax,
+          source:      sourceMode,
         }
       })
       setItems(res.data)
     } finally {
       setListLoading(false)
     }
-  }, [statusFilter, scoreFilter, appliedSearch, searchBody, page])
+  }, [statusFilter, scoreFilter, appliedSearch, searchBody, page, sourceMode])
 
   useEffect(() => { fetchList() }, [fetchList])
 
@@ -760,11 +768,32 @@ export default function EngineerMailsPage() {
         {/* ヘッダー */}
         <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex-shrink-0">
           <div className="flex items-center gap-3 mb-3">
-            <h1 className="text-lg font-semibold text-gray-900">要確認技術者メール</h1>
+            <h1 className="text-lg font-semibold text-gray-900">
+              {sourceMode === 'manual' ? '手動登録 技術者' : '要確認技術者メール'}
+            </h1>
             {items && (
               <span className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-300 px-2.5 py-0.5 rounded-full font-medium">
                 {items.total}件
               </span>
+            )}
+            {sourceMode === 'manual' ? (
+              <>
+                <Link href="/engineer-mails"
+                  className="ml-auto text-xs bg-white text-gray-600 border border-gray-300 px-2.5 py-1.5 rounded-md hover:bg-gray-50 flex items-center gap-1.5"
+                  title="通常の技術者メール一覧へ">
+                  ← 通常メール
+                </Link>
+                <button onClick={() => setShowCreate(true)}
+                  className="text-xs bg-green-600 text-white border border-green-600 px-2.5 py-1.5 rounded-md hover:bg-green-700 flex items-center gap-1.5">
+                  <span className="text-sm leading-none">+</span> 新規登録
+                </button>
+              </>
+            ) : (
+              <Link href="/engineer-mails/manual"
+                className="ml-auto text-xs bg-green-50 text-green-700 border border-green-200 px-2.5 py-1.5 rounded-md hover:bg-green-100 flex items-center gap-1.5"
+                title="手動登録した技術者の一覧 (LINE/個別メールから登録)">
+                🗂 手動登録一覧
+              </Link>
             )}
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -863,6 +892,16 @@ export default function EngineerMailsPage() {
             </div>
           )}
         </div>
+        {showCreate && (
+          <ManualEngineerModal
+            onClose={() => setShowCreate(false)}
+            onCreated={(ems) => {
+              setShowCreate(false)
+              fetchList()
+              handleSelect(ems)
+            }}
+          />
+        )}
       </div>
     )
   }
@@ -875,14 +914,37 @@ export default function EngineerMailsPage() {
       <div className={`${selected ? 'hidden md:flex' : 'flex'} w-full md:w-96 bg-white border-r border-gray-200 flex-col`}>
         <div className="p-4 border-b border-gray-200 space-y-3">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-gray-900">技術者メール</h1>
+            <h1 className="text-lg font-semibold text-gray-900">
+              {sourceMode === 'manual' ? '手動登録 技術者' : '技術者メール'}
+            </h1>
             <div className="flex gap-1.5">
-              {isAdmin && (
-              <button onClick={handleRescoreAll} disabled={rescoring}
-                className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
-                {rescoring && <Spinner size={11} />}
-                {rescoring ? '再スコア中...' : '全件再スコア'}
-              </button>
+              {sourceMode === 'manual' ? (
+                <>
+                  <Link href="/engineer-mails"
+                    className="text-xs bg-white text-gray-600 border border-gray-300 px-2.5 py-1.5 rounded-md hover:bg-gray-50 flex items-center gap-1.5"
+                    title="通常の技術者メール一覧へ">
+                    ← 通常メール
+                  </Link>
+                  <button onClick={() => setShowCreate(true)}
+                    className="text-xs bg-green-600 text-white border border-green-600 px-2.5 py-1.5 rounded-md hover:bg-green-700 flex items-center gap-1.5">
+                    <span className="text-sm leading-none">+</span> 新規登録
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link href="/engineer-mails/manual"
+                    className="text-xs bg-green-50 text-green-700 border border-green-200 px-2.5 py-1.5 rounded-md hover:bg-green-100 flex items-center gap-1.5"
+                    title="手動登録した技術者の一覧 (LINE/個別メールから登録)">
+                    🗂 手動登録一覧
+                  </Link>
+                  {isAdmin && (
+                  <button onClick={handleRescoreAll} disabled={rescoring}
+                    className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1.5 rounded-md hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1.5">
+                    {rescoring && <Spinner size={11} />}
+                    {rescoring ? '再スコア中...' : '全件再スコア'}
+                  </button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -1727,6 +1789,16 @@ export default function EngineerMailsPage() {
           </div>
         </div>
       )}
+      {showCreate && (
+        <ManualEngineerModal
+          onClose={() => setShowCreate(false)}
+          onCreated={(ems) => {
+            setShowCreate(false)
+            fetchList()
+            handleSelect(ems)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -1747,6 +1819,199 @@ function FormRow({ label, children }: { label: string; children: React.ReactNode
     <div>
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
       {children}
+    </div>
+  )
+}
+
+// ── 手動登録モーダル (E-3) ────────────────────────────────
+type ManualEngineerForm = {
+  name: string
+  age: string
+  affiliation_type: string
+  affiliation: string
+  available_from: string
+  nearest_station: string
+  skills: string
+  unit_price_min: string
+  unit_price_max: string
+  from_address: string
+  body_text: string
+}
+
+function ManualEngineerModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void
+  onCreated: (ems: EngineerMail) => void
+}) {
+  const [f, setF] = useState<ManualEngineerForm>({
+    name: '', age: '', affiliation_type: '', affiliation: '',
+    available_from: '', nearest_station: '', skills: '',
+    unit_price_min: '', unit_price_max: '', from_address: '', body_text: '',
+  })
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const set = <K extends keyof ManualEngineerForm>(k: K, v: ManualEngineerForm[K]) =>
+    setF(p => ({ ...p, [k]: v }))
+
+  const splitSkills = (s: string) =>
+    s.split(/[,、，\n]/).map(x => x.trim()).filter(Boolean)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!f.name.trim()) {
+      setError('氏名は必須です')
+      return
+    }
+    if (!f.unit_price_min && !f.unit_price_max) {
+      setError('単価は下限・上限のいずれかが必須です (35万未満は除外扱いになります)')
+      return
+    }
+    setSubmitting(true); setError(null)
+    try {
+      const payload: Record<string, unknown> = { name: f.name.trim() }
+      if (f.age)                     payload.age              = Number(f.age)
+      if (f.affiliation_type)        payload.affiliation_type = f.affiliation_type
+      if (f.affiliation.trim())      payload.affiliation      = f.affiliation.trim()
+      if (f.available_from.trim())   payload.available_from   = f.available_from.trim()
+      if (f.nearest_station.trim())  payload.nearest_station  = f.nearest_station.trim()
+      if (f.from_address.trim())     payload.from_address     = f.from_address.trim()
+      if (f.unit_price_min)          payload.unit_price_min   = Number(f.unit_price_min)
+      if (f.unit_price_max)          payload.unit_price_max   = Number(f.unit_price_max)
+      const sk = splitSkills(f.skills); if (sk.length) payload.skills = sk
+      if (f.body_text.trim())        payload.body_text        = f.body_text.trim()
+
+      const res = await axios.post('/api/v1/engineer-mails/manual', payload)
+      onCreated(res.data)
+    } catch (err) {
+      const e = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }
+      const msg = e.response?.data?.message
+                ?? Object.values(e.response?.data?.errors ?? {}).flat()[0]
+                ?? '登録に失敗しました'
+      setError(msg)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+         onClick={onClose}>
+      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+           onClick={e => e.stopPropagation()}>
+        <form onSubmit={handleSubmit}>
+          <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
+            <h2 className="text-lg font-semibold text-gray-900">技術者メール 新規登録</h2>
+            <button type="button" onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          </div>
+
+          <div className="px-5 py-4 space-y-3">
+            <p className="text-xs text-gray-500">
+              LINE や個別メールで受け取った技術者情報を登録します。単価が必須です (35万未満は除外扱い)。
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormRow label="氏名 *">
+                <input type="text" required value={f.name}
+                  onChange={e => set('name', e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+              <FormRow label="年齢">
+                <input type="number" min={18} max={99} value={f.age}
+                  onChange={e => set('age', e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormRow label="所属区分">
+                <select value={f.affiliation_type}
+                  onChange={e => set('affiliation_type', e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5">
+                  <option value="">未指定</option>
+                  <option value="自社正社員">自社正社員</option>
+                  <option value="一社先正社員">一社先正社員</option>
+                  <option value="BP">BP</option>
+                  <option value="BP要員">BP要員</option>
+                  <option value="契約社員">契約社員</option>
+                  <option value="個人事業主">個人事業主 / フリーランス</option>
+                  <option value="入社予定">入社予定</option>
+                  <option value="採用予定">採用予定</option>
+                </select>
+              </FormRow>
+              <FormRow label="所属会社名">
+                <input type="text" value={f.affiliation}
+                  onChange={e => set('affiliation', e.target.value)}
+                  placeholder="株式会社〇〇"
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormRow label="稼働開始">
+                <input type="text" value={f.available_from}
+                  onChange={e => set('available_from', e.target.value)}
+                  placeholder="即日 / 2026-06"
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+              <FormRow label="最寄り駅">
+                <input type="text" value={f.nearest_station}
+                  onChange={e => set('nearest_station', e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+            </div>
+
+            <FormRow label="スキル (カンマ・改行区切り)">
+              <textarea rows={2} value={f.skills}
+                onChange={e => set('skills', e.target.value)}
+                placeholder="Java, Spring, AWS"
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+            </FormRow>
+
+            <div className="grid grid-cols-3 gap-3">
+              <FormRow label="希望単価下限 (万円)">
+                <input type="number" value={f.unit_price_min}
+                  onChange={e => set('unit_price_min', e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+              <FormRow label="希望単価上限 (万円)">
+                <input type="number" value={f.unit_price_max}
+                  onChange={e => set('unit_price_max', e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+              <FormRow label="紹介元メール">
+                <input type="email" value={f.from_address}
+                  onChange={e => set('from_address', e.target.value)}
+                  placeholder="bp@example.com"
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+              </FormRow>
+            </div>
+
+            <FormRow label="メモ・備考 (本文に追記されます)">
+              <textarea rows={3} value={f.body_text}
+                onChange={e => set('body_text', e.target.value)}
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+            </FormRow>
+
+            {error && <p className="text-sm text-red-600">{error}</p>}
+          </div>
+
+          <div className="px-5 py-3 border-t border-gray-200 flex justify-end gap-2 sticky bottom-0 bg-white">
+            <button type="button" onClick={onClose}
+              className="px-4 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">
+              キャンセル
+            </button>
+            <button type="submit" disabled={submitting}
+              className="px-4 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1.5">
+              {submitting && <Spinner size={11} />}
+              {submitting ? '登録中...' : '登録'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
