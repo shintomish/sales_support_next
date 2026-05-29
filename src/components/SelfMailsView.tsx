@@ -120,6 +120,40 @@ export default function SelfMailsView() {
   const [dropOver, setDropOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // ── ペイン分割幅 (ドラッグでリサイズ。localStorage で永続化) ──
+  const splitContainerRef = useRef<HTMLDivElement>(null)
+  const [leftPct, setLeftPct] = useState<number>(() => {
+    if (typeof window === 'undefined') return 50
+    const v = Number(localStorage.getItem('selfMailsView:leftPct'))
+    return v >= 20 && v <= 80 ? v : 50
+  })
+  const [dragging, setDragging] = useState(false)
+  useEffect(() => {
+    if (!dragging) return
+    const onMove = (e: MouseEvent) => {
+      const el = splitContainerRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const pct = ((e.clientX - rect.left) / rect.width) * 100
+      const clamped = Math.max(20, Math.min(80, pct))
+      setLeftPct(clamped)
+    }
+    const onUp = () => {
+      setDragging(false)
+      try { localStorage.setItem('selfMailsView:leftPct', String(leftPct)) } catch { /* ignore */ }
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [dragging, leftPct])
+
   useEffect(() => {
     axios.get('/api/v1/emails/self-owners')
       .then(res => setOwners(res.data.owners ?? []))
@@ -226,9 +260,10 @@ export default function SelfMailsView() {
   }
 
   return (
-    <div className="flex h-full min-h-0">
+    <div ref={splitContainerRef} className="flex h-full min-h-0">
       {/* 左ペイン: 宛先 + 検索 + 一覧 */}
-      <div className="w-1/2 flex flex-col min-h-0 border-r border-gray-200">
+      <div className="flex flex-col min-h-0 border-r border-gray-200"
+           style={{ width: `${leftPct}%` }}>
         {/* 宛先（担当者）ドロップダウン */}
         <div className="flex items-center gap-2 p-3 border-b border-gray-200">
           <label className="text-xs text-gray-500 flex-shrink-0">宛先</label>
@@ -301,8 +336,19 @@ export default function SelfMailsView() {
         </div>
       </div>
 
+      {/* リサイザー (ドラッグで左右ペイン幅を変更) */}
+      <div
+        onMouseDown={() => setDragging(true)}
+        onDoubleClick={() => { setLeftPct(50); try { localStorage.setItem('selfMailsView:leftPct', '50') } catch { /* ignore */ } }}
+        className={`relative w-1 flex-shrink-0 cursor-col-resize group ${dragging ? 'bg-teal-400' : 'bg-gray-200 hover:bg-teal-300'}`}
+        title="ドラッグで幅を調整 / ダブルクリックで 50% にリセット"
+      >
+        {/* 当たり判定を太くするオーバーレイ */}
+        <div className="absolute inset-y-0 -left-1 -right-1" />
+      </div>
+
       {/* 右ペイン: 詳細 */}
-      <div className="w-1/2 overflow-y-auto p-4">
+      <div className="overflow-y-auto p-4 flex-1 min-w-0">
         {selected ? (
           <div>
             <p className="text-sm font-semibold text-gray-900 mb-1">{selected.subject || '(件名なし)'}</p>
