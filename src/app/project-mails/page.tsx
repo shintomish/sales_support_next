@@ -282,28 +282,38 @@ export default function ProjectMailsPage() {
     router.replace('/project-mails')
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 選択��に詳細取得
+  // 連続クリック時の async race 対策 (docs/730 §High #5):
+  // 古いレスポンスが新しい選択を上書きしないよう、選択 id を ref で追跡。
+  const currentSelectedIdRef = useRef<number | null>(null)
+
+  // 選択時に詳細取得
   const handleSelect = async (item: ProjectMail) => {
+    currentSelectedIdRef.current = item.id
     setDetailLoading(true)
     setSelected(null)
     setThreadItems([])
     setReplyForm(null)
     try {
       const res = await axios.get(`/api/v1/project-mails/${item.id}`)
+      if (currentSelectedIdRef.current !== item.id) return
       setSelected(res.data)
       setForm(res.data)
       setSaveMsg(null)
       setShowBody(false)
     } finally {
-      setDetailLoading(false)
+      if (currentSelectedIdRef.current === item.id) setDetailLoading(false)
     }
     // スレッド取得（非同期）
     setThreadLoading(true)
     try {
       const tres = await axios.get(`/api/v1/project-mails/${item.id}/thread`)
+      if (currentSelectedIdRef.current !== item.id) return
       setThreadItems(tres.data.thread ?? [])
-    } catch { setThreadItems([]) }
-    finally { setThreadLoading(false) }
+    } catch {
+      if (currentSelectedIdRef.current === item.id) setThreadItems([])
+    } finally {
+      if (currentSelectedIdRef.current === item.id) setThreadLoading(false)
+    }
   }
 
   // スレッド再取得

@@ -181,16 +181,24 @@ export default function SelfMailsView() {
 
   useEffect(() => { fetchList() }, [fetchList])
 
+  // 連続クリック時の async race 対策 (docs/730 §High #5):
+  // 古いレスポンスが新しい選択を上書きしないよう、選択 id を ref で追跡。
+  const currentSelectedIdRef = useRef<number | null>(null)
+
   // 行選択: 本文は一覧データに含まれるが添付一覧は詳細取得が必要
   // 別メール選択時は返信フォームを閉じる (誤送信防止)
   const openMail = (m: MailRow) => {
+    currentSelectedIdRef.current = m.id
     setSelected(m)
     setAttachments([])
     setReplyForm(null)
     setReplyMsg(null)
     if (m.attachments_count && m.attachments_count > 0) {
       axios.get(`/api/v1/emails/${m.id}`)
-        .then(res => setAttachments(res.data.attachments ?? []))
+        .then(res => {
+          if (currentSelectedIdRef.current !== m.id) return
+          setAttachments(res.data.attachments ?? [])
+        })
         .catch(() => {})
     }
   }
