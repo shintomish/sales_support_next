@@ -2,7 +2,8 @@ import apiClient from '@/lib/axios';
 
 /**
  * バックエンド SignedScanUploadService::buildDownloadFilename と同じ規約でファイル名を組み立てる。
- * 例: INV-SBC-202604-001-株式会社S.B.C-太陽光パネル設置に伴う事前調査.pdf
+ * 例: INV-SBC-202604-001-株式会社S.B.C様-太陽光パネル設置に伴う事前調査.pdf
+ * 顧客名には敬称「様」を付与。
  */
 export function buildSignedScanFilename(inv: {
   invoice_number?: string | null;
@@ -16,7 +17,9 @@ export function buildSignedScanFilename(inv: {
       .replace(/_+/g, '_')
       .replace(/^_|_$/g, '')
       .slice(0, 30);
-  const parts = [inv.invoice_number, sanitize(inv.customer_name_snapshot), sanitize(inv.subject_name)].filter((s) => s);
+  const customerSan = sanitize(inv.customer_name_snapshot);
+  const customer = customerSan !== '' ? customerSan + '様' : '';
+  const parts = [inv.invoice_number, customer, sanitize(inv.subject_name)].filter((s) => s);
   return parts.join('-') + '.pdf';
 }
 
