@@ -7,6 +7,8 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Toast from '@/components/Toast';
+import SignedScanUploadModal from '@/components/SignedScanUploadModal';
+import { buildSignedScanFilename, downloadSignedScanPdf } from '@/lib/signedScan';
 import { useAuthStore } from '@/store/authStore';
 
 interface InvoiceLine {
@@ -69,6 +71,8 @@ interface Invoice {
   tax: string;
   total: string;
   pdf_path: string | null;
+  signed_scan_pdf_path: string | null;
+  signed_scan_uploaded_at: string | null;
   customer_name_snapshot: string | null;
   engineer_name_snapshot: string | null;
   customer?: { id: number; company_name: string };
@@ -110,6 +114,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [busy,    setBusy]    = useState(false);
   const [toast,   setToast]   = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [signedScanOpen, setSignedScanOpen] = useState(false);
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToastType(type);
     setToast(message);
@@ -644,6 +649,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-6xl mx-auto w-full">
       <Toast message={toast} type={toastType} onClose={() => setToast(null)} />
+      <SignedScanUploadModal
+        open={signedScanOpen}
+        onClose={() => setSignedScanOpen(false)}
+        onComplete={fetchData}
+        fixedInvoiceId={invoice.id}
+      />
       <div className="flex-shrink-0 mb-4">
         <Link
           href={invoice.doc_type === 'estimate' ? '/estimates'
@@ -675,6 +686,25 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             {invoice.doc_type === 'purchase_order' && invoice.acknowledgement_pdf_path && (
               <a href={invoice.acknowledgement_pdf_path} target="_blank" rel="noreferrer"
                  className="text-blue-600 hover:underline text-sm">📄 注文請書 PDF</a>
+            )}
+            {invoice.signed_scan_pdf_path && (invoice.doc_type === 'invoice' || invoice.doc_type === 'purchase_order') && (
+              <button
+                type="button"
+                onClick={() => downloadSignedScanPdf(Number(id), (m) => showToast(m, 'error'))}
+                className="text-emerald-700 hover:underline text-sm"
+                title={buildSignedScanFilename(invoice)}
+              >
+                📑 捺印スキャンPDF
+              </button>
+            )}
+            {invoice.approval_status === 'approved' && (invoice.doc_type === 'invoice' || invoice.doc_type === 'purchase_order') && (
+              <button
+                type="button"
+                onClick={() => setSignedScanOpen(true)}
+                className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-700"
+              >
+                {invoice.signed_scan_pdf_path ? '📎 スキャン再アップロード' : '📎 捺印スキャンアップロード'}
+              </button>
             )}
           </div>
         </div>

@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import SortableHeader from '@/components/SortableHeader';
 import Toast from '@/components/Toast';
+import SignedScanUploadModal from '@/components/SignedScanUploadModal';
+import { buildSignedScanFilename, downloadSignedScanPdf } from '@/lib/signedScan';
 import { useAuthStore } from '@/store/authStore';
 
 type ApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejected';
@@ -25,7 +27,9 @@ interface InvoiceListItem {
   approval_comment: string | null;
   total: string;
   customer_name_snapshot: string | null;
+  subject_name: string | null;
   pdf_path: string | null;
+  signed_scan_pdf_path: string | null;
   customer?: { id: number; company_name: string } | null;
   deal?: { id: number; title: string } | null;
 }
@@ -87,10 +91,13 @@ export default function InvoicesPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [toast, setToast]         = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [signedScanOpen, setSignedScanOpen] = useState(false);
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToastType(type);
     setToast(message);
   };
+
+  const openSignedScan = (id: number) => downloadSignedScanPdf(id, (m) => showToast(m, 'error'));
 
   const handleApprove = async (id: number) => {
     if (!confirm('この請求書を承認しますか？')) return;
@@ -226,10 +233,20 @@ export default function InvoicesPage() {
           <h1 className="text-2xl font-bold text-gray-800">請求書一覧</h1>
           <p className="text-xs text-gray-400 mt-1">案件×月の請求書を発行・編集・PDF 出力</p>
         </div>
-        <Link href="/billing-summaries">
-          <Button variant="outline">← 請求書作成から発行</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setSignedScanOpen(true)}>
+            📎 捺印スキャンアップロード
+          </Button>
+          <Link href="/billing-summaries">
+            <Button variant="outline">← 請求書作成から発行</Button>
+          </Link>
+        </div>
       </div>
+      <SignedScanUploadModal
+        open={signedScanOpen}
+        onClose={() => setSignedScanOpen(false)}
+        onComplete={fetchData}
+      />
 
       <div className="flex-shrink-0 flex flex-wrap items-end gap-3 mb-4 bg-white p-4 rounded-lg border border-gray-200">
         <div>
@@ -299,6 +316,9 @@ export default function InvoicesPage() {
               <div className="flex gap-3">
                 {r.pdf_path && (
                   <a href={r.pdf_path} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">📄 PDF</a>
+                )}
+                {r.signed_scan_pdf_path && (
+                  <button onClick={() => openSignedScan(r.id)} title={buildSignedScanFilename(r)} className="text-xs text-emerald-700 hover:underline">📑 スキャン</button>
                 )}
                 <Link href={`/invoices/${r.id}`} className="text-xs text-gray-700 hover:underline">詳細</Link>
                 <button
@@ -419,9 +439,14 @@ export default function InvoicesPage() {
                     </div>
                   </td>
                   <td className="px-2 py-3 text-center">
-                    {r.pdf_path
-                      ? <a href={r.pdf_path} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs">📄 開く</a>
-                      : <span className="text-gray-300 text-xs">-</span>}
+                    <div className="flex flex-col items-center gap-0.5">
+                      {r.pdf_path
+                        ? <a href={r.pdf_path} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs">📄 開く</a>
+                        : <span className="text-gray-300 text-xs">-</span>}
+                      {r.signed_scan_pdf_path && (
+                        <button onClick={() => openSignedScan(r.id)} title={buildSignedScanFilename(r)} className="text-emerald-700 hover:underline text-xs">📑 スキャン</button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-2 py-3 text-center">
                     <div className="flex items-center justify-center gap-2">
