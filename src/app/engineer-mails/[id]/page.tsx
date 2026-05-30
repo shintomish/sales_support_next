@@ -8,6 +8,7 @@ import RequirementMatchAccordion from '@/components/RequirementMatchAccordion'
 import { pickMailBody, buildEmailBody, extractRecipientName, type EmailBodyTemplate } from '@/lib/mailBody'
 import { isSameDomain, extractDomain } from '@/lib/mailDomain'
 import { formatMatchTableMarkdown, insertMatchTableIntoBody, removeMatchTableFromBody } from '@/lib/requirementCategoryLabel'
+import { mapLimit } from '@/lib/mapLimit'
 import { useAuthStore } from '@/store/authStore'
 
 // ── 型定義 ──────────────────────────────────────────
@@ -1006,10 +1007,15 @@ export default function EngineerMailMatchingPage() {
           return
         }
         // 対照表フィルタ ON → 各 PMS で対照表を並列取得し、必須×案件を一覧から除外
+        // 同時実行数を絞り、上限件数も制限して Claude API のレート/コストを抑える (docs/730 §High #4)
         setMatchFilterLoading(true)
-        setMatchFilterProgress({ done: 0, total: items.length })
+        const MATCH_BATCH_LIMIT = 30        // 1 リクエストで処理する最大件数 (上回る分は対照表評価せず表示)
+        const MATCH_CONCURRENCY = 5         // 同時 Claude API 呼び出し数
+        const targets = items.slice(0, MATCH_BATCH_LIMIT)
+        const overflow = items.slice(MATCH_BATCH_LIMIT)
+        setMatchFilterProgress({ done: 0, total: targets.length })
         let done = 0
-        const results = await Promise.all(items.map(async item => {
+        const evaluated = await mapLimit(targets, MATCH_CONCURRENCY, async (item) => {
           try {
             const mr = await axios.get(`/api/v1/project-mails/${item.project_mail_id}/requirement-match`, {
               params: { ems_id: Number(id) },
@@ -1024,9 +1030,11 @@ export default function EngineerMailMatchingPage() {
             return { item, hasMustCross: false }
           } finally {
             done += 1
-            if (!cancelled) setMatchFilterProgress({ done, total: items.length })
+            if (!cancelled) setMatchFilterProgress({ done, total: targets.length })
           }
-        }))
+        })
+        // 上限超過分は対照表評価をスキップして表示
+        const results = [...evaluated, ...overflow.map(item => ({ item, hasMustCross: false }))]
         if (cancelled) return
         setFreshItems(results.filter(r => !r.hasMustCross).map(r => r.item))
       })

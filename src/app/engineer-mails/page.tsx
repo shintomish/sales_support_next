@@ -413,8 +413,14 @@ export default function EngineerMailsPage() {
     router.replace('/engineer-mails')
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 連続クリック時の async race 対策 (docs/730 §High #5):
+  // 古いレスポンスが新しい選択を上書きしないよう、現在選択 id を ref に保持し
+  // 各 await 後に「ref がまだこの id か」を確認してから setState する。
+  const currentSelectedIdRef = useRef<number | null>(null)
+
   // 選択時に詳細取得
   const handleSelect = async (item: EngineerMail) => {
+    currentSelectedIdRef.current = item.id
     setDetailLoading(true)
     setSelected(null)
     setMatchedProjects([])
@@ -423,29 +429,35 @@ export default function EngineerMailsPage() {
     setReplyForm(null)
     try {
       const res = await axios.get(`/api/v1/engineer-mails/${item.id}`)
+      if (currentSelectedIdRef.current !== item.id) return
       setSelected(res.data)
       setForm(res.data)
       setSkillInput('')
       setSaveMsg(null)
       setShowBody(false)
     } finally {
-      setDetailLoading(false)
+      if (currentSelectedIdRef.current === item.id) setDetailLoading(false)
     }
     // マッチ案件を非同期取得
     setMatchLoading(true)
     try {
       const mres = await axios.get(`/api/v1/engineer-mails/${item.id}/matched-projects`)
+      if (currentSelectedIdRef.current !== item.id) return
       setMatchedProjects(mres.data.data ?? [])
     } catch { /* silent */ } finally {
-      setMatchLoading(false)
+      if (currentSelectedIdRef.current === item.id) setMatchLoading(false)
     }
     // スレッド取得（非同期）
     setThreadLoading(true)
     try {
       const tres = await axios.get(`/api/v1/engineer-mails/${item.id}/thread`)
+      if (currentSelectedIdRef.current !== item.id) return
       setThreadItems(tres.data.thread ?? [])
-    } catch { setThreadItems([]) }
-    finally { setThreadLoading(false) }
+    } catch {
+      if (currentSelectedIdRef.current === item.id) setThreadItems([])
+    } finally {
+      if (currentSelectedIdRef.current === item.id) setThreadLoading(false)
+    }
   }
 
   // スレッド再取得
