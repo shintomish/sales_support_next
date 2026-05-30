@@ -128,14 +128,18 @@ export default function EmailsPage() {
   }, [page, appliedSearch, unreadOnly])
 
   // 全件既読 (非同期ジョブ化 / rescore-all と同パターン)
-  // POST /mark-all-read で job 登録 → /mark-read-status をポーリングして進捗表示
+  // POST /mark-all-read で job 登録 → /mark-read-status をポーリングして進捗表示。
+  // mountedRef で unmount 後の setTimeout 再発と setState 警告を防ぐ (docs/730 §Medium #16)。
+  const pollMarkReadMountedRef = useRef(true)
+  useEffect(() => () => { pollMarkReadMountedRef.current = false }, [])
   const pollMarkReadStatus = useCallback(() => {
     axios.get('/api/v1/emails/mark-read-status').then(res => {
+      if (!pollMarkReadMountedRef.current) return
       const job = res.data.job
       if (job && (job.status === 'pending' || job.status === 'processing')) {
         setMarkingAllRead(true)
         setSyncMessage(`既読化中: ${job.processed_count ?? 0} / ${job.total_count ?? 0}件`)
-        setTimeout(pollMarkReadStatus, 3000)
+        setTimeout(() => { if (pollMarkReadMountedRef.current) pollMarkReadStatus() }, 3000)
       } else if (job && job.status === 'completed') {
         setMarkingAllRead(false)
         setSyncMessage(`完了: ${job.total_count}件を既読にしました`)
@@ -147,7 +151,7 @@ export default function EmailsPage() {
       } else {
         setMarkingAllRead(false)
       }
-    }).catch(() => { setMarkingAllRead(false) })
+    }).catch(() => { if (pollMarkReadMountedRef.current) setMarkingAllRead(false) })
   }, [])
 
   const handleMarkAllRead = async () => {
@@ -172,11 +176,12 @@ export default function EmailsPage() {
   // ページ表示時、進行中の既読ジョブがあれば進捗表示を復帰（ブラウザを閉じても継続するため）
   useEffect(() => {
     axios.get('/api/v1/emails/mark-read-status').then(res => {
+      if (!pollMarkReadMountedRef.current) return
       const job = res.data.job
       if (job && (job.status === 'pending' || job.status === 'processing')) {
         setMarkingAllRead(true)
         setSyncMessage(`既読化中: ${job.processed_count ?? 0} / ${job.total_count ?? 0}件`)
-        setTimeout(pollMarkReadStatus, 3000)
+        setTimeout(() => { if (pollMarkReadMountedRef.current) pollMarkReadStatus() }, 3000)
       }
     }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps

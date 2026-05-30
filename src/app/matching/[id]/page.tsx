@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 import OriginalMailAccordion from '@/components/OriginalMailAccordion'
@@ -1432,7 +1432,10 @@ function FreshEmsList({
       </div>
     )
   }
-  const sorted = [...items].sort((a, b) => b.score - a.score)
+  // items の参照が変わらない限り再ソートしない (docs/730 §Low #35)。
+  // 親 (matching/[id]) 側で頻繁に再 render されるため、O(n log n) コピー+ソートを抑える。
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const sorted = useMemo(() => [...items].sort((a, b) => b.score - a.score), [items])
 
   // ── リスト(テーブル)表示 ──
   if (viewMode === 'list') {

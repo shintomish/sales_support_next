@@ -225,7 +225,7 @@ function DealsPage() {
         apiClient.get('/api/v1/deals', {
           params: { search, status: statusFilter, customer_id: customerFilter, amount_min: amountMin, amount_max: amountMax, page, user_id: userFilter, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined },
         }),
-        apiClient.get('/api/v1/customers', { params: { page: 1 } }),
+        apiClient.get('/api/v1/customers', { params: { page: 1, per_page: 500 } }),
         // カンバン・グラフ用に全件取得（ページなし・最大200件）
         apiClient.get('/api/v1/deals', { params: { page: 1, per_page: 200 } }),
       ]);

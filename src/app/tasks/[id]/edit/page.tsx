@@ -48,8 +48,8 @@ export default function TaskEditPage() {
     try {
       const [taskRes, cRes, dRes] = await Promise.all([
         apiClient.get(`/api/v1/tasks/${id}`),
-        apiClient.get('/api/v1/customers', { params: { page: 1 } }),
-        apiClient.get('/api/v1/deals',     { params: { page: 1 } }),
+        apiClient.get('/api/v1/customers', { params: { page: 1, per_page: 500 } }),
+        apiClient.get('/api/v1/deals',     { params: { page: 1, per_page: 500 } }),
       ]);
       const t = taskRes.data.data ?? taskRes.data;
       setForm({
@@ -81,7 +81,7 @@ export default function TaskEditPage() {
 
   useEffect(() => {
     if (!isDirty) return;
-    const handler = (e: BeforeUnloadEvent) => e.preventDefault();
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);

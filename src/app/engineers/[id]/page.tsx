@@ -83,6 +83,7 @@ export default function EngineerDetailPage() {
   const [saving, setSaving]       = useState(false);
   const [errors, setErrors]       = useState<Record<string, string>>({});
   const [copied, setCopied]       = useState(false);
+  const [deleting, setDeleting]   = useState(false);
 
   // 編集フォームステート
   const [name, setName]             = useState('');
@@ -332,9 +333,21 @@ export default function EngineerDetailPage() {
   };
 
   const handleDelete = async () => {
+    if (deleting) return;
     if (!confirm('この技術者を削除しますか？')) return;
-    await apiClient.delete(`/api/v1/engineers/${id}`);
-    router.push('/engineers');
+    // try/catch なし + busy state なしで「失敗時に黙って遷移」「二度押しで2回 DELETE」していた
+    // のを修正 (docs/730 §Medium #23)。
+    setDeleting(true);
+    try {
+      await apiClient.delete(`/api/v1/engineers/${id}`);
+      router.push('/engineers');
+    } catch (e) {
+      const msg = (e as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message
+        ?? (e as { message?: string }).message
+        ?? '削除に失敗しました';
+      alert(msg);
+      setDeleting(false);
+    }
   };
 
   if (loading) return (

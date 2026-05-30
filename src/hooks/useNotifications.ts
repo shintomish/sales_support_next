@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import apiClient from '@/lib/axios';
 import { supabase } from '@/lib/supabase';
+import { useAuthStore } from '@/store/authStore';
 
 export interface OverdueTask {
   id: number;
@@ -53,6 +54,7 @@ export interface NotificationData {
 export function useNotifications() {
   const [data, setData]       = useState<NotificationData | null>(null);
   const [loading, setLoading] = useState(true);
+  const tenantId = useAuthStore((s) => s.user?.tenant_id);
 
   const fetch = useCallback(async () => {
     try {
@@ -70,21 +72,25 @@ export function useNotifications() {
     // 5分ごとに再取得
     const timer = setInterval(fetch, 5 * 60 * 1000);
 
-    // タスク更新時に即時再取得（期限日変更でバッジを即反映）
-    const channel = supabase
-      .channel('notifications-tasks')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'tasks' },
-        () => { fetch(); }
-      )
-      .subscribe();
+    // タスク更新時に即時再取得 (期限日変更でバッジを即反映)。
+    // channel 名と filter に tenant_id を含めて他テナント UPDATE での無駄 fetch を防ぐ
+    // (docs/730 §Medium #17)。
+    const channel = tenantId
+      ? supabase
+          .channel(`notifications-tasks:${tenantId}`)
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'tasks', filter: `tenant_id=eq.${tenantId}` },
+            () => { fetch(); }
+          )
+          .subscribe()
+      : null;
 
     return () => {
       clearInterval(timer);
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
-  }, [fetch]);
+  }, [fetch, tenantId]);
 
   return { data, loading, refetch: fetch };
 }

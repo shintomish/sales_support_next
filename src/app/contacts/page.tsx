@@ -68,7 +68,7 @@ function ContactsPage() {
       setError(null);
       const [cRes, cusRes] = await Promise.all([
         apiClient.get('/api/v1/contacts', { params: { search, customer_id: customerFilter, page, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined } }),
-        apiClient.get('/api/v1/customers', { params: { page: 1 } }),
+        apiClient.get('/api/v1/customers', { params: { page: 1, per_page: 500 } }),
       ]);
       setContacts(cRes.data.data);
       setMeta(cRes.data.meta);

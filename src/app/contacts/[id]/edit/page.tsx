@@ -39,7 +39,7 @@ export default function ContactEditPage() {
     try {
       const [contactRes, customersRes] = await Promise.all([
         apiClient.get(`/api/v1/contacts/${id}`),
-        apiClient.get('/api/v1/customers', { params: { page: 1 } }),
+        apiClient.get('/api/v1/customers', { params: { page: 1, per_page: 500 } }),
       ]);
       const c = contactRes.data.data ?? contactRes.data;
       setForm({
@@ -62,7 +62,7 @@ export default function ContactEditPage() {
 
   useEffect(() => {
     if (!isDirty) return;
-    const handler = (e: BeforeUnloadEvent) => e.preventDefault();
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);

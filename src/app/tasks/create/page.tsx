@@ -44,8 +44,8 @@ export default function TaskCreatePage() {
   const fetchMasters = useCallback(async () => {
     try {
       const [cRes, dRes] = await Promise.all([
-        apiClient.get('/api/v1/customers', { params: { page: 1 } }),
-        apiClient.get('/api/v1/deals',     { params: { page: 1 } }),
+        apiClient.get('/api/v1/customers', { params: { page: 1, per_page: 500 } }),
+        apiClient.get('/api/v1/deals',     { params: { page: 1, per_page: 500 } }),
       ]);
       setCustomers(cRes.data.data);
       setDeals(dRes.data.data);

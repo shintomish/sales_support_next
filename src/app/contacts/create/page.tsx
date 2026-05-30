@@ -34,7 +34,7 @@ export default function ContactCreatePage() {
 
   const fetchCustomers = useCallback(async () => {
     try {
-      const res = await apiClient.get('/api/v1/customers', { params: { page: 1 } });
+      const res = await apiClient.get('/api/v1/customers', { params: { page: 1, per_page: 500 } });
       setCustomers(res.data.data);
     } catch { /* silent */ }
   }, []);

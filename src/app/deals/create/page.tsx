@@ -37,8 +37,8 @@ export default function DealCreatePage() {
   const fetchMasters = useCallback(async () => {
     try {
       const [cRes, coRes] = await Promise.all([
-        apiClient.get('/api/v1/customers', { params: { page: 1 } }),
-        apiClient.get('/api/v1/contacts',  { params: { page: 1 } }),
+        apiClient.get('/api/v1/customers', { params: { page: 1, per_page: 500 } }),
+        apiClient.get('/api/v1/contacts',  { params: { page: 1, per_page: 500 } }),
       ]);
       setCustomers(cRes.data.data);
       setContacts(coRes.data.data);

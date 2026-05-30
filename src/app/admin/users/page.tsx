@@ -67,6 +67,8 @@ export default function AdminUsersPage() {
   // ダイアログ
   const [showCreate, setShowCreate] = useState(false);
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
+  // 招待再送の連打防止 (Supabase Auth レート制限 + 二重招待メール送信防止 / docs/730 §Low #39)
+  const [resendingId, setResendingId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
 
   // ページネーション
@@ -215,17 +217,22 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3 text-right space-x-1">
                     <button className="text-xs px-2 py-1 rounded hover:bg-blue-100 text-blue-600"
                       onClick={() => setEditTarget(u)}>編集</button>
-                    <button className="text-xs px-2 py-1 rounded hover:bg-amber-100 text-amber-600"
+                    <button className="text-xs px-2 py-1 rounded hover:bg-amber-100 text-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={resendingId === u.id}
                       onClick={async () => {
+                        if (resendingId !== null) return;
                         if (!confirm(`${u.email} に招待メールを再送しますか？`)) return;
+                        setResendingId(u.id);
                         try {
                           await apiClient.post(`/api/v1/users/${u.id}/resend-invite`);
                           alert('招待メールを再送しました');
                         } catch (err: unknown) {
                           const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '再送に失敗しました';
                           alert(msg);
+                        } finally {
+                          setResendingId(null);
                         }
-                      }}>招待再送</button>
+                      }}>{resendingId === u.id ? '送信中…' : '招待再送'}</button>
                     <button className="text-xs px-2 py-1 rounded hover:bg-red-100 text-red-600"
                       onClick={() => setDeleteTarget(u)} disabled={u.id === me.id}>削除</button>
                   </td>

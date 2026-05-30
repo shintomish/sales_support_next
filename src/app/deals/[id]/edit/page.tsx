@@ -41,8 +41,8 @@ export default function DealEditPage() {
     try {
       const [dealRes, cRes, coRes] = await Promise.all([
         apiClient.get(`/api/v1/deals/${id}`),
-        apiClient.get('/api/v1/customers', { params: { page: 1 } }),
-        apiClient.get('/api/v1/contacts',  { params: { page: 1 } }),
+        apiClient.get('/api/v1/customers', { params: { page: 1, per_page: 500 } }),
+        apiClient.get('/api/v1/contacts',  { params: { page: 1, per_page: 500 } }),
       ]);
       const d = dealRes.data.data ?? dealRes.data;
       setForm({
@@ -76,7 +76,7 @@ export default function DealEditPage() {
 
   useEffect(() => {
     if (!isDirty) return;
-    const handler = (e: BeforeUnloadEvent) => e.preventDefault();
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);

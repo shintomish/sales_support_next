@@ -45,9 +45,9 @@ export default function ActivityEditPage() {
     try {
       const [actRes, cRes, coRes, dRes] = await Promise.all([
         apiClient.get(`/api/v1/activities/${id}`),
-        apiClient.get('/api/v1/customers', { params: { page: 1 } }),
-        apiClient.get('/api/v1/contacts',  { params: { page: 1 } }),
-        apiClient.get('/api/v1/deals',     { params: { page: 1 } }),
+        apiClient.get('/api/v1/customers', { params: { page: 1, per_page: 500 } }),
+        apiClient.get('/api/v1/contacts',  { params: { page: 1, per_page: 500 } }),
+        apiClient.get('/api/v1/deals',     { params: { page: 1, per_page: 500 } }),
       ]);
       const a = actRes.data.data ?? actRes.data;
       setForm({
@@ -82,7 +82,7 @@ export default function ActivityEditPage() {
 
   useEffect(() => {
     if (!isDirty) return;
-    const handler = (e: BeforeUnloadEvent) => e.preventDefault();
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);

@@ -438,26 +438,18 @@ export default function EngineerMailsPage() {
     } finally {
       if (currentSelectedIdRef.current === item.id) setDetailLoading(false)
     }
-    // マッチ案件を非同期取得
+    // マッチ案件とスレッドは互いに独立なので Promise.all で並列化 (docs/730 §Low #36)
     setMatchLoading(true)
-    try {
-      const mres = await axios.get(`/api/v1/engineer-mails/${item.id}/matched-projects`)
-      if (currentSelectedIdRef.current !== item.id) return
-      setMatchedProjects(mres.data.data ?? [])
-    } catch { /* silent */ } finally {
-      if (currentSelectedIdRef.current === item.id) setMatchLoading(false)
-    }
-    // スレッド取得（非同期）
     setThreadLoading(true)
-    try {
-      const tres = await axios.get(`/api/v1/engineer-mails/${item.id}/thread`)
-      if (currentSelectedIdRef.current !== item.id) return
-      setThreadItems(tres.data.thread ?? [])
-    } catch {
-      if (currentSelectedIdRef.current === item.id) setThreadItems([])
-    } finally {
-      if (currentSelectedIdRef.current === item.id) setThreadLoading(false)
-    }
+    const [mres, tres] = await Promise.all([
+      axios.get(`/api/v1/engineer-mails/${item.id}/matched-projects`).catch(() => null),
+      axios.get(`/api/v1/engineer-mails/${item.id}/thread`).catch(() => null),
+    ])
+    if (currentSelectedIdRef.current !== item.id) return
+    setMatchedProjects(mres?.data?.data ?? [])
+    setThreadItems(tres?.data?.thread ?? [])
+    setMatchLoading(false)
+    setThreadLoading(false)
   }
 
   // スレッド再取得
@@ -639,14 +631,18 @@ export default function EngineerMailsPage() {
   const currentUser = useAuthStore((s) => s.user)
   const isAdmin = currentUser?.role === 'tenant_admin' || currentUser?.role === 'super_admin'
 
-  // 全件再スコアリング（非同期ジョブ。バックエンドの Schedule tick が処理し進捗をポーリング）
+  // 全件再スコアリング（非同期ジョブ。バックエンドの Schedule tick が処理し進捗をポーリング）。
+  // mountedRef で unmount 後の setTimeout 再発を防ぐ (docs/730 §Medium #16)。
+  const pollRescoreMountedRef = useRef(true)
+  useEffect(() => () => { pollRescoreMountedRef.current = false }, [])
   const pollRescoreStatus = () => {
     axios.get('/api/v1/engineer-mails/rescore-status').then(res => {
+      if (!pollRescoreMountedRef.current) return
       const job = res.data.job
       if (job && (job.status === 'pending' || job.status === 'processing')) {
         setRescoring(true)
         setScoreMsg(`再スコア中: ${job.processed_count ?? 0} / ${job.total_count ?? 0}件`)
-        setTimeout(pollRescoreStatus, 3000)
+        setTimeout(() => { if (pollRescoreMountedRef.current) pollRescoreStatus() }, 3000)
       } else if (job && job.status === 'completed') {
         setRescoring(false)
         setScoreMsg(`完了: ${job.total_count}件を再スコアリングしました`)
@@ -657,7 +653,7 @@ export default function EngineerMailsPage() {
       } else {
         setRescoring(false)
       }
-    }).catch(() => { setRescoring(false) })
+    }).catch(() => { if (pollRescoreMountedRef.current) setRescoring(false) })
   }
 
   const handleRescoreAll = async () => {
@@ -675,11 +671,12 @@ export default function EngineerMailsPage() {
   // ページ表示時、進行中の再スコアジョブがあれば進捗表示を復帰（ブラウザを閉じても継続するため）
   useEffect(() => {
     axios.get('/api/v1/engineer-mails/rescore-status').then(res => {
+      if (!pollRescoreMountedRef.current) return
       const job = res.data.job
       if (job && (job.status === 'pending' || job.status === 'processing')) {
         setRescoring(true)
         setScoreMsg(`再スコア中: ${job.processed_count ?? 0} / ${job.total_count ?? 0}件`)
-        setTimeout(pollRescoreStatus, 3000)
+        setTimeout(() => { if (pollRescoreMountedRef.current) pollRescoreStatus() }, 3000)
       }
     }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps

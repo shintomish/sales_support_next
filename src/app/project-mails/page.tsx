@@ -286,34 +286,29 @@ export default function ProjectMailsPage() {
   // 古いレスポンスが新しい選択を上書きしないよう、選択 id を ref で追跡。
   const currentSelectedIdRef = useRef<number | null>(null)
 
-  // 選択時に詳細取得
+  // 選択時に詳細取得。detail と thread は互いに独立なので Promise.all で並列化
+  // (docs/730 §Low #36)。
   const handleSelect = async (item: ProjectMail) => {
     currentSelectedIdRef.current = item.id
     setDetailLoading(true)
+    setThreadLoading(true)
     setSelected(null)
     setThreadItems([])
     setReplyForm(null)
-    try {
-      const res = await axios.get(`/api/v1/project-mails/${item.id}`)
-      if (currentSelectedIdRef.current !== item.id) return
+    const [res, tres] = await Promise.all([
+      axios.get(`/api/v1/project-mails/${item.id}`).catch(() => null),
+      axios.get(`/api/v1/project-mails/${item.id}/thread`).catch(() => null),
+    ])
+    if (currentSelectedIdRef.current !== item.id) return
+    if (res) {
       setSelected(res.data)
       setForm(res.data)
       setSaveMsg(null)
       setShowBody(false)
-    } finally {
-      if (currentSelectedIdRef.current === item.id) setDetailLoading(false)
     }
-    // スレッド取得（非同期）
-    setThreadLoading(true)
-    try {
-      const tres = await axios.get(`/api/v1/project-mails/${item.id}/thread`)
-      if (currentSelectedIdRef.current !== item.id) return
-      setThreadItems(tres.data.thread ?? [])
-    } catch {
-      if (currentSelectedIdRef.current === item.id) setThreadItems([])
-    } finally {
-      if (currentSelectedIdRef.current === item.id) setThreadLoading(false)
-    }
+    setThreadItems(tres?.data?.thread ?? [])
+    setDetailLoading(false)
+    setThreadLoading(false)
   }
 
   // スレッド再取得
@@ -380,14 +375,18 @@ export default function ProjectMailsPage() {
   const currentUser = useAuthStore((s) => s.user)
   const isAdmin = currentUser?.role === 'tenant_admin' || currentUser?.role === 'super_admin'
 
-  // 全件再スコアリング（非同期ジョブ。バックエンドの Schedule tick が処理し進捗をポーリング）
+  // 全件再スコアリング（非同期ジョブ。バックエンドの Schedule tick が処理し進捗をポーリング）。
+  // mountedRef で unmount 後の setTimeout 再発を防ぐ (docs/730 §Medium #16)。
+  const pollRescoreMountedRef = useRef(true)
+  useEffect(() => () => { pollRescoreMountedRef.current = false }, [])
   const pollRescoreStatus = () => {
     axios.get('/api/v1/project-mails/rescore-status').then(res => {
+      if (!pollRescoreMountedRef.current) return
       const job = res.data.job
       if (job && (job.status === 'pending' || job.status === 'processing')) {
         setRescoring(true)
         setScoreMsg(`再スコア中: ${job.processed_count ?? 0} / ${job.total_count ?? 0}件`)
-        setTimeout(pollRescoreStatus, 3000)
+        setTimeout(() => { if (pollRescoreMountedRef.current) pollRescoreStatus() }, 3000)
       } else if (job && job.status === 'completed') {
         setRescoring(false)
         setScoreMsg(`完了: ${job.total_count}件を再スコアリングしました`)
@@ -398,7 +397,7 @@ export default function ProjectMailsPage() {
       } else {
         setRescoring(false)
       }
-    }).catch(() => { setRescoring(false) })
+    }).catch(() => { if (pollRescoreMountedRef.current) setRescoring(false) })
   }
 
   const handleRescoreAll = async () => {
@@ -416,18 +415,21 @@ export default function ProjectMailsPage() {
   // ページ表示時、進行中の再スコアジョブがあれば進捗表示を復帰（ブラウザを閉じても継続するため）
   useEffect(() => {
     axios.get('/api/v1/project-mails/rescore-status').then(res => {
+      if (!pollRescoreMountedRef.current) return
       const job = res.data.job
       if (job && (job.status === 'pending' || job.status === 'processing')) {
         setRescoring(true)
         setScoreMsg(`再スコア中: ${job.processed_count ?? 0} / ${job.total_count ?? 0}件`)
-        setTimeout(pollRescoreStatus, 3000)
+        setTimeout(() => { if (pollRescoreMountedRef.current) pollRescoreStatus() }, 3000)
       }
     }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 抽出情報を全件再計算（バッチ処理で進捗表示）
+  // 抽出情報を全件再計算（バッチ処理で進捗表示）。
+  // 手動編集が上書きされるため確認ダイアログを表示 (docs/730 §Medium #22)。
   const handleReextractAll = async () => {
+    if (!confirm('情報抽出を全件再実行します。手動で編集した抽出情報が上書きされます。よろしいですか？')) return
     setExtracting(true); setScoreMsg('')
     try {
       let total = 0, offset = 0
@@ -450,15 +452,21 @@ export default function ProjectMailsPage() {
     finally { setExtracting(false) }
   }
 
-  // 再スコアリング
+  // 再スコアリング (連打防止 / docs/730 §Low #38)
+  const [rescoringOne, setRescoringOne] = useState(false)
   const handleRescore = async () => {
-    if (!selected) return
+    if (!selected || rescoringOne) return
+    setRescoringOne(true)
     try {
       const res = await axios.post(`/api/v1/project-mails/${selected.id}/rescore`)
       setSelected(res.data)
       setForm(res.data)
       fetchList()
-    } catch { setSaveMsg({ type: 'err', text: '再スコアリングに失敗しました' }) }
+    } catch {
+      setSaveMsg({ type: 'err', text: '再スコアリングに失敗しました' })
+    } finally {
+      setRescoringOne(false)
+    }
   }
 
   // 保存
@@ -905,8 +913,9 @@ export default function ProjectMailsPage() {
                     メール詳細
                   </button>
                   <button onClick={handleRescore}
-                    className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50">
-                    再スコア
+                    disabled={rescoringOne}
+                    className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {rescoringOne ? '再スコア中…' : '再スコア'}
                   </button>
                 </div>
               </div>
