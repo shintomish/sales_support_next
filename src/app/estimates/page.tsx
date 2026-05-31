@@ -16,6 +16,7 @@ interface EstimateListItem {
   valid_until_text: string | null;
   subject_name: string | null;
   status: 'draft' | 'issued';
+  approved: boolean;
   total: string;
   customer_name_snapshot: string | null;
   pdf_path: string | null;
@@ -235,6 +236,21 @@ export default function EstimatesPage() {
     }
   };
 
+  const handleDelete = async (id: number, invoiceNumber: string, status: 'draft' | 'issued') => {
+    const statusLabel = status === 'issued' ? '発行済' : '下書き';
+    if (!confirm(`${invoiceNumber}（${statusLabel}）を削除します。\n誤発行のリカバリ用です。よろしいですか？`)) return;
+    setBusyId(id);
+    try {
+      await apiClient.delete(`/api/v1/invoices/${id}`);
+      fetchData();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '削除に失敗しました';
+      alert(msg);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const sortedItems = useMemo(() => {
     const arr = [...items];
     const key = (r: EstimateListItem): string | number => {
@@ -332,6 +348,14 @@ export default function EstimatesPage() {
                 disabled={busyId === r.id}
                 className="text-xs text-indigo-600 hover:underline disabled:opacity-50"
               >複写</button>
+              {!r.approved && (
+                <button
+                  onClick={() => handleDelete(r.id, r.invoice_number, r.status)}
+                  disabled={busyId === r.id}
+                  className="text-xs text-rose-600 hover:underline disabled:opacity-50"
+                  title="承認済の見積書は削除できません"
+                >削除</button>
+              )}
             </div>
           </div>
         ))}
@@ -389,6 +413,14 @@ export default function EstimatesPage() {
                         className="text-xs text-indigo-600 hover:underline disabled:opacity-50"
                         title="翌月扱いで複写して下書き作成"
                       >複写</button>
+                      {!r.approved && (
+                        <button
+                          onClick={() => handleDelete(r.id, r.invoice_number, r.status)}
+                          disabled={busyId === r.id}
+                          className="text-xs text-rose-600 hover:underline disabled:opacity-50"
+                          title="承認済の見積書は削除できません"
+                        >削除</button>
+                      )}
                     </div>
                   </td>
                 </tr>
