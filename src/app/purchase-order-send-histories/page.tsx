@@ -45,10 +45,8 @@ const recentMonths = (): string[] => {
   return arr;
 };
 
-const previousMonth = (): string => {
+const currentMonth = (): string => {
   const d = new Date();
-  d.setDate(1);
-  d.setMonth(d.getMonth() - 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
@@ -63,7 +61,7 @@ const fmtDateTime = (s: string | null) => {
 export default function PurchaseOrderSendHistoriesPage() {
   const [items,   setItems]   = useState<HistoryRow[]>([]);
   const [total,   setTotal]   = useState(0);
-  const [yearMonth, setYearMonth] = useState<string>(previousMonth());
+  const [yearMonth, setYearMonth] = useState<string>(currentMonth());
   const [status,  setStatus]  = useState<'' | 'sent' | 'failed'>('');
   const [method,  setMethod]  = useState<'' | 'mail' | 'post'>('');
   const [q,       setQ]       = useState('');
