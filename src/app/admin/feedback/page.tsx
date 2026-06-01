@@ -32,6 +32,11 @@ interface PaginatedFeedback {
   total: number;
 }
 
+interface TenantOption {
+  id: number;
+  name: string;
+}
+
 const TYPE_LABEL: Record<FeedbackType, { label: string; color: string }> = {
   bug:     { label: 'バグ',  color: 'bg-red-100 text-red-700'    },
   request: { label: '要望',  color: 'bg-blue-100 text-blue-700'  },
@@ -59,6 +64,8 @@ export default function AdminFeedbackPage() {
   // フィルタ
   const [statusFilter, setStatusFilter] = useState<'' | FeedbackStatus>('');
   const [typeFilter,   setTypeFilter]   = useState<'' | FeedbackType>('');
+  const [tenantFilter, setTenantFilter] = useState<string>(''); // tenant_id (空 = すべて)
+  const [tenants,      setTenants]      = useState<TenantOption[]>([]);
   const [page, setPage] = useState(1);
 
   // 詳細展開
@@ -68,8 +75,9 @@ export default function AdminFeedbackPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (statusFilter) params.set('status', statusFilter);
-      if (typeFilter)   params.set('type',   typeFilter);
+      if (statusFilter) params.set('status',    statusFilter);
+      if (typeFilter)   params.set('type',      typeFilter);
+      if (tenantFilter) params.set('tenant_id', tenantFilter);
       params.set('page',     String(page));
       params.set('per_page', '50');
       const res = await apiClient.get<PaginatedFeedback>(`/api/v1/admin/feedback?${params.toString()}`);
@@ -84,10 +92,10 @@ export default function AdminFeedbackPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, typeFilter, page]);
+  }, [statusFilter, typeFilter, tenantFilter, page]);
 
   // フィルタ変更時は 1 ページ目にリセット
-  useEffect(() => { setPage(1); }, [statusFilter, typeFilter]);
+  useEffect(() => { setPage(1); }, [statusFilter, typeFilter, tenantFilter]);
 
   useEffect(() => {
     if (user && user.role !== 'super_admin') {
@@ -96,6 +104,14 @@ export default function AdminFeedbackPage() {
     }
     fetchData();
   }, [user, router, fetchData]);
+
+  // テナント候補を 1 度だけロード (super_admin のみアクセス可なので /tenants が 200 を返す前提)
+  useEffect(() => {
+    if (!user || user.role !== 'super_admin') return;
+    apiClient.get<TenantOption[]>('/api/v1/tenants')
+      .then((res) => setTenants(res.data ?? []))
+      .catch(() => setTenants([]));
+  }, [user]);
 
   const updateStatus = async (item: FeedbackItem, status: FeedbackStatus) => {
     setBusy(true);
@@ -149,6 +165,19 @@ export default function AdminFeedbackPage() {
               <option value="bug">バグ</option>
               <option value="request">要望</option>
               <option value="other">その他</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">テナント</label>
+            <select
+              value={tenantFilter}
+              onChange={(e) => setTenantFilter(e.target.value)}
+              className="border border-gray-200 rounded px-2 py-1 text-sm"
+            >
+              <option value="">すべて</option>
+              {tenants.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
             </select>
           </div>
           <div className="ml-auto text-xs text-gray-500">全 {total} 件</div>
