@@ -5,6 +5,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import axios from '@/lib/axios'
 import { useAuthStore } from '@/store/authStore'
+import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
@@ -283,13 +284,13 @@ export default function ProjectMailsPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 連続クリック時の async race 対策 (docs/730 §High #5):
-  // 古いレスポンスが新しい選択を上書きしないよう、選択 id を ref で追跡。
-  const currentSelectedIdRef = useRef<number | null>(null)
+  // 古いレスポンスが新しい選択を上書きしないよう、選択 id を hook で追跡。
+  const selectGuard = useStaleResponseGuard<number>()
 
   // 選択時に詳細取得。detail と thread は互いに独立なので Promise.all で並列化
   // (docs/730 §Low #36)。
   const handleSelect = async (item: ProjectMail) => {
-    currentSelectedIdRef.current = item.id
+    selectGuard.mark(item.id)
     setDetailLoading(true)
     setThreadLoading(true)
     setSelected(null)
@@ -299,7 +300,7 @@ export default function ProjectMailsPage() {
       axios.get(`/api/v1/project-mails/${item.id}`).catch(() => null),
       axios.get(`/api/v1/project-mails/${item.id}/thread`).catch(() => null),
     ])
-    if (currentSelectedIdRef.current !== item.id) return
+    if (selectGuard.isStale(item.id)) return
     if (res) {
       setSelected(res.data)
       setForm(res.data)

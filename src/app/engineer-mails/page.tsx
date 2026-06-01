@@ -5,6 +5,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import axios from '@/lib/axios'
 import { useAuthStore } from '@/store/authStore'
+import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
@@ -414,13 +415,13 @@ export default function EngineerMailsPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 連続クリック時の async race 対策 (docs/730 §High #5):
-  // 古いレスポンスが新しい選択を上書きしないよう、現在選択 id を ref に保持し
-  // 各 await 後に「ref がまだこの id か」を確認してから setState する。
-  const currentSelectedIdRef = useRef<number | null>(null)
+  // 古いレスポンスが新しい選択を上書きしないよう、選択 id を hook で保持し
+  // 各 await 後に isStale チェックで古いレスポンスを破棄する。
+  const selectGuard = useStaleResponseGuard<number>()
 
   // 選択時に詳細取得
   const handleSelect = async (item: EngineerMail) => {
-    currentSelectedIdRef.current = item.id
+    selectGuard.mark(item.id)
     setDetailLoading(true)
     setSelected(null)
     setMatchedProjects([])
@@ -429,14 +430,14 @@ export default function EngineerMailsPage() {
     setReplyForm(null)
     try {
       const res = await axios.get(`/api/v1/engineer-mails/${item.id}`)
-      if (currentSelectedIdRef.current !== item.id) return
+      if (selectGuard.isStale(item.id)) return
       setSelected(res.data)
       setForm(res.data)
       setSkillInput('')
       setSaveMsg(null)
       setShowBody(false)
     } finally {
-      if (currentSelectedIdRef.current === item.id) setDetailLoading(false)
+      if (selectGuard.isCurrent(item.id)) setDetailLoading(false)
     }
     // マッチ案件とスレッドは互いに独立なので Promise.all で並列化 (docs/730 §Low #36)
     setMatchLoading(true)
@@ -445,7 +446,7 @@ export default function EngineerMailsPage() {
       axios.get(`/api/v1/engineer-mails/${item.id}/matched-projects`).catch(() => null),
       axios.get(`/api/v1/engineer-mails/${item.id}/thread`).catch(() => null),
     ])
-    if (currentSelectedIdRef.current !== item.id) return
+    if (selectGuard.isStale(item.id)) return
     setMatchedProjects(mres?.data?.data ?? [])
     setThreadItems(tres?.data?.thread ?? [])
     setMatchLoading(false)

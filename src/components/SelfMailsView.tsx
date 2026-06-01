@@ -10,6 +10,7 @@ import axios from '@/lib/axios'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
+import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
 
 type Attachment = { id: number; filename: string; mime_type: string | null; size: number | null }
 type MailRow = {
@@ -182,13 +183,13 @@ export default function SelfMailsView() {
   useEffect(() => { fetchList() }, [fetchList])
 
   // 連続クリック時の async race 対策 (docs/730 §High #5):
-  // 古いレスポンスが新しい選択を上書きしないよう、選択 id を ref で追跡。
-  const currentSelectedIdRef = useRef<number | null>(null)
+  // 古いレスポンスが新しい選択を上書きしないよう、選択 id を hook で追跡。
+  const selectGuard = useStaleResponseGuard<number>()
 
   // 行選択: 本文は一覧データに含まれるが添付一覧は詳細取得が必要
   // 別メール選択時は返信フォームを閉じる (誤送信防止)
   const openMail = (m: MailRow) => {
-    currentSelectedIdRef.current = m.id
+    selectGuard.mark(m.id)
     setSelected(m)
     setAttachments([])
     setReplyForm(null)
@@ -196,7 +197,7 @@ export default function SelfMailsView() {
     if (m.attachments_count && m.attachments_count > 0) {
       axios.get(`/api/v1/emails/${m.id}`)
         .then(res => {
-          if (currentSelectedIdRef.current !== m.id) return
+          if (selectGuard.isStale(m.id)) return
           setAttachments(res.data.attachments ?? [])
         })
         .catch(() => {})

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from '@/lib/axios'
 import { useRouter } from 'next/navigation'
+import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { supabase } from '@/lib/supabase'
@@ -191,23 +192,23 @@ export default function EmailsPage() {
   // メール取込は Laravel scheduler (sync-kagoya-pop3 / 15分毎) が担当。
 
   // 連続クリック時の async race 対策 (docs/730 §High #5):
-  // 古いレスポンスが新しい選択を上書きしないよう、選択 id を ref で追跡。
-  const currentSelectedIdRef = useRef<number | null>(null)
+  // 古いレスポンスが新しい選択を上書きしないよう、選択 id を hook で追跡。
+  const selectGuard = useStaleResponseGuard<number>()
 
   // メール選択
   const handleSelectEmail = async (email: Email) => {
-    currentSelectedIdRef.current = email.id
+    selectGuard.mark(email.id)
     const wasUnread = !email.is_read
     setDetailLoading(true)
     setSelectedEmail(null)
     try {
       const res = await axios.get(`/api/v1/emails/${email.id}`)
-      if (currentSelectedIdRef.current !== email.id) return
+      if (selectGuard.isStale(email.id)) return
       setSelectedEmail(res.data)
       setEmails(prev => prev ? { ...prev, data: prev.data.map(e => e.id === email.id ? { ...e, is_read: true } : e) } : null)
       if (wasUnread) window.dispatchEvent(new CustomEvent('emails:mark-all-read'))
     } finally {
-      if (currentSelectedIdRef.current === email.id) setDetailLoading(false)
+      if (selectGuard.isCurrent(email.id)) setDetailLoading(false)
     }
   }
 
