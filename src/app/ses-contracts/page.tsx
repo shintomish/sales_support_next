@@ -319,18 +319,13 @@ function SesContractsPage() {
     setPage(1);
   };
 
-  const fetchData = useCallback(async () => {
+  // ── list (フィルタ/ソート/ページごとに再取得) ──────────────
+  const fetchList = useCallback(async () => {
     try {
       setError(null);
-      const [res, allRes, sumRes] = await Promise.all([
-        apiClient.get('/api/v1/ses-contracts', { params: { search, status: statusFilter, include_expired: includeExpired ? 1 : 0, page, per_page: 50, user_id: userFilter, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined } }),
-        apiClient.get('/api/v1/ses-contracts', { params: { include_expired: includeExpired ? 1 : 0, page: 1, per_page: 200 } }),
-        apiClient.get('/api/v1/ses-contracts/summary'),
-      ]);
+      const res = await apiClient.get('/api/v1/ses-contracts', { params: { search, status: statusFilter, include_expired: includeExpired ? 1 : 0, page, per_page: 50, user_id: userFilter, sort_by: sortField || undefined, sort_order: sortField ? sortOrder : undefined } });
       setContracts(res.data.data);
       setMeta(res.data.meta);
-      setAllContracts(allRes.data.data);
-      setSummary(sumRes.data);
       if (userFilter === 'all') setGrandTotal(res.data.meta.total);
     } catch (err: unknown) {
       if ((err as ApiError).response?.status === 401) router.push('/login');
@@ -338,13 +333,39 @@ function SesContractsPage() {
     } finally { setLoading(false); }
   }, [search, statusFilter, includeExpired, page, userFilter, sortField, sortOrder, router]);
 
+  // ── summary (テナント単位の集計 — マウント時に 1 回でよい) ──
+  const fetchSummary = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/api/v1/ses-contracts/summary');
+      setSummary(res.data);
+    } catch { /* summary 失敗は静かに無視 */ }
+  }, []);
+
+  // ── all (per_page=200) — kanban view 限定 ───────────────────
+  const fetchAllForKanban = useCallback(async () => {
+    if (viewMode !== 'kanban') return;
+    try {
+      const res = await apiClient.get('/api/v1/ses-contracts', { params: { include_expired: includeExpired ? 1 : 0, page: 1, per_page: 200 } });
+      setAllContracts(res.data.data);
+    } catch { /* kanban 取得失敗は静かに無視 */ }
+  }, [viewMode, includeExpired]);
+
+  // 再試行ボタン用 (全体を再取得)
+  const fetchData = useCallback(() => {
+    fetchList();
+    fetchSummary();
+    fetchAllForKanban();
+  }, [fetchList, fetchSummary, fetchAllForKanban]);
+
   // テキスト入力のデバウンス（300ms）
   useEffect(() => {
     const timer = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchList(); }, [fetchList]);
+  useEffect(() => { fetchSummary(); }, [fetchSummary]);
+  useEffect(() => { fetchAllForKanban(); }, [fetchAllForKanban]);
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3">
