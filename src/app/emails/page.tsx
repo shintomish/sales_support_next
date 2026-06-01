@@ -205,7 +205,19 @@ export default function EmailsPage() {
       const res = await axios.get(`/api/v1/emails/${email.id}`)
       if (selectGuard.isStale(email.id)) return
       setSelectedEmail(res.data)
-      setEmails(prev => prev ? { ...prev, data: prev.data.map(e => e.id === email.id ? { ...e, is_read: true } : e) } : null)
+      // 「未読のみ」フィルタ時は、既読化したメールをリストから除外する
+      // (フィルタ条件を満たさなくなったため。バグ: チェックを入れても既読が混ざる)
+      setEmails(prev => {
+        if (!prev) return null
+        const newData = unreadOnly
+          ? prev.data.filter(e => e.id !== email.id)
+          : prev.data.map(e => e.id === email.id ? { ...e, is_read: true } : e)
+        return {
+          ...prev,
+          data: newData,
+          total: unreadOnly && wasUnread ? Math.max(0, prev.total - 1) : prev.total,
+        }
+      })
       if (wasUnread) window.dispatchEvent(new CustomEvent('emails:mark-all-read'))
     } finally {
       if (selectGuard.isCurrent(email.id)) setDetailLoading(false)
