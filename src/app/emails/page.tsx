@@ -4,8 +4,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from '@/lib/axios'
 import { useRouter } from 'next/navigation'
 import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
-import { formatDistanceToNow } from 'date-fns'
-import { ja } from 'date-fns/locale'
 import { supabase } from '@/lib/supabase'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
 import SelfMailsView from '@/components/SelfMailsView'
@@ -400,7 +398,7 @@ export default function EmailsPage() {
                     )}
                   </div>
                   <span className="text-xs text-gray-400 flex-shrink-0">
-                    {formatReceivedAt(email.received_at)}
+                    {formatDateFull(email.received_at)}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
@@ -543,16 +541,6 @@ export default function EmailsPage() {
 }
 
 // ── ユーティリティ ────────────────────────────────────────
-
-function formatReceivedAt(raw: string): string {
-  try {
-    if (!raw) return '—'
-    const s = raw.endsWith('Z') ? raw : raw.includes('T') ? raw + 'Z' : raw.replace(' ', 'T') + 'Z'
-    const d = new Date(s)
-    if (isNaN(d.getTime())) return '—'
-    return formatDistanceToNow(d, { locale: ja, addSuffix: true })
-  } catch { return '—' }
-}
 
 function formatDateFull(raw: string): string {
   try {

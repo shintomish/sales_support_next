@@ -6,8 +6,6 @@ import Link from 'next/link'
 import axios from '@/lib/axios'
 import { useAuthStore } from '@/store/authStore'
 import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
-import { formatDistanceToNow } from 'date-fns'
-import { ja } from 'date-fns/locale'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
 
 // ── 型定義 ─────────────────────────────────────────────────
@@ -782,7 +780,7 @@ export default function ProjectMailsPage() {
                     {rank.label} {item.score}
                   </span>
                   <span className="text-xs text-gray-400 ml-auto flex-shrink-0">
-                    {formatReceivedAt(item.received_at)}
+                    {formatDateFull(item.received_at)}
                   </span>
                 </div>
                 <p className="text-sm font-medium text-gray-800 truncate">
@@ -840,7 +838,7 @@ export default function ProjectMailsPage() {
                       <span className="text-gray-300">|</span>
                       <span>{selected.email?.from_address}</span>
                       <span className="text-gray-300">|</span>
-                      <span>{formatReceivedAt(selected.received_at)}</span>
+                      <span>{formatDateFull(selected.received_at)}</span>
                     </div>
                   </div>
                   {(() => { const r = scoreRank(selected.score); return (
@@ -1584,7 +1582,7 @@ function ReviewRow({
 
         {/* 受信日時 */}
         <span className="hidden md:block flex-shrink-0 text-xs text-gray-400 w-16 text-right">
-          {formatReceivedAt(item.received_at)}
+          {formatDateFull(item.received_at)}
         </span>
 
         {/* アクションボタン (mobile はタイトルの右、ラップ後は右上) */}
@@ -1756,14 +1754,12 @@ function highlightBody(text: string, keywords: string[]): React.ReactNode {
 
 // ── ユーティリティ ────────────────────────────────────────
 
-function formatReceivedAt(raw: string): string {
+// /emails 右ペインと表示を揃えるための絶対日時フォーマット（例: 2026/6/2 14:30:45）
+function formatDateFull(raw: string): string {
   try {
-    if (!raw) return '—'
-    const s = raw.endsWith('Z') ? raw : raw.includes('T') ? raw + 'Z' : raw.replace(' ', 'T') + 'Z'
-    const d = new Date(s)
-    if (isNaN(d.getTime())) return '—'
-    return formatDistanceToNow(d, { locale: ja, addSuffix: true })
-  } catch { return '—' }
+    const s = raw.replace(' ', 'T') + (raw.endsWith('Z') ? '' : 'Z')
+    return new Date(s).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+  } catch { return raw }
 }
 
 function formatDateTime(raw: string): string {
