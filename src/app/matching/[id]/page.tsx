@@ -888,41 +888,207 @@ function ScoreBar({ label, value, max }: { label: string; value: number; max: nu
   )
 }
 
-// ── スコア内訳モーダル ────────────────────────────────
-function BreakdownModal({ eng, onClose }: { eng: MatchedEngineer; onClose: () => void }) {
-  const b = eng.breakdown
+// ── 技術者メール詳細モーダル ──────────────────────────
+// カードクリック / 「詳細」ボタンから開く。カードが既に持つ要約は即時表示し、
+// 本文・添付・スキルシート本文は engineer_mail_source_id があれば show API から追加 fetch する。
+// 鮮度マッチング(FreshEms) / 登録済技術者(MatchedEngineer) の両方を共通の DetailTarget に正規化して扱う。
+interface DetailSummary {
+  name: string | null
+  age: number | null
+  affiliation: string | null
+  affiliation_type: string | null
+  score: number
+  breakdown: MatchedEngineer['breakdown']
+  reasons: string[]
+  skills: string[]
+  unit_price_min: number | null
+  unit_price_max: number | null
+  available_from: string | null
+  nearest_station: string | null
+  email_subject: string | null
+  received_at: string | null
+}
+interface DetailTarget {
+  emsId: number | null       // engineer_mail_source_id。null=手動登録等で本文/添付なし
+  engineerId: number | null  // 登録済技術者 id（対照表 fallback 用）
+  summary: DetailSummary
+}
+// show API のレスポンス（必要部分のみ）
+interface EmsDetailResponse {
+  parsed_skill_sheet_text?: string | null
+  email?: { body_text?: string | null; attachments?: EmailAttachment[] } | null
+}
+
+function freshToDetail(item: FreshEms): DetailTarget {
+  return {
+    emsId: item.engineer_mail_source_id,
+    engineerId: item.registered_engineer_id,
+    summary: {
+      name: item.name, age: item.age, affiliation: item.affiliation, affiliation_type: item.affiliation_type,
+      score: item.score, breakdown: item.breakdown, reasons: item.reasons,
+      skills: item.skills ?? [],
+      unit_price_min: item.unit_price_min, unit_price_max: item.unit_price_max,
+      available_from: item.available_from, nearest_station: item.nearest_station,
+      email_subject: item.email_subject, received_at: item.received_at,
+    },
+  }
+}
+function engToDetail(eng: MatchedEngineer): DetailTarget {
+  return {
+    emsId: eng.engineer_mail_source_id,
+    engineerId: eng.engineer_id,
+    summary: {
+      name: eng.engineer_name, age: eng.age, affiliation: eng.affiliation, affiliation_type: eng.affiliation_type,
+      score: eng.score, breakdown: eng.breakdown, reasons: eng.reasons,
+      skills: eng.skills.map(s => s.experience_years ? `${s.name} ${s.experience_years}y` : s.name),
+      unit_price_min: eng.desired_unit_price_min, unit_price_max: eng.desired_unit_price_max,
+      available_from: eng.available_from, nearest_station: null,
+      email_subject: null, received_at: null,
+    },
+  }
+}
+
+function EngineerDetailModal({
+  target, projectMailId, requirementMatchingEnabled, onClose,
+}: {
+  target: DetailTarget
+  projectMailId: number
+  requirementMatchingEnabled: boolean
+  onClose: () => void
+}) {
+  const { emsId, engineerId, summary } = target
+  const b = summary.breakdown
+  const [detail, setDetail] = useState<EmsDetailResponse | null>(null)
+  const [loading, setLoading] = useState(emsId != null)  // emsId があればマウント時点で fetch 中
+  const [showSheet, setShowSheet] = useState(false)
+  const [showBody, setShowBody] = useState(false)
+
+  useEffect(() => {
+    if (emsId == null) return
+    let alive = true
+    axios.get(`/api/v1/engineer-mails/${emsId}`)
+      .then(res => { if (alive) setDetail(res.data) })
+      .catch(() => { if (alive) setDetail(null) })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [emsId])
+
+  const attachments = detail?.email?.attachments ?? []
+  const sheetText = detail?.parsed_skill_sheet_text ?? null
+  const bodyText = detail?.email?.body_text ?? null
+  const color = rankColor(summary.score)
+  const price = priceStr(summary.unit_price_min, summary.unit_price_max)
+
   return (
-    <div
-      onClick={onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{ background: '#fff', borderRadius: 12, padding: 24, width: 360, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ fontWeight: 700, fontSize: 16 }}>{eng.engineer_name}</h3>
-          <span style={{ fontSize: 24, fontWeight: 800, color: '#1d4ed8' }}>{eng.score}点</span>
-        </div>
-        <ScoreBar label="必須条件 (国籍・年齢・稼働形態)" value={b.requirements} max={40} />
-        <ScoreBar label="スキルマッチ" value={b.skills} max={25} />
-        <ScoreBar label="条件一致 (単価・場所・契約)" value={b.conditions} max={20} />
-        <ScoreBar label="稼働可否・時期" value={b.availability} max={10} />
-        <ScoreBar label="実績" value={b.track_record} max={5} />
-        {eng.reasons.length > 0 && (
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e5e7eb' }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>評価コメント</p>
-            {eng.reasons.map((r, i) => (
-              <p key={i} style={{ fontSize: 12, color: '#374151', marginBottom: 4 }}>• {r}</p>
-            ))}
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 560, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,0.3)' }}>
+        {/* ヘッダー */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', borderBottom: '1px solid #f3f4f6' }}>
+          <span style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 10, border: `2px solid ${color.border}`, background: color.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: color.text, lineHeight: 1 }}>{rankLabel(summary.score)}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: color.text }}>{summary.score}</span>
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontWeight: 700, fontSize: 16, color: '#111827', margin: 0 }}>
+              {summary.name ?? '（氏名未取得）'}
+              {summary.age ? <span style={{ fontWeight: 400, fontSize: 12, color: '#6b7280', marginLeft: 6 }}>{summary.age}歳</span> : null}
+            </p>
+            {summary.affiliation && <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 0' }}>🏢 {summary.affiliation}</p>}
           </div>
-        )}
-        <button
-          onClick={onClose}
-          style={{ marginTop: 16, width: '100%', padding: '8px 0', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}
-        >
-          閉じる
-        </button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9ca3af' }}>✕</button>
+        </div>
+
+        {/* 本体（スクロール） */}
+        <div style={{ overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* メタ */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 12, color: '#374151' }}>
+            {price && <span>💴 {price}</span>}
+            {summary.available_from && <span>📅 {summary.available_from}〜</span>}
+            {summary.nearest_station && <span>🚉 {summary.nearest_station}</span>}
+            {summary.email_subject && <span style={{ color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }} title={summary.email_subject}>📧 {summary.email_subject}</span>}
+          </div>
+
+          {/* スキル */}
+          {summary.skills.length > 0 && (
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>スキル</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {summary.skills.map((s, i) => <span key={i} style={{ fontSize: 11, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, padding: '1px 6px' }}>{s}</span>)}
+              </div>
+            </div>
+          )}
+
+          {/* スコア内訳 */}
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>スコア内訳</p>
+            <ScoreBar label="必須条件 (国籍・年齢・稼働形態)" value={b.requirements} max={40} />
+            <ScoreBar label="スキルマッチ" value={b.skills} max={25} />
+            <ScoreBar label="条件一致 (単価・場所・契約)" value={b.conditions} max={20} />
+            <ScoreBar label="稼働可否・時期" value={b.availability} max={10} />
+            <ScoreBar label="実績" value={b.track_record} max={5} />
+            {summary.reasons.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                {summary.reasons.map((r, i) => <p key={i} style={{ fontSize: 12, color: '#374151', margin: '2px 0' }}>• {r}</p>)}
+              </div>
+            )}
+          </div>
+
+          {/* 対照表（カードと同様、既定は折り畳み。展開時に生成/取得） */}
+          {requirementMatchingEnabled && (emsId != null || engineerId != null) && (
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>📊 対照表</p>
+              <RequirementMatchAccordion
+                projectMailId={projectMailId}
+                emsId={emsId ?? undefined}
+                engineerId={emsId == null ? (engineerId ?? undefined) : undefined}
+              />
+            </div>
+          )}
+
+          {/* 添付ファイル */}
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>📎 添付ファイル</p>
+            {emsId == null ? (
+              <p style={{ fontSize: 12, color: '#9ca3af' }}>添付なし（手動登録）。スキルシートのアップロードは今後対応予定です。</p>
+            ) : loading ? (
+              <p style={{ fontSize: 12, color: '#9ca3af' }}>読み込み中…</p>
+            ) : attachments.length === 0 ? (
+              <p style={{ fontSize: 12, color: '#9ca3af' }}>添付ファイルはありません。</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {attachments.map(att => (
+                  <button key={att.id} onClick={() => downloadEngineerAttachment(emsId, att)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 12, textAlign: 'left' }}>
+                    <span>📄</span>
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.filename}</span>
+                    <span style={{ color: '#9ca3af' }}>{formatBytes(att.size)}</span>
+                    <span style={{ color: '#2563eb', fontWeight: 600 }}>DL</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* スキルシート本文（抽出済み・折り畳み） */}
+          {sheetText && (
+            <div>
+              <button onClick={() => setShowSheet(s => !s)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#6b7280' }}>📄 スキルシート本文 {showSheet ? '▲' : '▼'}</button>
+              {showSheet && <pre style={{ marginTop: 6, maxHeight: 240, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11, color: '#374151', background: '#f9fafb', borderRadius: 8, padding: 10, fontFamily: 'inherit' }}>{sheetText}</pre>}
+            </div>
+          )}
+
+          {/* メール本文（折り畳み・先頭1500字） */}
+          {bodyText && (
+            <div>
+              <button onClick={() => setShowBody(s => !s)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#6b7280' }}>✉️ メール本文 {showBody ? '▲' : '▼'}</button>
+              {showBody && <pre style={{ marginTop: 6, maxHeight: 280, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11, color: '#374151', background: '#f9fafb', borderRadius: 8, padding: 10, fontFamily: 'inherit' }}>{bodyText.slice(0, 1500)}{bodyText.length > 1500 ? '…' : ''}</pre>}
+            </div>
+          )}
+        </div>
+
+        {/* フッター */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f3f4f6' }}>
+          <button onClick={onClose} style={{ width: '100%', padding: '8px 0', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>閉じる</button>
+        </div>
       </div>
     </div>
   )
@@ -978,7 +1144,7 @@ function EngineerCard({
         />
         <button
           onClick={onDetail}
-          title="スコア内訳を見る"
+          title="詳細を見る"
           style={{
             flexShrink: 0,
             width: 52,
@@ -1165,7 +1331,7 @@ function EngineerRow({
       {/* スコアバッジ */}
       <button
         onClick={onDetail}
-        title="スコア内訳を見る"
+        title="詳細を見る"
         style={{
           flexShrink: 0,
           width: 44,
@@ -1399,6 +1565,7 @@ function FreshEmsList({
   days,
   viewMode,
   onPropose,
+  onDetail,
   checked,
   onCheck,
   projectMailId,
@@ -1410,6 +1577,7 @@ function FreshEmsList({
   days: number
   viewMode: 'card' | 'list'
   onPropose: (item: FreshEms) => void
+  onDetail: (item: FreshEms) => void
   checked: Set<number>
   onCheck: (emsId: number) => void
   projectMailId: number
@@ -1520,22 +1688,30 @@ function FreshEmsList({
                     <td style={{ padding: '8px 10px', color: '#6b7280' }}>{item.available_from ?? '—'}</td>
                     <td style={{ padding: '8px 10px', color: '#9ca3af', fontSize: 11 }}>{formatDate(item.received_at) ?? '—'}</td>
                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                      <button
-                        onClick={() => onPropose(item)}
-                        disabled={item.badge === 'proposed'}
-                        style={{
-                          fontSize: 11,
-                          background: item.badge === 'proposed' ? '#e5e7eb' : '#2563eb',
-                          color: item.badge === 'proposed' ? '#9ca3af' : '#fff',
-                          border: 'none',
-                          borderRadius: 6,
-                          padding: '4px 10px',
-                          cursor: item.badge === 'proposed' ? 'not-allowed' : 'pointer',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {item.badge === 'proposed' ? '提案済' : '提案'}
-                      </button>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                        <button
+                          onClick={() => onDetail(item)}
+                          style={{ fontSize: 11, background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontWeight: 600 }}
+                        >
+                          詳細
+                        </button>
+                        <button
+                          onClick={() => onPropose(item)}
+                          disabled={item.badge === 'proposed'}
+                          style={{
+                            fontSize: 11,
+                            background: item.badge === 'proposed' ? '#e5e7eb' : '#2563eb',
+                            color: item.badge === 'proposed' ? '#9ca3af' : '#fff',
+                            border: 'none',
+                            borderRadius: 6,
+                            padding: '4px 10px',
+                            cursor: item.badge === 'proposed' ? 'not-allowed' : 'pointer',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {item.badge === 'proposed' ? '提案済' : '提案'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -1570,6 +1746,8 @@ function FreshEmsList({
           return (
             <div
               key={item.engineer_mail_source_id}
+              onClick={() => onDetail(item)}
+              title="クリックで詳細を表示"
               style={{
                 background: '#fff',
                 border: `1px solid ${hasMatch ? '#16a34a' : c.border}`,
@@ -1578,6 +1756,7 @@ function FreshEmsList({
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 8,
+                cursor: 'pointer',
                 boxShadow: hasMatch ? '0 0 0 2px rgba(22,163,74,0.15), 0 1px 3px rgba(0,0,0,0.05)' : '0 1px 3px rgba(0,0,0,0.05)',
               }}
             >
@@ -1591,6 +1770,7 @@ function FreshEmsList({
                   type="checkbox"
                   checked={checked.has(item.engineer_mail_source_id)}
                   onChange={() => onCheck(item.engineer_mail_source_id)}
+                  onClick={e => e.stopPropagation()}
                   disabled={item.badge === 'proposed'}
                   style={{ cursor: item.badge === 'proposed' ? 'not-allowed' : 'pointer' }}
                 />
@@ -1630,33 +1810,43 @@ function FreshEmsList({
                   {item.reasons.slice(0, 3).join(' / ')}
                 </div>
               )}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                <div style={{ fontSize: 10, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }} title={item.email_subject ?? ''}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
+                <div style={{ fontSize: 10, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }} title={item.email_subject ?? ''}>
                   📧 {item.email_subject ?? '—'}
                 </div>
-                <button
-                  onClick={() => onPropose(item)}
-                  disabled={item.badge === 'proposed'}
-                  style={{
-                    fontSize: 11,
-                    background: item.badge === 'proposed' ? '#e5e7eb' : '#2563eb',
-                    color: item.badge === 'proposed' ? '#9ca3af' : '#fff',
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '5px 12px',
-                    cursor: item.badge === 'proposed' ? 'not-allowed' : 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  {item.badge === 'proposed' ? '提案済' : '提案メール作成'}
-                </button>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button
+                    onClick={e => { e.stopPropagation(); onDetail(item) }}
+                    style={{ fontSize: 11, background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    詳細
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); onPropose(item) }}
+                    disabled={item.badge === 'proposed'}
+                    style={{
+                      fontSize: 11,
+                      background: item.badge === 'proposed' ? '#e5e7eb' : '#2563eb',
+                      color: item.badge === 'proposed' ? '#9ca3af' : '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '5px 12px',
+                      cursor: item.badge === 'proposed' ? 'not-allowed' : 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {item.badge === 'proposed' ? '提案済' : '提案メール作成'}
+                  </button>
+                </div>
               </div>
               {requirementMatchingEnabled && (
-                <RequirementMatchAccordion
-                  projectMailId={projectMailId}
-                  emsId={item.engineer_mail_source_id}
-                  prefetched={hasMatch}
-                />
+                <div onClick={e => e.stopPropagation()}>
+                  <RequirementMatchAccordion
+                    projectMailId={projectMailId}
+                    emsId={item.engineer_mail_source_id}
+                    prefetched={hasMatch}
+                  />
+                </div>
               )}
             </div>
           )
@@ -1688,7 +1878,7 @@ export default function MatchingPage() {
   const [engineers, setEngineers] = useState<MatchedEngineer[]>([])
   const [proposed, setProposed] = useState<Set<number>>(new Set())
   const [excluded, setExcluded] = useState<Set<number>>(new Set())
-  const [detailEng, setDetailEng] = useState<MatchedEngineer | null>(null)
+  const [detailTarget, setDetailTarget] = useState<DetailTarget | null>(null)
   const [proposalDraft, setProposalDraft] = useState<ProposalDraft | null>(null)
   const [generatingId, setGeneratingId] = useState<number | null>(null)
   const [showBulkSend, setShowBulkSend] = useState(false)
@@ -1963,7 +2153,14 @@ export default function MatchingPage() {
       {/* 提案メールモーダル */}
       {proposalDraft && <ProposalModal draft={proposalDraft} onClose={() => setProposalDraft(null)} />}
       {/* スコア内訳モーダル */}
-      {detailEng && <BreakdownModal eng={detailEng} onClose={() => setDetailEng(null)} />}
+      {detailTarget && (
+        <EngineerDetailModal
+          target={detailTarget}
+          projectMailId={Number(id)}
+          requirementMatchingEnabled={requirementMatchingEnabled}
+          onClose={() => setDetailTarget(null)}
+        />
+      )}
 
       {/* 案件サマリーヘッダー */}
       <div style={{
@@ -2202,6 +2399,7 @@ export default function MatchingPage() {
             days={freshDays}
             viewMode={viewMode}
             onPropose={handleGenerateProposalFromEms}
+            onDetail={(item) => setDetailTarget(freshToDetail(item))}
             checked={freshChecked}
             onCheck={toggleFreshCheck}
             projectMailId={Number(id)}
@@ -2226,7 +2424,7 @@ export default function MatchingPage() {
                 onPropose={togglePropose}
                 onExclude={toggleExclude}
                 onCheck={toggleCheck}
-                onDetail={setDetailEng}
+                onDetail={(eng) => setDetailTarget(engToDetail(eng))}
                 generatingId={generatingId}
                 onGenerateProposal={handleGenerateProposal}
                 viewMode={viewMode}
