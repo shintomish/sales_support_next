@@ -126,4 +126,11 @@
   .form-input {
     @apply w-full text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500;
   }
+  /* ガイド(placeholder)と入力値を差別化: ガイドは斜体＋青緑(teal)。
+     全画面の input / textarea に一括適用（入力済みの値は濃い直立のまま）。 */
+  input::placeholder,
+  textarea::placeholder {
+    @apply italic text-teal-400;
+    opacity: 1; /* Firefox の placeholder 既定 opacity を打ち消す */
+  }
 }
