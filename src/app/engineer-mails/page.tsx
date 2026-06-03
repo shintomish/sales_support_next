@@ -716,6 +716,18 @@ export default function EngineerMailsPage() {
     } catch { setSaveMsg({ type: 'err', text: 'ステータス変更に失敗しました' }) }
   }
 
+  // 削除（論理削除・一覧から除外）
+  const handleDelete = async () => {
+    if (!selected) return
+    if (!confirm(`「${selected.name || `技術者メール #${selected.id}`}」を削除します。よろしいですか？`)) return
+    try {
+      await axios.delete(`/api/v1/engineer-mails/${selected.id}`)
+      setSelected(null)
+      setForm({})
+      fetchList()
+    } catch { setSaveMsg({ type: 'err', text: '削除に失敗しました' }) }
+  }
+
   // スキルタグ追加
   const handleAddSkill = () => {
     const skill = skillInput.trim()
@@ -1188,6 +1200,13 @@ export default function EngineerMailsPage() {
                     className="text-xs border border-teal-300 text-teal-600 px-3 py-1.5 rounded-lg hover:bg-teal-50">
                     メール詳細
                   </button>
+                  {sourceMode === 'manual' && (
+                    <button
+                      onClick={handleDelete}
+                      className="text-xs border border-red-300 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50">
+                      🗑 削除
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1862,12 +1881,40 @@ function ManualEngineerModal({
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [files, setFiles] = useState<File[]>([])
+  const [dropOver, setDropOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const set = <K extends keyof ManualEngineerForm>(k: K, v: ManualEngineerForm[K]) =>
     setF(p => ({ ...p, [k]: v }))
 
   const splitSkills = (s: string) =>
     s.split(/[,、，\n]/).map(x => x.trim()).filter(Boolean)
+
+  const ATTACH_EXT = ['pdf', 'xlsx', 'xls', 'xlsm', 'docx']
+  const ATTACH_MAX_SIZE = 10 * 1024 * 1024
+  const ATTACH_MAX_FILES = 5
+  const addFiles = (list: FileList | null) => {
+    if (!list) return
+    const incoming: File[] = []
+    for (const file of Array.from(list)) {
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+      if (!ATTACH_EXT.includes(ext)) { setError(`対応していない形式です: ${file.name}（PDF / Excel / Word のみ）`); continue }
+      if (file.size > ATTACH_MAX_SIZE) { setError(`サイズが大きすぎます: ${file.name}（10MBまで）`); continue }
+      incoming.push(file)
+    }
+    if (incoming.length === 0) return
+    setFiles(prev => {
+      const merged = [...prev, ...incoming]
+      if (merged.length > ATTACH_MAX_FILES) {
+        setError(`添付は最大 ${ATTACH_MAX_FILES} 件までです`)
+        return merged.slice(0, ATTACH_MAX_FILES)
+      }
+      setError(null)
+      return merged
+    })
+  }
+  const removeFile = (i: number) => setFiles(prev => prev.filter((_, idx) => idx !== i))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1881,19 +1928,23 @@ function ManualEngineerModal({
     }
     setSubmitting(true); setError(null)
     try {
-      const payload: Record<string, unknown> = { name: f.name.trim() }
-      if (f.age)                     payload.age              = Number(f.age)
-      if (f.affiliation_type)        payload.affiliation_type = f.affiliation_type
-      if (f.affiliation.trim())      payload.affiliation      = f.affiliation.trim()
-      if (f.available_from.trim())   payload.available_from   = f.available_from.trim()
-      if (f.nearest_station.trim())  payload.nearest_station  = f.nearest_station.trim()
-      if (f.from_address.trim())     payload.from_address     = f.from_address.trim()
-      if (f.unit_price_min)          payload.unit_price_min   = Number(f.unit_price_min)
-      if (f.unit_price_max)          payload.unit_price_max   = Number(f.unit_price_max)
-      const sk = splitSkills(f.skills); if (sk.length) payload.skills = sk
-      if (f.body_text.trim())        payload.body_text        = f.body_text.trim()
+      const fd = new FormData()
+      fd.append('name', f.name.trim())
+      if (f.age)                     fd.append('age', String(Number(f.age)))
+      if (f.affiliation_type)        fd.append('affiliation_type', f.affiliation_type)
+      if (f.affiliation.trim())      fd.append('affiliation', f.affiliation.trim())
+      if (f.available_from.trim())   fd.append('available_from', f.available_from.trim())
+      if (f.nearest_station.trim())  fd.append('nearest_station', f.nearest_station.trim())
+      if (f.from_address.trim())     fd.append('from_address', f.from_address.trim())
+      if (f.unit_price_min)          fd.append('unit_price_min', String(Number(f.unit_price_min)))
+      if (f.unit_price_max)          fd.append('unit_price_max', String(Number(f.unit_price_max)))
+      splitSkills(f.skills).forEach(s => fd.append('skills[]', s))
+      if (f.body_text.trim())        fd.append('body_text', f.body_text.trim())
+      files.forEach(file => fd.append('attachments[]', file))
 
-      const res = await axios.post('/api/v1/engineer-mails/manual', payload)
+      const res = await axios.post('/api/v1/engineer-mails/manual', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
       onCreated(res.data)
     } catch (err) {
       const e = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }
@@ -2004,6 +2055,37 @@ function ManualEngineerModal({
               <textarea rows={3} value={f.body_text}
                 onChange={e => set('body_text', e.target.value)}
                 className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+            </FormRow>
+
+            <FormRow label="スキルシート添付 (PDF / Excel / Word・最大5件・各10MB)">
+              <div
+                onDragOver={e => { e.preventDefault(); if (!dropOver) setDropOver(true) }}
+                onDragEnter={e => { e.preventDefault(); setDropOver(true) }}
+                onDragLeave={e => { e.preventDefault(); setDropOver(false) }}
+                onDrop={e => { e.preventDefault(); setDropOver(false); addFiles(e.dataTransfer?.files ?? null) }}
+                onClick={() => fileInputRef.current?.click()}
+                className={`cursor-pointer rounded border-2 border-dashed p-4 text-center transition-colors ${
+                  dropOver ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+                }`}>
+                <p className="text-sm text-gray-600">ファイルをドロップ、またはクリックして選択</p>
+                <p className="text-xs text-gray-400 mt-0.5">PDF / Excel(xlsx, xls, xlsm) / Word(docx)</p>
+                <input ref={fileInputRef} type="file" multiple
+                  accept=".pdf,.xlsx,.xls,.xlsm,.docx" className="hidden"
+                  onChange={e => { addFiles(e.target.files); if (e.target) e.target.value = '' }} />
+              </div>
+              {files.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {files.map((file, i) => (
+                    <li key={i} className="flex items-center justify-between text-sm bg-white border border-gray-200 rounded px-2.5 py-1">
+                      <span className="truncate">📎 {file.name}
+                        <span className="text-xs text-gray-400"> ({(file.size / 1024 / 1024).toFixed(2)}MB)</span>
+                      </span>
+                      <button type="button" onClick={() => removeFile(i)}
+                        className="text-red-500 hover:text-red-700 ml-2 leading-none">×</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </FormRow>
 
             {error && <p className="text-sm text-red-600">{error}</p>}

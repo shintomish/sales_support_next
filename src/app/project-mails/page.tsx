@@ -517,6 +517,18 @@ export default function ProjectMailsPage() {
     } catch { setSaveMsg({ type: 'err', text: 'ステータス変更に失敗しました' }) }
   }
 
+  // 削除（論理削除・一覧から除外）
+  const handleDelete = async () => {
+    if (!selected) return
+    if (!confirm(`「${selected.title || `案件メール #${selected.id}`}」を削除します。よろしいですか？`)) return
+    try {
+      await axios.delete(`/api/v1/project-mails/${selected.id}`)
+      setSelected(null)
+      setForm({})
+      fetchList()
+    } catch { setSaveMsg({ type: 'err', text: '削除に失敗しました' }) }
+  }
+
   const set = (key: keyof ProjectMail, val: unknown) => setForm(f => ({ ...f, [key]: val }))
   const arrToStr = (v: string[] | null | undefined) => (v ?? []).join(', ')
 
@@ -916,6 +928,13 @@ export default function ProjectMailsPage() {
                     className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
                     {rescoringOne ? '再スコア中…' : '再スコア'}
                   </button>
+                  {sourceMode === 'manual' && (
+                    <button
+                      onClick={handleDelete}
+                      className="text-xs border border-red-300 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50">
+                      🗑 削除
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
