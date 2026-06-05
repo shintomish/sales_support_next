@@ -18,12 +18,14 @@ interface Kpi {
 }
 interface PipelineItem   { status: string; count: number; total: number; }
 interface MonthlyRevenue { month: string; revenue: number; }
+interface MonthlySales   { month: string; revenue: number; profit: number; }
 interface Task     { id: number; title: string; priority: '高'|'中'|'低'; due_date: string|null; customer: {company_name:string}|null; }
 interface Activity { id: number; subject: string; type: string; activity_date: string; customer: {company_name:string}|null; }
 interface WonDeal  { id: number; title: string; amount: number; customer: {company_name:string}|null; }
 
 interface DashboardData {
   kpi: Kpi; pipeline: PipelineItem[]; monthly_revenue: MonthlyRevenue[];
+  monthly_sales?: MonthlySales[];
   upcoming_tasks: Task[]; recent_activities: Activity[]; won_deals: WonDeal[];
 }
 
@@ -76,6 +78,26 @@ const RevenueTooltip = ({ active, payload, label }: RevenueTooltipProps) => {
   );
 };
 
+// SES確定売上チャート用 Tooltip（売上＋利益）
+type SalesTooltipProps = {
+  active?: boolean;
+  payload?: { name?: string; value: number | string; color?: string }[];
+  label?: string;
+};
+const SalesTooltip = ({ active, payload, label }: SalesTooltipProps) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg shadow-md px-3 py-2 text-sm">
+      <p className="font-semibold text-gray-700 mb-1">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} className="font-bold" style={{ color: p.color }}>
+          {p.name === 'profit' ? '利益' : '売上'}：¥{Number(p.value).toLocaleString()}
+        </p>
+      ))}
+    </div>
+  );
+};
+
 // ───────── メインコンポーネント ─────────
 export default function DashboardPage() {
   const [data, setData]       = useState<DashboardData | null>(null);
@@ -111,7 +133,8 @@ export default function DashboardPage() {
     </div>
   );
 
-  const { kpi, pipeline, monthly_revenue, upcoming_tasks, recent_activities, won_deals } = data;
+  const { kpi, pipeline, monthly_revenue, monthly_sales, upcoming_tasks, recent_activities, won_deals } = data;
+  const hasSales = !!monthly_sales && monthly_sales.some(m => m.revenue > 0 || m.profit > 0);
   const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
   const pieData = pipeline
@@ -177,7 +200,7 @@ export default function DashboardPage() {
         {/* 月別売上棒グラフ */}
         <Card className="md:col-span-2 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-gray-700">📈 月別売上（過去6ヶ月）</CardTitle>
+            <CardTitle className="text-base text-gray-700">📈 月別売上 見込み（商談ベース・過去6ヶ月）</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
@@ -216,6 +239,29 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── 月別売上 確定（SES台帳ベース）── */}
+      {hasSales && (
+        <Card className="mb-4 md:mb-6 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-gray-700">📊 月別売上 確定（SES台帳ベース・過去6ヶ月）</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={monthly_sales} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false}
+                  tickFormatter={v => v === 0 ? '0' : `${Math.floor(v/10000)}万`} />
+                <Tooltip content={<SalesTooltip />} />
+                <Legend iconSize={10} formatter={(v) => <span style={{ fontSize: 11, color: '#64748B' }}>{v === 'profit' ? '利益' : '売上'}</span>} />
+                <Bar dataKey="revenue" name="revenue" fill="#2563EB" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                <Bar dataKey="profit"  name="profit"  fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={28} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── 期限タスク & 活動履歴 & 今月成約 ── */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-3 md:gap-4">
