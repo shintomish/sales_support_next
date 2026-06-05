@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import Toast from '@/components/Toast';
 import type { ApiError } from '@/lib/error-helpers';
 
@@ -14,6 +13,12 @@ interface MonthlySalesRow {
   year: number;
   month: number;
   label: string;
+  revenue: number;
+  cost: number;
+  profit: number;
+  detail_count: number;
+}
+interface SalesTotal {
   revenue: number;
   cost: number;
   profit: number;
@@ -33,8 +38,12 @@ const yen = (n: number) => `¥${Number(n).toLocaleString('ja-JP')}`;
 export default function MonthlySalesPage() {
   const router = useRouter();
   const [rows, setRows] = useState<MonthlySalesRow[]>([]);
+  const [total, setTotal] = useState<SalesTotal | null>(null);
+  const [fiscalYear, setFiscalYear] = useState<number | null>(null);
+  const [period, setPeriod] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [recomputing, setRecomputing] = useState(false);
 
   // トースト
   const [toast, setToast] = useState<string | null>(null);
@@ -44,23 +53,23 @@ export default function MonthlySalesPage() {
     setToast(message);
   };
 
-  // 再集計フォーム（既定は前月）
-  const now = new Date();
-  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const [recYear, setRecYear] = useState<number>(prev.getFullYear());
-  const [recMonth, setRecMonth] = useState<number>(prev.getMonth() + 1);
-  const [recomputing, setRecomputing] = useState(false);
-
   // 明細ドリルダウン
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [details, setDetails] = useState<DetailRow[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  const fetchSummary = useCallback(async () => {
+  // fy 未指定なら当年度をサーバーが返す
+  const fetchSummary = useCallback(async (fy?: number) => {
     try {
       setError(null);
-      const res = await apiClient.get('/api/v1/monthly-sales', { params: { months: 12 } });
+      setOpenKey(null);
+      const res = await apiClient.get('/api/v1/monthly-sales', {
+        params: fy ? { fiscal_year: fy } : {},
+      });
       setRows(res.data.monthly_sales ?? []);
+      setTotal(res.data.total ?? null);
+      setFiscalYear(res.data.fiscal_year ?? null);
+      setPeriod(res.data.period ?? null);
     } catch (err: unknown) {
       if ((err as ApiError).response?.status === 401) router.push('/login');
       else setError('データの取得に失敗しました');
@@ -72,14 +81,14 @@ export default function MonthlySalesPage() {
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
   const handleRecompute = async () => {
+    if (!fiscalYear) return;
     setRecomputing(true);
     try {
       const res = await apiClient.post('/api/v1/monthly-sales/recompute', {
-        year: recYear, month: recMonth,
+        fiscal_year: fiscalYear,
       });
-      showToast(`${recYear}年${recMonth}月を再集計しました（${res.data.detail_count}件）`);
-      setOpenKey(null);
-      await fetchSummary();
+      showToast(`${fiscalYear}年度を再集計しました（${res.data.detail_count}件）`);
+      await fetchSummary(fiscalYear);
     } catch (err: unknown) {
       if ((err as ApiError).response?.status === 401) router.push('/login');
       else showToast('再集計に失敗しました', 'error');
@@ -104,39 +113,37 @@ export default function MonthlySalesPage() {
     }
   };
 
+  const fyLabel = fiscalYear
+    ? `${fiscalYear}年度${period ? `（${period}期）` : ''}`
+    : '—';
+
   return (
-    <div className="max-w-6xl mx-auto py-4 md:py-6 px-4 md:px-6">
-      <div className="flex flex-wrap justify-between items-center gap-2 mb-4 md:mb-6">
+    <div className="flex flex-col h-screen max-w-6xl mx-auto py-4 md:py-6 px-4 md:px-6">
+      {/* ヘッダー：年度切替 + 再集計 */}
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-4 flex-shrink-0">
         <h1 className="text-xl md:text-2xl font-bold text-gray-800">📈 月別売上（確定・SES台帳ベース）</h1>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" disabled={!fiscalYear || loading}
+              onClick={() => fiscalYear && fetchSummary(fiscalYear - 1)}>←</Button>
+            <span className="min-w-[140px] text-center font-semibold text-gray-700">{fyLabel}</span>
+            <Button variant="outline" size="sm" disabled={!fiscalYear || loading}
+              onClick={() => fiscalYear && fetchSummary(fiscalYear + 1)}>→</Button>
+          </div>
+          <Button onClick={handleRecompute} disabled={recomputing || !fiscalYear}>
+            {recomputing ? '再集計中…' : 'この年度を再集計'}
+          </Button>
+        </div>
       </div>
 
-      {/* 再集計コントロール */}
-      <Card className="mb-4 shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-1">年</label>
-              <Input type="number" min={2000} max={2100} value={recYear}
-                onChange={e => setRecYear(Number(e.target.value))} className="w-28" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-1">月</label>
-              <Input type="number" min={1} max={12} value={recMonth}
-                onChange={e => setRecMonth(Number(e.target.value))} className="w-20" />
-            </div>
-            <Button onClick={handleRecompute} disabled={recomputing}>
-              {recomputing ? '再集計中…' : '再集計'}
-            </Button>
-            <p className="text-xs text-gray-400 ml-auto self-center">
-              契約期間ベース・月単位粗計上。SES台帳の更新後に再集計してください。
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <p className="text-xs text-gray-400 mb-3 flex-shrink-0">
+        決算月で区切った会計年度（{fiscalYear ? `${fiscalYear - 1}年10月〜${fiscalYear}年9月` : ''}）。
+        契約期間ベース・月単位粗計上。SES台帳を更新したら「この年度を再集計」を押してください。
+      </p>
 
       {/* サマリテーブル */}
-      <Card className="shadow-sm">
-        <CardContent className="p-0">
+      <Card className="shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+        <CardContent className="p-0 flex flex-col h-full overflow-hidden">
           {loading ? (
             <div className="py-16 flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -145,13 +152,13 @@ export default function MonthlySalesPage() {
           ) : error ? (
             <div className="py-16 text-center">
               <p className="text-gray-600 mb-3">{error}</p>
-              <Button onClick={fetchSummary}>再試行</Button>
+              <Button onClick={() => fetchSummary(fiscalYear ?? undefined)}>再試行</Button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto flex-1">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-gray-50 text-gray-500 text-xs">
+                <thead className="sticky top-0 bg-gray-50 z-10 border-b">
+                  <tr className="text-gray-500 text-xs">
                     <th className="text-left  px-4 py-3 font-semibold">年月</th>
                     <th className="text-right px-4 py-3 font-semibold">売上</th>
                     <th className="text-right px-4 py-3 font-semibold">仕入</th>
@@ -219,12 +226,19 @@ export default function MonthlySalesPage() {
                       </Fragment>
                     );
                   })}
-                  {rows.length === 0 && (
-                    <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400 text-sm">
-                      データがありません。上の「再集計」で対象月を集計してください。
-                    </td></tr>
-                  )}
                 </tbody>
+                {total && (
+                  <tfoot className="sticky bottom-0 bg-white border-t-2 border-gray-200">
+                    <tr className="font-bold text-gray-800">
+                      <td className="px-4 py-3">{fiscalYear}年度 合計</td>
+                      <td className="px-4 py-3 text-right">{yen(total.revenue)}</td>
+                      <td className="px-4 py-3 text-right text-gray-600">{yen(total.cost)}</td>
+                      <td className="px-4 py-3 text-right text-emerald-700">{yen(total.profit)}</td>
+                      <td className="px-4 py-3 text-right text-gray-600">{total.detail_count}</td>
+                      <td className="px-4 py-3" />
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           )}

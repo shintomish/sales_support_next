@@ -96,6 +96,9 @@ const TEXT_KEYS: (keyof IssuerSettings)[] = [
 
 export default function InvoiceIssuerSettingsPage() {
   const [form, setForm]       = useState<IssuerSettings>(EMPTY);
+  // 決算情報（数値項目のため form とは別管理・文字列で保持）
+  const [fiscalEndMonth, setFiscalEndMonth]   = useState<string>('');
+  const [firstPeriodYear, setFirstPeriodYear] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy]       = useState(false);
   const [toast, setToast]     = useState<string | null>(null);
@@ -105,13 +108,19 @@ export default function InvoiceIssuerSettingsPage() {
   const squareSealInputRef    = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    apiClient.get<IssuerSettings>('/api/v1/settings/invoice-issuer')
+    apiClient.get('/api/v1/settings/invoice-issuer')
       .then((res) => {
+        const data = res.data as IssuerSettings & {
+          fiscal_year_end_month?: number | null;
+          first_period_fiscal_year?: number | null;
+        };
         const merged: IssuerSettings = { ...EMPTY };
         (Object.keys(EMPTY) as (keyof IssuerSettings)[]).forEach((k) => {
-          merged[k] = res.data[k] ?? '';
+          merged[k] = data[k] ?? '';
         });
         setForm(merged);
+        setFiscalEndMonth(data.fiscal_year_end_month != null ? String(data.fiscal_year_end_month) : '');
+        setFirstPeriodYear(data.first_period_fiscal_year != null ? String(data.first_period_fiscal_year) : '');
       })
       .finally(() => setLoading(false));
   }, []);
@@ -121,8 +130,10 @@ export default function InvoiceIssuerSettingsPage() {
   const submit = async () => {
     setBusy(true);
     try {
-      const payload: Partial<IssuerSettings> = {};
+      const payload: Record<string, unknown> = {};
       TEXT_KEYS.forEach((k) => { payload[k] = form[k]; });
+      payload.fiscal_year_end_month    = fiscalEndMonth ? Number(fiscalEndMonth) : null;
+      payload.first_period_fiscal_year = firstPeriodYear ? Number(firstPeriodYear) : null;
       await apiClient.put('/api/v1/settings/invoice-issuer', payload);
       setToast('保存しました');
     } catch (err: unknown) {
@@ -208,6 +219,20 @@ export default function InvoiceIssuerSettingsPage() {
   };
 
   if (loading) return <div className="p-6 text-gray-400">読み込み中...</div>;
+
+  // 決算情報プレビュー（現在の年度・期）
+  const endM = Number(fiscalEndMonth);
+  const validEnd = endM >= 1 && endM <= 12 ? endM : null;
+  let fiscalPreview: string | null = null;
+  if (validEnd) {
+    const today = new Date();
+    const fy = (today.getMonth() + 1) <= validEnd ? today.getFullYear() : today.getFullYear() + 1;
+    const startY = validEnd === 12 ? fy : fy - 1;
+    const startM = (validEnd % 12) + 1;
+    const period = firstPeriodYear ? fy - Number(firstPeriodYear) + 1 : null;
+    fiscalPreview = `現在は ${fy}年度${period ? `（${period}期）` : ''}`
+      + ` ＝ ${startY}年${startM}月〜${fy}年${validEnd}月`;
+  }
 
   return (
     <div className="p-6 max-w-3xl mx-auto w-full">
@@ -388,6 +413,31 @@ export default function InvoiceIssuerSettingsPage() {
               <Input value={form.invoice_issuer_bank_account_holder ?? ''} onChange={(e) => set('invoice_issuer_bank_account_holder')(e.target.value)} />
             </Field>
           </div>
+        </div>
+
+        <div className="border-t border-gray-100 pt-4 mt-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-1">決算情報（月別売上の年度・期）</h2>
+          <p className="text-xs text-gray-400 mb-3">
+            決算月で会計年度を区切り、月別売上を年度集計します。「期」は第1期の年度から自動算出します。
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="決算月">
+              <select value={fiscalEndMonth} onChange={(e) => setFiscalEndMonth(e.target.value)}
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-white">
+                <option value="">未設定</option>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={m}>{m}月</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="第1期の年度（例: 2011）">
+              <Input type="number" min={1900} max={2100} value={firstPeriodYear}
+                onChange={(e) => setFirstPeriodYear(e.target.value)} placeholder="2011" />
+            </Field>
+          </div>
+          {fiscalPreview && (
+            <p className="text-xs text-blue-600 mt-2">📅 {fiscalPreview}</p>
+          )}
         </div>
 
         <div className="flex justify-end pt-4 border-t border-gray-100">
