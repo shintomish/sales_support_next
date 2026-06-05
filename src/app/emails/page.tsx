@@ -28,6 +28,7 @@ type Email = {
   body_html: string | null
   thread_id: string | null
   received_at: string
+  arrived_at: string | null
   created_at: string
   is_read: boolean
   attachments_count: number
@@ -399,8 +400,8 @@ export default function EmailsPage() {
                     )}
                   </div>
                   <span className="text-xs text-gray-400 flex-shrink-0"
-                        title={`送信 ${formatDateFull(email.received_at)}`}>
-                    {formatDateFull(email.created_at)}
+                        title={`送信 ${formatDateFull(email.received_at)} / 取込 ${formatDateFull(email.created_at)}`}>
+                    {formatDateFull(email.arrived_at ?? email.created_at)}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
@@ -477,8 +478,9 @@ export default function EmailsPage() {
                 <div className="text-sm text-gray-600 space-y-1">
                   <p><span className="text-gray-400">差出人:</span> {fromLabel(selectedEmail)}</p>
                   <p><span className="text-gray-400">宛先:</span> {selectedEmail.to_address}</p>
-                  <p><span className="text-gray-400">取込:</span> {formatDateFull(selectedEmail.created_at)}</p>
+                  <p><span className="text-gray-400">受信:</span> {formatDateFull(selectedEmail.arrived_at ?? selectedEmail.created_at)}</p>
                   <p><span className="text-gray-400">送信:</span> {formatDateFull(selectedEmail.received_at)}</p>
+                  <p><span className="text-gray-400">取込:</span> {formatDateFull(selectedEmail.created_at)}</p>
                 </div>
               </div>
 
