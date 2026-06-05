@@ -7,6 +7,8 @@ import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
 import { supabase } from '@/lib/supabase'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
 import SelfMailsView from '@/components/SelfMailsView'
+import { ResizeHandle } from '@/components/ResizeHandle'
+import { useResizableSplit } from '@/hooks/useResizableSplit'
 
 // ── 型定義 ────────────────────────────────────────────────
 
@@ -59,6 +61,8 @@ const CATEGORY_BADGE: Record<string, { label: string; cls: string }> = {
 
 export default function EmailsPage() {
   const router = useRouter()
+  // 左右ペイン幅（md+ のみ可変。モバイルは一画面切替のため固定）
+  const split = useResizableSplit('emailsView:leftPct')
   const [emails, setEmails] = useState<PaginatedEmails | null>(null)
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null)
   const [search, setSearch] = useState('')           // 入力欄の値 (未確定)
@@ -240,7 +244,7 @@ export default function EmailsPage() {
     email.from_name ? `${email.from_name} <${email.from_address}>` : email.from_address
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div ref={split.containerRef} className="flex h-screen bg-gray-50">
       {selfMode ? (
         <div className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center gap-3 p-3 border-b border-gray-200 bg-white">
@@ -253,7 +257,8 @@ export default function EmailsPage() {
       <>
 
       {/* 左ペイン: 一覧 (mobile では選択時に非表示) */}
-      <div className={`${selectedEmail ? 'hidden md:flex' : 'flex'} w-full md:w-96 bg-white border-r border-gray-200 flex-col`}>
+      <div className={`${selectedEmail ? 'hidden md:flex' : 'flex'} w-full md:w-[var(--split-left)] bg-white border-r border-gray-200 flex-col`}
+           style={split.leftPaneStyle}>
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -438,8 +443,11 @@ export default function EmailsPage() {
         )}
       </div>
 
+      {/* リサイザー (md+ のみ。ドラッグで左右幅を変更) */}
+      <ResizeHandle dragging={split.dragging} onStart={split.startDragging} onReset={split.reset} />
+
       {/* 右ペイン: 詳細 (mobile では選択時のみ表示) */}
-      <div className={`${selectedEmail ? 'flex' : 'hidden md:flex'} flex-1 flex-col overflow-hidden`}>
+      <div className={`${selectedEmail ? 'flex' : 'hidden md:flex'} flex-1 flex-col overflow-hidden min-w-0`}>
         {selectedEmail ? (
           <div className="flex-1 overflow-y-auto">
             <div className="p-4 md:p-6">

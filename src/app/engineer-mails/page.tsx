@@ -9,6 +9,8 @@ import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
+import { ResizeHandle } from '@/components/ResizeHandle'
+import { useResizableSplit } from '@/hooks/useResizableSplit'
 
 // ── 型定義 ─────────────────────────────────────────────────
 
@@ -291,6 +293,8 @@ export default function EngineerMailsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
+  // 左右ペイン幅（md+ のみ可変。モバイルは一画面切替のため固定）
+  const split = useResizableSplit('engineerMails:leftPct')
   // /engineer-mails/manual で手動登録モード (E-3 別枠化 2026-05-29)。
   const sourceMode: 'imap' | 'manual' = pathname?.endsWith('/manual') ? 'manual' : 'imap'
   const [items, setItems] = useState<Paginated | null>(null)
@@ -930,10 +934,11 @@ export default function EngineerMailsPage() {
 
   // ── 通常モード（左右2ペイン） ─────────────────────────────
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div ref={split.containerRef} className="flex h-screen bg-gray-50">
 
       {/* 左ペイン (mobile では選択時に非表示) */}
-      <div className={`${selected ? 'hidden md:flex' : 'flex'} w-full md:w-96 bg-white border-r border-gray-200 flex-col`}>
+      <div className={`${selected ? 'hidden md:flex' : 'flex'} w-full md:w-[var(--split-left)] bg-white border-r border-gray-200 flex-col`}
+           style={split.leftPaneStyle}>
         <div className="p-4 border-b border-gray-200 space-y-3">
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-semibold text-gray-900">
@@ -1109,8 +1114,11 @@ export default function EngineerMailsPage() {
         )}
       </div>
 
+      {/* リサイザー (md+ のみ。ドラッグで左右幅を変更) */}
+      <ResizeHandle dragging={split.dragging} onStart={split.startDragging} onReset={split.reset} />
+
       {/* 右ペイン (mobile では選択時のみ表示) */}
-      <div className={`${selected ? 'flex' : 'hidden md:flex'} flex-1 overflow-y-auto`}>
+      <div className={`${selected ? 'flex' : 'hidden md:flex'} flex-1 overflow-y-auto min-w-0`}>
         {selected ? (
           <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4 md:space-y-5 w-full">
 
