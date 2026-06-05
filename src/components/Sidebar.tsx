@@ -127,6 +127,7 @@ export default function Sidebar() {
       type: 'group', key: 'invoicing', label: '販売管理', icon: '🧾', sesOnly: true,
       items: [
         { label: 'SES台帳',         path: '/ses-contracts',                 icon: '📋' },
+        { label: '月別売上',        path: '/monthly-sales',                 icon: '📈' },
         { label: '勤務表',          path: '/timesheets',                    icon: '⏰' },
         // ── 見積書（doc_type=estimate）─────────────────────
         { label: '見積書作成',      path: '/estimates?create=1',            icon: '🧮' },
