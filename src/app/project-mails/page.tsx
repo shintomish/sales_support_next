@@ -20,6 +20,7 @@ type Email = {
   body_text: string | null
   body_html: string | null
   received_at: string
+  arrived_at: string | null
   attachments: { id: number; filename: string; mime_type: string | null; size: number | null }[]
 }
 
@@ -48,6 +49,7 @@ type ProjectMail = {
   status: string
   lost_reason: string | null
   received_at: string
+  arrived_at: string | null
   email?: Email
 }
 
@@ -796,8 +798,9 @@ export default function ProjectMailsPage() {
                   <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${rank.cls}`}>
                     {rank.label} {item.score}
                   </span>
-                  <span className="text-xs text-gray-400 ml-auto flex-shrink-0">
-                    {formatDateFull(item.received_at)}
+                  <span className="text-xs text-gray-400 ml-auto flex-shrink-0"
+                    title={`受信(着信) ${formatDateFull(item.arrived_at ?? item.received_at)} / 送信 ${formatDateFull(item.received_at)}`}>
+                    {formatDateFull(item.arrived_at ?? item.received_at)}
                   </span>
                 </div>
                 <p className="text-sm font-medium text-gray-800 truncate">
@@ -858,7 +861,9 @@ export default function ProjectMailsPage() {
                       <span className="text-gray-300">|</span>
                       <span>{selected.email?.from_address}</span>
                       <span className="text-gray-300">|</span>
-                      <span>{formatDateFull(selected.received_at)}</span>
+                      <span title={`送信 ${formatDateFull(selected.received_at)}`}>
+                        受信 {formatDateFull(selected.arrived_at ?? selected.received_at)}
+                      </span>
                     </div>
                   </div>
                   {(() => { const r = scoreRank(selected.score); return (
@@ -1607,9 +1612,10 @@ function ReviewRow({
           {item.work_location && <span>📍 {item.work_location}</span>}
         </div>
 
-        {/* 受信日時 */}
-        <span className="hidden md:block flex-shrink-0 text-xs text-gray-400 w-16 text-right">
-          {formatDateFull(item.received_at)}
+        {/* 受信(着信)日時 */}
+        <span className="hidden md:block flex-shrink-0 text-xs text-gray-400 w-16 text-right"
+          title={`受信(着信) ${formatDateFull(item.arrived_at ?? item.received_at)} / 送信 ${formatDateFull(item.received_at)}`}>
+          {formatDateFull(item.arrived_at ?? item.received_at)}
         </span>
 
         {/* アクションボタン (mobile はタイトルの右、ラップ後は右上) */}

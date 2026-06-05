@@ -30,6 +30,7 @@ type Email = {
   body_text: string | null
   body_html: string | null
   received_at: string
+  arrived_at: string | null
   attachments: EmailAttachment[]
 }
 
@@ -50,6 +51,7 @@ type EngineerMail = {
   has_attachment: boolean
   status: string
   received_at: string
+  arrived_at: string | null
   email?: Email
 }
 
@@ -103,6 +105,7 @@ type FreshPms = {
   remote_ok: boolean | null
   start_date: string | null
   received_at: string | null
+  arrived_at: string | null
   email_from_address: string | null
   email_from_name: string | null
   email_subject: string | null
@@ -1070,8 +1073,9 @@ export default function EngineerMailsPage() {
                   {item.has_attachment && (
                     <span className="text-xs bg-teal-50 text-teal-600 border border-teal-200 rounded px-1.5 py-0.5">📎 シート</span>
                   )}
-                  <span className="text-xs text-gray-400 ml-auto flex-shrink-0">
-                    {formatDateFull(item.received_at)}
+                  <span className="text-xs text-gray-400 ml-auto flex-shrink-0"
+                    title={`受信(着信) ${formatDateFull(item.arrived_at ?? item.received_at)} / 送信 ${formatDateFull(item.received_at)}`}>
+                    {formatDateFull(item.arrived_at ?? item.received_at)}
                   </span>
                 </div>
                 <p className="text-sm font-medium text-gray-800 truncate">
@@ -1143,7 +1147,9 @@ export default function EngineerMailsPage() {
                       <span className="text-gray-300">|</span>
                       <span>{selected.email?.from_address}</span>
                       <span className="text-gray-300">|</span>
-                      <span>{formatDateFull(selected.received_at)}</span>
+                      <span title={`送信 ${formatDateFull(selected.received_at)}`}>
+                        受信 {formatDateFull(selected.arrived_at ?? selected.received_at)}
+                      </span>
                     </div>
                     {/* 基本情報 */}
                     <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-600">
@@ -1470,8 +1476,8 @@ export default function EngineerMailsPage() {
                                 {item.score}点
                               </span>
                               <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${badgeCls}`}>{badgeLabel}</span>
-                              {item.received_at && (
-                                <span className="text-[10px] text-gray-400">{formatDistanceToNow(new Date(item.received_at), { addSuffix: true, locale: ja })}</span>
+                              {(item.arrived_at ?? item.received_at) && (
+                                <span className="text-[10px] text-gray-400">{formatDistanceToNow(new Date(item.arrived_at ?? item.received_at as string), { addSuffix: true, locale: ja })}</span>
                               )}
                             </div>
                             <p className="text-sm font-medium text-gray-800 truncate mt-1">{item.title ?? '（件名未取得）'}</p>
@@ -2180,9 +2186,10 @@ function ReviewRow({
           {item.available_from && <span>🗓 {item.available_from}</span>}
         </div>
 
-        {/* 受信日時 */}
-        <span className="hidden md:block flex-shrink-0 text-xs text-gray-400 w-16 text-right">
-          {formatDateFull(item.received_at)}
+        {/* 受信(着信)日時 */}
+        <span className="hidden md:block flex-shrink-0 text-xs text-gray-400 w-16 text-right"
+          title={`受信(着信) ${formatDateFull(item.arrived_at ?? item.received_at)} / 送信 ${formatDateFull(item.received_at)}`}>
+          {formatDateFull(item.arrived_at ?? item.received_at)}
         </span>
 
         {/* アクションボタン (mobile はラップして右上) */}

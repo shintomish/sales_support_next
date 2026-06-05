@@ -91,6 +91,7 @@ interface FreshPms {
   remote_ok: boolean | null
   start_date: string | null
   received_at: string | null
+  arrived_at: string | null
   email_from_address: string | null
   email_subject: string | null
   email_body: string | null
@@ -703,7 +704,7 @@ function FreshPmsCard({ item, onPropose, generating, checked, onCheck, engineerM
           <p style={{ fontSize: 11, color: '#6b7280', margin: '2px 0 0', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             {badge && <span style={{ padding: '1px 5px', borderRadius: 3, background: '#fff', color: badge.color, border: `1px solid ${badge.color}`, fontSize: 10, fontWeight: 600 }}>{badge.label}</span>}
             <span>{item.customer_name ?? '—'}</span>
-            <span>{formatDate(item.received_at) ?? '—'}</span>
+            <span title={item.received_at ? `送信 ${formatDate(item.received_at)}` : undefined}>{formatDate(item.arrived_at ?? item.received_at) ?? '—'}</span>
           </p>
         </div>
       </div>
@@ -880,7 +881,7 @@ function FreshPmsRow({ item, onPropose, generating, checked, onCheck }: {
       </td>
       <td style={{ padding: '8px 10px', textAlign: 'right', color: '#374151' }}>{priceStr(item.unit_price_min, item.unit_price_max)}</td>
       <td style={{ padding: '8px 10px', color: '#6b7280' }}>{item.start_date ? formatDate(item.start_date) : '—'}</td>
-      <td style={{ padding: '8px 10px', color: '#9ca3af', fontSize: 11 }}>{formatDate(item.received_at) ?? '—'}</td>
+      <td style={{ padding: '8px 10px', color: '#9ca3af', fontSize: 11 }} title={item.received_at ? `送信 ${formatDate(item.received_at)}` : undefined}>{formatDate(item.arrived_at ?? item.received_at) ?? '—'}</td>
       <td style={{ padding: '8px 10px', textAlign: 'center' }}>
         <button
           onClick={() => onPropose(item)}
