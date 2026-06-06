@@ -327,7 +327,7 @@ function applyTemplate(base: string, tpl: EmailBodyTemplate | null): string {
   return body
 }
 
-type Tab = 'addresses' | 'campaigns' | 'threads' | 'send'
+type Tab = 'addresses' | 'campaigns' | 'threads' | 'replies' | 'send'
 
 // ── メインコンポーネント ──────────────────────────────────
 
@@ -670,16 +670,17 @@ export default function DeliveriesPage() {
         date_to:       campDateTo        || undefined,
         user_id:       campUserId        || undefined,
         delivery_type: campDeliveryType  || undefined,
-        exclude_proposals: 1,
+        // 返信履歴タブは /emails 個別返信(self_reply)のみ、一斉配信履歴タブは提案/返信を除外。
+        ...(tab === 'replies' ? { send_type: 'self_reply' } : { exclude_proposals: 1 }),
         sort_by:       campSortBy,
         sort_dir:      campSortDir,
       },
     })
     setCampaigns(res.data)
-  }, [campPage, campSearch, campDateFrom, campDateTo, campUserId, campDeliveryType, campSortBy, campSortDir])
+  }, [tab, campPage, campSearch, campDateFrom, campDateTo, campUserId, campDeliveryType, campSortBy, campSortDir])
 
   useEffect(() => {
-    if (tab === 'campaigns') fetchCampaigns()
+    if (tab === 'campaigns' || tab === 'replies') fetchCampaigns()
   }, [tab, fetchCampaigns])
 
   // 配信履歴のアコーディオン展開
@@ -1155,6 +1156,7 @@ export default function DeliveriesPage() {
     { key: 'addresses', label: '配信先一覧' },
     { key: 'campaigns', label: '一斉配信履歴' },
     { key: 'threads',   label: '提案スレッド' },
+    { key: 'replies',   label: '返信履歴' },
     { key: 'send',      label: '新規配信' },
   ]
 
@@ -1440,7 +1442,7 @@ export default function DeliveriesPage() {
       )}
 
       {/* ── キャンペーン履歴タブ ────────────────────────── */}
-      {tab === 'campaigns' && (
+      {(tab === 'campaigns' || tab === 'replies') && (
         <div>
           {/* フィルターバー */}
           <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap gap-3 items-end sticky top-0 z-20">
