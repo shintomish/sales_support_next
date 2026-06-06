@@ -26,6 +26,7 @@ const UNSUBSCRIBE_REASON_LABEL: Record<string, string> = {
   operator_disabled:      '担当者による停止',
   recipient_unsubscribed: '客先により停止',
   hard_bounce:            'ハードバウンス（自動停止）',
+  expired_bounce:         '配送不能・期限切れ（自動停止）',
   system:                 'システム',
 }
 
