@@ -1840,35 +1840,61 @@ export default function DeliveriesPage() {
       {/* ── 提案スレッドタブ ────────────────────────────── */}
       {tab === 'threads' && (
         <div>
-          {/* フィルタ */}
-          <div className="flex items-center gap-3 flex-wrap mb-4 sticky top-0 bg-white z-20 py-3">
-            <select value={threadTypeFilter} onChange={e => { setThreadTypeFilter(e.target.value as '' | 'project' | 'engineer'); setThreadPage(1) }}
-              className="text-sm border border-gray-300 rounded-md px-3 py-1.5">
-              <option value="">全タイプ</option>
-              <option value="project">案件メール</option>
-              <option value="engineer">技術者メール</option>
-            </select>
-            <select value={threadStatusFilter} onChange={e => { setThreadStatusFilter(e.target.value); setThreadPage(1) }}
-              className="text-sm border border-gray-300 rounded-md px-3 py-1.5">
-              <option value="">全ステータス</option>
-              <option value="new">新着</option>
-              <option value="review">要確認</option>
-              <option value="proposed">提案済</option>
-              <option value="interview">面談</option>
-              <option value="won">成約</option>
-              <option value="lost">失注</option>
-            </select>
-            <select value={threadUserId} onChange={e => { setThreadUserId(e.target.value); setThreadPage(1) }}
-              className="text-sm border border-gray-300 rounded-md px-3 py-1.5">
-              <option value="">全担当者</option>
-              {salesUsers.map(u => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </select>
-            <input type="text" placeholder="顧客名・技術者名で検索" value={threadSearch}
-              onChange={e => { setThreadSearch(e.target.value); setThreadPage(1) }}
-              className="text-sm border border-gray-300 rounded-md px-3 py-1.5 w-64" />
-            {threads && <span className="text-xs text-gray-400 ml-auto">{threads.total}件</span>}
+          {/* フィルターバー（一斉配信履歴・返信履歴と体裁を統一） */}
+          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap gap-3 items-end sticky top-0 z-20">
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-xs text-gray-500 mb-1">顧客名・技術者名で検索</label>
+              <input
+                type="text"
+                placeholder="顧客名・技術者名..."
+                value={threadSearch}
+                onChange={e => { setThreadSearch(e.target.value); setThreadPage(1) }}
+                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">タイプ</label>
+              <select value={threadTypeFilter} onChange={e => { setThreadTypeFilter(e.target.value as '' | 'project' | 'engineer'); setThreadPage(1) }}
+                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                <option value="">全タイプ</option>
+                <option value="project">案件メール</option>
+                <option value="engineer">技術者メール</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">ステータス</label>
+              <select value={threadStatusFilter} onChange={e => { setThreadStatusFilter(e.target.value); setThreadPage(1) }}
+                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                <option value="">全ステータス</option>
+                <option value="new">新着</option>
+                <option value="review">要確認</option>
+                <option value="proposed">提案済</option>
+                <option value="interview">面談</option>
+                <option value="won">成約</option>
+                <option value="lost">失注</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">担当者</label>
+              <select value={threadUserId} onChange={e => { setThreadUserId(e.target.value); setThreadPage(1) }}
+                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                <option value="">全担当者</option>
+                {salesUsers.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+            {(threadSearch || threadTypeFilter || threadStatusFilter || threadUserId) && (
+              <button
+                onClick={() => { setThreadSearch(''); setThreadTypeFilter(''); setThreadStatusFilter(''); setThreadUserId(''); setThreadPage(1) }}
+                className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 border border-gray-200 rounded"
+              >
+                リセット
+              </button>
+            )}
+            {threads && (
+              <span className="text-sm text-gray-500 ml-auto self-center">全 {threads.total} 件</span>
+            )}
           </div>
 
           {/* 一覧 */}
