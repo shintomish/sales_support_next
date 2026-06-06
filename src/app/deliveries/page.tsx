@@ -359,6 +359,8 @@ export default function DeliveriesPage() {
   const [threadStatusFilter, setThreadStatusFilter] = useState('')
   const [threadSearch, setThreadSearch] = useState('')
   const [threadUserId, setThreadUserId] = useState('')
+  const [threadDateFrom, setThreadDateFrom] = useState('')
+  const [threadDateTo, setThreadDateTo] = useState('')
   const [threadLoading, setThreadLoading] = useState(false)
 
   const fetchThreads = useCallback(async () => {
@@ -371,12 +373,14 @@ export default function DeliveriesPage() {
           status: threadStatusFilter || undefined,
           search: threadSearch || undefined,
           user_id: threadUserId || undefined,
+          date_from: threadDateFrom || undefined,
+          date_to: threadDateTo || undefined,
         },
       })
       setThreads(res.data)
     } catch { setThreads(null) }
     finally { setThreadLoading(false) }
-  }, [threadPage, threadTypeFilter, threadStatusFilter, threadSearch, threadUserId])
+  }, [threadPage, threadTypeFilter, threadStatusFilter, threadSearch, threadUserId, threadDateFrom, threadDateTo])
 
   useEffect(() => {
     if (tab === 'threads') fetchThreads()
@@ -1853,6 +1857,24 @@ export default function DeliveriesPage() {
               />
             </div>
             <div>
+              <label className="block text-xs text-gray-500 mb-1">送信日 From</label>
+              <input
+                type="date"
+                value={threadDateFrom}
+                onChange={e => { setThreadDateFrom(e.target.value); setThreadPage(1) }}
+                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">送信日 To</label>
+              <input
+                type="date"
+                value={threadDateTo}
+                onChange={e => { setThreadDateTo(e.target.value); setThreadPage(1) }}
+                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+            <div>
               <label className="block text-xs text-gray-500 mb-1">タイプ</label>
               <select value={threadTypeFilter} onChange={e => { setThreadTypeFilter(e.target.value as '' | 'project' | 'engineer'); setThreadPage(1) }}
                 className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
@@ -1884,9 +1906,9 @@ export default function DeliveriesPage() {
                 ))}
               </select>
             </div>
-            {(threadSearch || threadTypeFilter || threadStatusFilter || threadUserId) && (
+            {(threadSearch || threadTypeFilter || threadStatusFilter || threadUserId || threadDateFrom || threadDateTo) && (
               <button
-                onClick={() => { setThreadSearch(''); setThreadTypeFilter(''); setThreadStatusFilter(''); setThreadUserId(''); setThreadPage(1) }}
+                onClick={() => { setThreadSearch(''); setThreadTypeFilter(''); setThreadStatusFilter(''); setThreadUserId(''); setThreadDateFrom(''); setThreadDateTo(''); setThreadPage(1) }}
                 className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 border border-gray-200 rounded"
               >
                 リセット
