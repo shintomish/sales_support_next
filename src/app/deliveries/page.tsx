@@ -356,7 +356,6 @@ export default function DeliveriesPage() {
   const [threads, setThreads] = useState<PaginatedThreads | null>(null)
   const [threadPage, setThreadPage] = useState(1)
   const [threadTypeFilter, setThreadTypeFilter] = useState<'' | 'project' | 'engineer'>('')
-  const [threadStatusFilter, setThreadStatusFilter] = useState('')
   const [threadSearch, setThreadSearch] = useState('')
   const [threadUserId, setThreadUserId] = useState('')
   const [threadDateFrom, setThreadDateFrom] = useState('')
@@ -370,7 +369,6 @@ export default function DeliveriesPage() {
         params: {
           page: threadPage, per_page: 50,
           type: threadTypeFilter || undefined,
-          status: threadStatusFilter || undefined,
           search: threadSearch || undefined,
           user_id: threadUserId || undefined,
           date_from: threadDateFrom || undefined,
@@ -380,7 +378,7 @@ export default function DeliveriesPage() {
       setThreads(res.data)
     } catch { setThreads(null) }
     finally { setThreadLoading(false) }
-  }, [threadPage, threadTypeFilter, threadStatusFilter, threadSearch, threadUserId, threadDateFrom, threadDateTo])
+  }, [threadPage, threadTypeFilter, threadSearch, threadUserId, threadDateFrom, threadDateTo])
 
   useEffect(() => {
     if (tab === 'threads') fetchThreads()
@@ -1878,37 +1876,24 @@ export default function DeliveriesPage() {
               <label className="block text-xs text-gray-500 mb-1">タイプ</label>
               <select value={threadTypeFilter} onChange={e => { setThreadTypeFilter(e.target.value as '' | 'project' | 'engineer'); setThreadPage(1) }}
                 className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-                <option value="">全タイプ</option>
+                <option value="">全部</option>
                 <option value="project">案件メール</option>
                 <option value="engineer">技術者メール</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">ステータス</label>
-              <select value={threadStatusFilter} onChange={e => { setThreadStatusFilter(e.target.value); setThreadPage(1) }}
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-                <option value="">全ステータス</option>
-                <option value="new">新着</option>
-                <option value="review">要確認</option>
-                <option value="proposed">提案済</option>
-                <option value="interview">面談</option>
-                <option value="won">成約</option>
-                <option value="lost">失注</option>
               </select>
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">担当者</label>
               <select value={threadUserId} onChange={e => { setThreadUserId(e.target.value); setThreadPage(1) }}
                 className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-                <option value="">全担当者</option>
+                <option value="">全員</option>
                 {salesUsers.map(u => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
               </select>
             </div>
-            {(threadSearch || threadTypeFilter || threadStatusFilter || threadUserId || threadDateFrom || threadDateTo) && (
+            {(threadSearch || threadTypeFilter || threadUserId || threadDateFrom || threadDateTo) && (
               <button
-                onClick={() => { setThreadSearch(''); setThreadTypeFilter(''); setThreadStatusFilter(''); setThreadUserId(''); setThreadDateFrom(''); setThreadDateTo(''); setThreadPage(1) }}
+                onClick={() => { setThreadSearch(''); setThreadTypeFilter(''); setThreadUserId(''); setThreadDateFrom(''); setThreadDateTo(''); setThreadPage(1) }}
                 className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 border border-gray-200 rounded"
               >
                 リセット
