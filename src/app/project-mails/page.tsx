@@ -300,19 +300,24 @@ export default function ProjectMailsPage() {
     setSelected(null)
     setThreadItems([])
     setReplyForm(null)
-    const [res, tres] = await Promise.all([
-      axios.get(`/api/v1/project-mails/${item.id}`).catch(() => null),
-      axios.get(`/api/v1/project-mails/${item.id}/thread`).catch(() => null),
-    ])
-    if (selectGuard.isStale(item.id)) return
-    if (res) {
+    // 詳細を先に取得して即表示する。スレッドは独立なので待たず裏で非同期ロード
+    // (技術者メールと同方針・docs/730 §Low #36)。
+    try {
+      const res = await axios.get(`/api/v1/project-mails/${item.id}`)
+      if (selectGuard.isStale(item.id)) return
       setSelected(res.data)
       setForm(res.data)
       setSaveMsg(null)
       setShowBody(false)
+    } catch {
+      /* 詳細取得失敗は握りつぶし (右ペインは空のまま) */
+    } finally {
+      if (selectGuard.isCurrent(item.id)) setDetailLoading(false)
     }
+    // スレッドは裏で非同期ロード (取得を待っても詳細表示はブロックしない)
+    const tres = await axios.get(`/api/v1/project-mails/${item.id}/thread`).catch(() => null)
+    if (selectGuard.isStale(item.id)) return
     setThreadItems(tres?.data?.thread ?? [])
-    setDetailLoading(false)
     setThreadLoading(false)
   }
 
