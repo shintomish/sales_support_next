@@ -1039,10 +1039,6 @@ export default function DeliveriesPage() {
       alert(`未置換のプレースホルダがあります:\n${unresolvedPlaceholders.join(' / ')}\n\nメール署名設定（/settings/email-template）を確認してください。`)
       return
     }
-    if (!isLinked && !sendForm.source_email) {
-      alert('入手元アドレスを入力してください。\n（案件・技術者を紐づける場合は不要です）')
-      return
-    }
     if (sourceEmailInvalid) {
       alert('入手元アドレスのメール形式が正しくありません。')
       return
@@ -2211,9 +2207,9 @@ export default function DeliveriesPage() {
             {!isLinked && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  入手元アドレス <span className="text-red-500">*</span>
+                  入手元アドレス <span className="text-gray-400 font-normal text-xs">（任意）</span>
                   <span className="text-gray-400 font-normal ml-1 text-xs">
-                    （この案件を入手した元請けのメールアドレス。再送信時の重複防止に使用）
+                    （この案件を入手した元請けのメールアドレス。入力すると再送信時の重複防止に使用）
                   </span>
                 </label>
                 <input
@@ -2340,7 +2336,7 @@ export default function DeliveriesPage() {
             <div className="flex items-center gap-4 pt-2">
               <button
                 onClick={handleSend}
-                disabled={sending || !!sendProgress || !sendForm.subject || !sendForm.body || unresolvedPlaceholders.length > 0 || (!isLinked && (!sendForm.source_email || sourceEmailInvalid))}
+                disabled={sending || !!sendProgress || !sendForm.subject || !sendForm.body || unresolvedPlaceholders.length > 0 || sourceEmailInvalid}
                 className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-6 py-2.5 rounded"
               >
                 {sending ? '送信準備中...' : (addresses?.active_count != null ? `配信先リストへ一括送信（${addresses.active_count} 件）` : '配信先リストへ一括送信')}
