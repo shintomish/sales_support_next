@@ -266,7 +266,7 @@ function applyTemplate(base: string, tpl: EmailBodyTemplate | null): string {
     .replace(/<送信者アドレス>/g, tpl?.email  ?? '<送信者アドレス>')
     .replace(/<送信者TEL>/g,   tpl?.mobile ?? '<送信者TEL>')
   const sig = buildSignature(tpl)
-  if (sig) body += '\n\n' + sig
+  if (sig) body += '\n' + sig
   return body
 }
 
