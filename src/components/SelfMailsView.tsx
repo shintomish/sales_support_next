@@ -286,7 +286,7 @@ export default function SelfMailsView() {
             <button
               key={m.id}
               onClick={() => openMail(m)}
-              className={`w-full text-left px-3 py-2 border-b border-gray-100 hover:bg-gray-50 ${selected?.id === m.id ? 'bg-teal-50' : ''}`}
+              className={`w-full text-left px-3 py-2 border-b border-gray-100 hover:bg-gray-50 ${selected?.id === m.id ? 'bg-teal-100 border-l-2 border-l-teal-500 ring-1 ring-inset ring-teal-300' : ''}`}
             >
               <div className="flex items-center gap-2">
                 {!m.is_read && <span className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0" />}
