@@ -77,6 +77,7 @@ export default function EmailsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [searchBody, setSearchBody] = useState(false)
   const [listLoading, setListLoading] = useState(false) // 一覧取得中インジケータ
+  const [autoSyncing, setAutoSyncing] = useState(false) // Realtime 新着INSERTによる自動更新中 (= 取込み中バナー用)
 
   const fetchEmailsRef = useRef<() => void>(() => {})
 
@@ -114,6 +115,7 @@ export default function EmailsPage() {
       setNewEmailCount(0)
     } finally {
       setListLoading(false)
+      setAutoSyncing(false)
     }
   }, [appliedSearch, searchBody, unreadOnly, categoryFilter, page])
 
@@ -125,7 +127,7 @@ export default function EmailsPage() {
     const channel = supabase
       .channel('emails-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'emails' }, () => {
-        if (page === 1 && !appliedSearch && !unreadOnly) fetchEmailsRef.current()
+        if (page === 1 && !appliedSearch && !unreadOnly) { setAutoSyncing(true); fetchEmailsRef.current() }
         else setNewEmailCount(c => c + 1)
       })
       .subscribe()
@@ -279,6 +281,13 @@ export default function EmailsPage() {
               </button>
             </div>
           </div>
+
+          {autoSyncing && (
+            <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-md bg-blue-50 border border-blue-200 text-sm text-blue-700">
+              <span className="inline-block w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+              <span>メール取込み中…</span>
+            </div>
+          )}
 
           {syncMessage && <p className="text-xs text-green-600 mb-2">{syncMessage}</p>}
 
