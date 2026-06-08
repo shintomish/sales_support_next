@@ -796,13 +796,21 @@ export default function ProjectMailsPage() {
             const rank = scoreRank(item.score)
             return (
               <div key={item.id} onClick={() => handleSelect(item)}
-                className={`p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
-                  selected?.id === item.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
+                className={`px-3 py-2 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
+                  selected?.id === item.id ? 'bg-blue-100 border-l-2 border-l-blue-500 ring-1 ring-inset ring-blue-300' : ''
                 }`}>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${rank.cls}`}>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${rank.cls}`}>
                     {rank.label} {item.score}
                   </span>
+                  <span className="text-sm text-gray-600 truncate min-w-0">
+                    {item.customer_name || item.email?.from_name || item.email?.from_address || '—'}
+                  </span>
+                  {item.unit_price_min && (
+                    <span className="text-xs text-gray-400 flex-shrink-0">
+                      {item.unit_price_min}〜{item.unit_price_max ?? '?'}万
+                    </span>
+                  )}
                   <span className="text-xs text-gray-400 ml-auto flex-shrink-0"
                     title={`受信(着信) ${formatDateFull(item.arrived_at ?? item.received_at)} / 送信 ${formatDateFull(item.received_at)}`}>
                     {formatDateFull(item.arrived_at ?? item.received_at)}
@@ -811,16 +819,6 @@ export default function ProjectMailsPage() {
                 <p className="text-sm font-medium text-gray-800 truncate">
                   {item.title || item.email?.subject || '(タイトル未抽出)'}
                 </p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <p className="text-xs text-gray-500 truncate flex-1">
-                    {item.customer_name || item.email?.from_name || item.email?.from_address || '—'}
-                  </p>
-                  {item.unit_price_min && (
-                    <span className="text-xs text-gray-400 flex-shrink-0">
-                      {item.unit_price_min}〜{item.unit_price_max ?? '?'}万
-                    </span>
-                  )}
-                </div>
               </div>
             )
           })}

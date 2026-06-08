@@ -390,7 +390,7 @@ export default function EmailsPage() {
               <div key={email.id} onClick={() => handleSelectEmail(email)}
                 className={`p-4 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 ${
                   selectedEmail?.id === email.id
-                    ? 'bg-blue-50 border-l-2 border-l-blue-500'
+                    ? 'bg-blue-100 border-l-2 border-l-blue-500 ring-1 ring-inset ring-blue-300'
                     : ''}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">

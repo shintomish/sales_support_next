@@ -1063,45 +1063,45 @@ export default function EngineerMailsPage() {
             const rank = scoreRank(item.score)
             return (
               <div key={item.id} onClick={() => handleSelect(item)}
-                className={`p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
-                  selected?.id === item.id ? 'bg-teal-50 border-l-2 border-l-teal-500' : ''
+                className={`px-3 py-2 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
+                  selected?.id === item.id ? 'bg-teal-100 border-l-2 border-l-teal-500 ring-1 ring-inset ring-teal-300' : ''
                 }`}>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${rank.cls}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${rank.cls}`}>
                     {rank.label} {item.score}
                   </span>
+                  <span className="text-sm text-gray-600 truncate min-w-0 max-w-[10rem]">
+                    {item.email?.from_name || item.email?.from_address || '—'}
+                  </span>
+                  <span className="text-sm font-medium text-gray-800 flex-shrink-0">
+                    {item.name || '—'}
+                  </span>
+                  {item.skills && item.skills.length > 0 && (
+                    <span className="flex items-center gap-1 min-w-0 overflow-hidden">
+                      {item.skills.slice(0, 2).map((s, i) => (
+                        <span key={i} className="text-xs bg-teal-50 text-teal-600 border border-teal-100 rounded px-1.5 py-0.5 flex-shrink-0">{s}</span>
+                      ))}
+                      {item.skills.length > 2 && (
+                        <span className="text-xs text-gray-400 flex-shrink-0">+{item.skills.length - 2}</span>
+                      )}
+                    </span>
+                  )}
                   {item.has_attachment && (
-                    <span className="text-xs bg-teal-50 text-teal-600 border border-teal-200 rounded px-1.5 py-0.5">📎 シート</span>
+                    <span className="text-xs text-teal-600 flex-shrink-0" title="スキルシート添付">📎</span>
                   )}
                   <span className="text-xs text-gray-400 ml-auto flex-shrink-0"
                     title={`受信(着信) ${formatDateFull(item.arrived_at ?? item.received_at)} / 送信 ${formatDateFull(item.received_at)}`}>
                     {formatDateFull(item.arrived_at ?? item.received_at)}
                   </span>
                 </div>
-                <p className="text-sm font-medium text-gray-800 truncate">
-                  {item.name || item.email?.from_name || '(件名なし)'}
-                </p>
-                {item.email?.subject && (
-                  <p className="text-xs text-gray-600 truncate mt-0.5">{item.email.subject}</p>
-                )}
                 <div className="flex items-center gap-2 mt-0.5">
-                  <p className="text-xs text-gray-500 truncate flex-1">
-                    {item.email?.from_name || item.email?.from_address || '—'}
+                  <p className="text-xs text-gray-500 truncate flex-1 min-w-0">
+                    {item.email?.subject || item.email?.from_name || item.email?.from_address || '—'}
                   </p>
                   {item.nearest_station && (
                     <span className="text-xs text-gray-400 flex-shrink-0">📍{item.nearest_station}</span>
                   )}
                 </div>
-                {item.skills && item.skills.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {item.skills.slice(0, 3).map((s, i) => (
-                      <span key={i} className="text-xs bg-teal-50 text-teal-600 border border-teal-100 rounded px-1.5 py-0.5">{s}</span>
-                    ))}
-                    {item.skills.length > 3 && (
-                      <span className="text-xs text-gray-400">+{item.skills.length - 3}</span>
-                    )}
-                  </div>
-                )}
               </div>
             )
           })}
