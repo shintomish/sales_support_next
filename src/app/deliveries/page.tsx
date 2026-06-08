@@ -877,6 +877,31 @@ export default function DeliveriesPage() {
     }
   }
 
+  // ── CSVエクスポート ───────────────────────────────────
+  const [exporting, setExporting] = useState(false)
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const res = await axios.get('/api/v1/delivery-addresses/export', {
+        params: { search: addrSearch || undefined },
+        responseType: 'blob',
+      })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      a.href = url
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+      a.download = `DeliveryAddress_${today}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err: unknown) {
+      alert(`エクスポートに失敗しました: ${(err as ApiError).message}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   // ── 有効/無効切替 ─────────────────────────────────────
   const toggleActive = async (addr: DeliveryAddress) => {
     await axios.patch(`/api/v1/delivery-addresses/${addr.id}`, { is_active: !addr.is_active })
@@ -1207,21 +1232,6 @@ export default function DeliveriesPage() {
             </span>
             <div className="md:ml-auto flex flex-wrap items-center gap-2">
               <button
-                onClick={handleSaveState}
-                disabled={bulkBusy}
-                className="border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm px-3 py-2 rounded">
-                💾 現在の状態を保存
-              </button>
-              <button
-                onClick={handleRestoreState}
-                disabled={bulkBusy || !addresses?.saved_state}
-                title={addresses?.saved_state
-                  ? `保存日時: ${addresses.saved_state.created_at ? new Date(addresses.saved_state.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '不明'}（${addresses.saved_state.count}件）`
-                  : '保存された状態がありません'}
-                className="border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm px-3 py-2 rounded">
-                ↩ 保存状態{addresses?.saved_state ? `「${addresses.saved_state.label}」` : 'A'}に戻す
-              </button>
-              <button
                 onClick={() => handleBulkSetActive(true)}
                 disabled={bulkBusy}
                 className="border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-700 text-sm px-3 py-2 rounded">
@@ -1253,6 +1263,13 @@ export default function DeliveriesPage() {
                 className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded"
               >
                 {importing ? 'インポート中...' : 'CSVインポート'}
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="border border-green-600 hover:bg-green-50 disabled:opacity-50 text-green-700 text-sm px-4 py-2 rounded"
+              >
+                {exporting ? 'エクスポート中...' : 'CSVエクスポート'}
               </button>
             </div>
           </div>
