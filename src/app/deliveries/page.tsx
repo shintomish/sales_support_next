@@ -42,12 +42,6 @@ type EditAddressForm = {
   unsubscribe_reason: string
 }
 
-type SavedAddressState = {
-  label: string
-  created_at: string | null
-  count: number
-}
-
 type PaginatedAddresses = {
   data: DeliveryAddress[]
   current_page: number
@@ -55,7 +49,6 @@ type PaginatedAddresses = {
   total: number
   all_count?: number
   active_count?: number
-  saved_state?: SavedAddressState | null
 }
 
 type Campaign = {
@@ -923,41 +916,6 @@ export default function DeliveriesPage() {
       fetchAddresses()
     } catch {
       setBulkMsg('一括更新に失敗しました')
-    } finally {
-      setBulkBusy(false)
-    }
-  }
-
-  const handleSaveState = async () => {
-    if (!confirm('現在の有効/無効状態をラベル "A" で保存します（既存の保存状態は上書きされます）。よろしいですか？')) return
-    setBulkBusy(true)
-    setBulkMsg(null)
-    try {
-      const res = await axios.post('/api/v1/delivery-addresses/save-state', { label: 'A' })
-      setBulkMsg(res.data?.message ?? '状態を保存しました')
-      fetchAddresses()
-    } catch {
-      setBulkMsg('状態の保存に失敗しました')
-    } finally {
-      setBulkBusy(false)
-    }
-  }
-
-  const handleRestoreState = async () => {
-    const saved = addresses?.saved_state
-    if (!saved) {
-      alert('保存された状態がありません。先に「現在の状態を保存」してください。')
-      return
-    }
-    if (!confirm(`保存状態「${saved.label}」(${saved.count}件) に復元します。現在の有効/無効は上書きされます。よろしいですか？`)) return
-    setBulkBusy(true)
-    setBulkMsg(null)
-    try {
-      const res = await axios.post('/api/v1/delivery-addresses/restore-state')
-      setBulkMsg(res.data?.message ?? '状態を復元しました')
-      fetchAddresses()
-    } catch {
-      setBulkMsg('状態の復元に失敗しました')
     } finally {
       setBulkBusy(false)
     }
