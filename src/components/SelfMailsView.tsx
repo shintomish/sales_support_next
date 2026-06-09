@@ -22,6 +22,7 @@ type MailRow = {
   body_html: string | null
   body_text: string | null
   received_at: string
+  arrived_at: string | null
   is_read: boolean
   attachments_count?: number
   // 一斉配信(delivery_campaigns) への返信の場合、紐付け元 campaign 情報（バックエンド EmailController::index が付与）
@@ -45,6 +46,20 @@ function formatSize(n: number | null): string {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
   return `${(n / 1024 / 1024).toFixed(1)} MB`
+}
+
+// 一覧/詳細の日時表示。PMS/EMS と揃えて arrived_at(Kagoya 着信)基準で表示し、
+// 送信時刻(received_at)は tooltip に併記する (2026-06-05 着信基準統一・d09b010)。
+function formatMailDate(iso: string, full: boolean): string {
+  return new Date(iso).toLocaleString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    ...(full ? { year: 'numeric' as const } : {}),
+    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  })
+}
+// tooltip: 「受信(着信) … / 送信 …」(EMS と同じ文言)
+function mailDateTitle(m: { arrived_at: string | null; received_at: string }): string {
+  return `受信(着信) ${formatMailDate(m.arrived_at ?? m.received_at, true)} / 送信 ${formatMailDate(m.received_at, true)}`
 }
 
 // project-mails / engineer-mails 同等の署名生成。テンプレ body_text に「（本文）」マーカーがあれば
@@ -291,8 +306,8 @@ export default function SelfMailsView() {
               <div className="flex items-center gap-2">
                 {!m.is_read && <span className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0" />}
                 <span className="text-xs text-gray-500 truncate">{m.from_name || m.from_address}</span>
-                <span className="text-[10px] text-gray-400 ml-auto flex-shrink-0">
-                  {new Date(m.received_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                <span className="text-[10px] text-gray-400 ml-auto flex-shrink-0" title={mailDateTitle(m)}>
+                  {formatMailDate(m.arrived_at ?? m.received_at, false)}
                 </span>
               </div>
               <p className="text-sm text-gray-800 truncate mt-0.5">{m.attachments_count ? '📎 ' : ''}{m.subject || '(件名なし)'}</p>
@@ -323,8 +338,8 @@ export default function SelfMailsView() {
           <div>
             <p className="text-sm font-semibold text-gray-900 mb-1">{selected.subject || '(件名なし)'}</p>
             <p className="text-xs text-gray-500 mb-1">{selected.from_name} &lt;{selected.from_address}&gt;</p>
-            <p className="text-xs text-gray-400 mb-1">
-              {new Date(selected.received_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            <p className="text-xs text-gray-400 mb-1" title={mailDateTitle(selected)}>
+              受信 {formatMailDate(selected.arrived_at ?? selected.received_at, true)}
             </p>
             {selected.reply_to_campaign_id && (
               <a
