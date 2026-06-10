@@ -328,6 +328,10 @@ export default function EngineerMailsPage() {
   const [showBody, setShowBody] = useState(false)
   // 「元メール本文」展開時に、その位置まで自動スクロールして見やすくする (展開部が画面下に出て気付きにくい問題の解消)
   const mailBodyRef = useRef<HTMLDivElement>(null)
+  // 右ペインのメモ・備考追記 (手動登録のみ)。POST /engineer-mails/{id}/memo で本文末尾に追記。
+  const [memoText, setMemoText] = useState('')
+  const [memoSaving, setMemoSaving] = useState(false)
+  const [memoMsg, setMemoMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [expandedItem, setExpandedItem] = useState<EngineerMail | null>(null)
   const [expandLoading, setExpandLoading] = useState(false)
@@ -413,6 +417,8 @@ export default function EngineerMailsPage() {
       setSkillInput('')
       setSaveMsg(null)
       setShowBody(false)
+      setMemoText('')
+      setMemoMsg(null)
       // マッチ案件��得
       setMatchLoading(true)
       axios.get(`/api/v1/engineer-mails/${id}/matched-projects`).then(mres => {
@@ -449,6 +455,8 @@ export default function EngineerMailsPage() {
       setSkillInput('')
       setSaveMsg(null)
       setShowBody(false)
+      setMemoText('')
+      setMemoMsg(null)
     } finally {
       if (selectGuard.isCurrent(item.id)) setDetailLoading(false)
     }
@@ -716,6 +724,21 @@ export default function EngineerMailsPage() {
       fetchList()
     } catch { setSaveMsg({ type: 'err', text: '保存に失敗しました' }) }
     finally { setSaving(false) }
+  }
+
+  // メモ・備考を本文末尾に追記 (手動登録のみ)。追記後は詳細を更新し本文を開いて結果を見せる。
+  const handleAppendMemo = async () => {
+    if (!selected || !memoText.trim()) return
+    setMemoSaving(true); setMemoMsg(null)
+    try {
+      const res = await axios.post(`/api/v1/engineer-mails/${selected.id}/memo`, { body_text: memoText.trim() })
+      setSelected(res.data)
+      setForm(res.data)
+      setMemoText('')
+      setShowBody(true)
+      setMemoMsg({ type: 'ok', text: '本文末尾に追記しました' })
+    } catch { setMemoMsg({ type: 'err', text: '追記に失敗しました' }) }
+    finally { setMemoSaving(false) }
   }
 
   // ステータス変更
@@ -1674,6 +1697,25 @@ export default function EngineerMailsPage() {
                 )}
               </div>
             </div>
+
+            {/* メモ・備考の追記 (手動登録のみ。本文末尾に追記される) */}
+            {sourceMode === 'manual' && (
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <p className="text-sm font-semibold text-gray-700 mb-2">メモ・備考 (本文に追記されます)</p>
+                <textarea rows={3} value={memoText} onChange={e => setMemoText(e.target.value)}
+                  placeholder="LINE や電話で得た補足情報など"
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5" />
+                <div className="flex items-center gap-2 mt-2">
+                  <button onClick={handleAppendMemo} disabled={memoSaving || !memoText.trim()}
+                    className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
+                    {memoSaving ? '追記中...' : '追記'}
+                  </button>
+                  {memoMsg && (
+                    <span className={`text-xs ${memoMsg.type === 'ok' ? 'text-green-600' : 'text-red-600'}`}>{memoMsg.text}</span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* 元メール */}
             <div ref={mailBodyRef} className="bg-white rounded-xl border border-gray-200 overflow-hidden scroll-mt-4">
