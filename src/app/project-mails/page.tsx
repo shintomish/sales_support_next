@@ -960,11 +960,15 @@ export default function ProjectMailsPage() {
                     className="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg hover:bg-orange-700 font-medium">
                     📤 一斉配信
                   </button>
-                  <button
-                    onClick={() => router.push(`/emails?email_id=${selected.email_id}`)}
-                    className="text-xs border border-blue-300 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-50">
-                    メール詳細
-                  </button>
+                  {/* メール詳細(/emails へジャンプ)は実受信メールのみ。手動登録はダミー emails で
+                      /emails に出ないため非表示。本文は右ペインの「元メール本文」で確認できる。 */}
+                  {sourceMode !== 'manual' && (
+                    <button
+                      onClick={() => router.push(`/emails?email_id=${selected.email_id}`)}
+                      className="text-xs border border-blue-300 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-50">
+                      メール詳細
+                    </button>
+                  )}
                   <button onClick={handleRescore}
                     disabled={rescoringOne}
                     className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
