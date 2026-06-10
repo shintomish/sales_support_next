@@ -398,7 +398,7 @@ export default function EmailsPage() {
             const badge = email.category ? CATEGORY_BADGE[email.category] : null
             return (
               <div key={email.id} onClick={() => handleSelectEmail(email)}
-                className={`p-4 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 ${
+                className={`px-4 py-2 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 ${
                   selectedEmail?.id === email.id
                     ? 'bg-blue-100 border-l-2 border-l-blue-500 ring-1 ring-inset ring-blue-300'
                     : ''}`}>
@@ -436,7 +436,6 @@ export default function EmailsPage() {
                     )}
                   </div>
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5 truncate">{email.body_text?.slice(0, 80)}</p>
               </div>
             )
           })}
