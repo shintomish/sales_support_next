@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
 import { supabase } from '@/lib/supabase'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
+import { renderMailBody } from '@/components/mailBody'
 import SelfMailsView from '@/components/SelfMailsView'
 import { ResizeHandle } from '@/components/ResizeHandle'
 import { useResizableSplit } from '@/hooks/useResizableSplit'
@@ -544,7 +545,7 @@ export default function EmailsPage() {
                   <EmailHtmlFrame html={selectedEmail.body_html} highlight={appliedSearch} />
                 ) : (
                   <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans">
-                    <HighlightedText text={selectedEmail.body_text || '(本文なし)'} term={appliedSearch} />
+                    {renderMailBody(selectedEmail.body_text || '(本文なし)', appliedSearch ? [appliedSearch] : [])}
                   </pre>
                 )}
               </div>
@@ -593,31 +594,6 @@ function fileIcon(mimeType: string | null, filename?: string): string {
 }
 
 // 検索ワードを <mark> で強調する小コンポーネント (案件番号や名前など 1 ワード想定)
-function HighlightedText({ text, term }: { text: string; term?: string }) {
-  if (!term || !term.trim()) return <>{text}</>
-  const t = term.trim()
-  const lcText = text.toLowerCase()
-  const lcTerm = t.toLowerCase()
-  const parts: React.ReactNode[] = []
-  let i = 0
-  let key = 0
-  while (i < text.length) {
-    const idx = lcText.indexOf(lcTerm, i)
-    if (idx === -1) {
-      parts.push(text.slice(i))
-      break
-    }
-    if (idx > i) parts.push(text.slice(i, idx))
-    parts.push(
-      <mark key={key++} className="bg-yellow-200 text-inherit px-0.5 rounded-sm">
-        {text.slice(idx, idx + t.length)}
-      </mark>
-    )
-    i = idx + t.length
-  }
-  return <>{parts}</>
-}
-
 function formatFileSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)}MB`
   if (bytes >= 1024) return `${Math.round(bytes / 1024)}KB`

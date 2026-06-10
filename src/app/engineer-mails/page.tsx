@@ -9,8 +9,12 @@ import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
 import { formatDistanceToNow } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
+import { renderMailBody } from '@/components/mailBody'
 import { ResizeHandle } from '@/components/ResizeHandle'
 import { useResizableSplit } from '@/hooks/useResizableSplit'
+
+// 技術者メールのハイライトは teal 系 (案件メールの黄色と区別)
+const ENGINEER_MARK = { background: '#ccfbf1', borderRadius: 2, padding: '0 1px', color: '#0f766e' } as const
 
 // ── 型定義 ─────────────────────────────────────────────────
 
@@ -322,6 +326,8 @@ export default function EngineerMailsPage() {
   // 手動登録モーダル (E-3 営業打ち合わせ 2026-05-25)
   const [showCreate, setShowCreate] = useState(false)
   const [showBody, setShowBody] = useState(false)
+  // 「元メール本文」展開時に、その位置まで自動スクロールして見やすくする (展開部が画面下に出て気付きにくい問題の解消)
+  const mailBodyRef = useRef<HTMLDivElement>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [expandedItem, setExpandedItem] = useState<EngineerMail | null>(null)
   const [expandLoading, setExpandLoading] = useState(false)
@@ -1670,8 +1676,12 @@ export default function EngineerMailsPage() {
             </div>
 
             {/* 元メール */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <button onClick={() => setShowBody(v => !v)}
+            <div ref={mailBodyRef} className="bg-white rounded-xl border border-gray-200 overflow-hidden scroll-mt-4">
+              <button onClick={() => setShowBody(v => {
+                const next = !v
+                if (next) setTimeout(() => mailBodyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+                return next
+              })}
                 className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-100">
                 <span>元メール本文</span>
                 <span className="text-gray-400">{showBody ? '▲ 閉じる' : '▼ 開く'}</span>
@@ -1681,12 +1691,13 @@ export default function EngineerMailsPage() {
                   <p className="text-xs text-gray-400 mb-2">件名: {selected.email?.subject}</p>
                   {selected.email?.body_text ? (
                     <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans">
-                      {highlightBody(
+                      {renderMailBody(
                         selected.email.body_text,
                         [
                           ...(appliedSearch ? [appliedSearch] : []),
                           ...(selected.skills ?? []),
-                        ].filter(Boolean)
+                        ].filter(Boolean),
+                        ENGINEER_MARK,
                       )}
                     </pre>
                   ) : selected.email?.body_html ? (
@@ -2276,7 +2287,7 @@ function ReviewRow({
                   <div>
                     <p className="text-xs font-semibold text-gray-500 mb-1.5">メール本文</p>
                     <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto font-mono">
-                      {highlightBody(body, [...(appliedSearch ? [appliedSearch] : []), ...(expandedDetail.skills ?? [])].filter(Boolean))}
+                      {renderMailBody(body, [...(appliedSearch ? [appliedSearch] : []), ...(expandedDetail.skills ?? [])].filter(Boolean), ENGINEER_MARK)}
                       {raw.length > 1500 && <span className="text-gray-400">…（以下省略）</span>}
                     </div>
                   </div>
@@ -2330,37 +2341,6 @@ function ScoreReasonChip({ reason }: { reason: string }) {
   return (
     <span className="text-xs px-2 py-0.5 bg-teal-50 text-teal-600 border border-teal-100 rounded-full">{reason}</span>
   )
-}
-
-function highlightBody(text: string, keywords: string[]): React.ReactNode {
-  const kws = keywords.filter(k => k.length >= 2)
-  if (!kws.length) return text
-
-  const urlPattern = /https?:\/\/[^\s\u3000"'<>「」【】）)]+/g
-  const segments: { text: string; isUrl: boolean }[] = []
-  let lastIndex = 0
-  let urlMatch: RegExpExecArray | null
-  while ((urlMatch = urlPattern.exec(text)) !== null) {
-    if (urlMatch.index > lastIndex) segments.push({ text: text.slice(lastIndex, urlMatch.index), isUrl: false })
-    segments.push({ text: urlMatch[0], isUrl: true })
-    lastIndex = urlMatch.index + urlMatch[0].length
-  }
-  if (lastIndex < text.length) segments.push({ text: text.slice(lastIndex), isUrl: false })
-
-  const kwPattern = new RegExp(
-    `(?<![a-zA-Z0-9/.])(${kws.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![a-zA-Z0-9/.])`,
-    'gi'
-  )
-
-  return segments.flatMap((seg, si) => {
-    if (seg.isUrl) return [seg.text]
-    const parts = seg.text.split(kwPattern)
-    return parts.map((part, pi) =>
-      kws.some(k => k.toLowerCase() === part.toLowerCase())
-        ? <mark key={`${si}-${pi}`} style={{ background: '#ccfbf1', borderRadius: 2, padding: '0 1px', color: '#0f766e' }}>{part}</mark>
-        : part
-    )
-  })
 }
 
 // /emails 右ペインと表示を揃えるための絶対日時フォーマット（例: 2026/6/2 14:30:45）

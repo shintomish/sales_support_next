@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from '@/lib/axios'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
+import { renderMailBody } from '@/components/mailBody'
 import { ResizeHandle } from '@/components/ResizeHandle'
 import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
 import { useResizableSplit } from '@/hooks/useResizableSplit'
@@ -23,6 +24,7 @@ type MailRow = {
   body_text: string | null
   received_at: string
   arrived_at: string | null
+  created_at: string
   is_read: boolean
   attachments_count?: number
   // 一斉配信(delivery_campaigns) への返信の場合、紐付け元 campaign 情報（バックエンド EmailController::index が付与）
@@ -56,6 +58,10 @@ function formatMailDate(iso: string, full: boolean): string {
     ...(full ? { year: 'numeric' as const } : {}),
     month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
   })
+}
+// 右ペイン詳細の受信/送信/取込 用。秒まで表示して 1 秒差(受信 vs 取込)を見分けられるようにする。
+function formatMailDateSec(iso: string): string {
+  return new Date(iso).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
 }
 // tooltip: 「受信(着信) … / 送信 …」(EMS と同じ文言)
 function mailDateTitle(m: { arrived_at: string | null; received_at: string }): string {
@@ -338,9 +344,11 @@ export default function SelfMailsView() {
           <div>
             <p className="text-sm font-semibold text-gray-900 mb-1">{selected.subject || '(件名なし)'}</p>
             <p className="text-xs text-gray-500 mb-1">{selected.from_name} &lt;{selected.from_address}&gt;</p>
-            <p className="text-xs text-gray-400 mb-1" title={mailDateTitle(selected)}>
-              受信 {formatMailDate(selected.arrived_at ?? selected.received_at, true)}
-            </p>
+            <div className="text-xs text-gray-400 mb-1 space-y-0.5">
+              <p>受信 {formatMailDateSec(selected.arrived_at ?? selected.received_at)}</p>
+              <p>送信 {formatMailDateSec(selected.received_at)}</p>
+              <p>取込 {formatMailDateSec(selected.created_at)}</p>
+            </div>
             {selected.reply_to_campaign_id && (
               <a
                 href={`/deliveries/campaigns/${selected.reply_to_campaign_id}`}
@@ -375,7 +383,7 @@ export default function SelfMailsView() {
             )}
             {selected.body_html
               ? <EmailHtmlFrame html={selected.body_html} />
-              : <pre className="text-sm whitespace-pre-wrap text-gray-800 font-sans">{selected.body_text}</pre>}
+              : <pre className="text-sm whitespace-pre-wrap text-gray-800 font-sans">{renderMailBody(selected.body_text ?? '', [])}</pre>}
 
             {/* 返信エリア (E-4 2026-05-27) */}
             <div className="mt-4 pt-4 border-t border-gray-200">

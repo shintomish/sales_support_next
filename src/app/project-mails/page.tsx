@@ -7,6 +7,7 @@ import axios from '@/lib/axios'
 import { useAuthStore } from '@/store/authStore'
 import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
+import { renderMailBody } from '@/components/mailBody'
 import { ResizeHandle } from '@/components/ResizeHandle'
 import { useResizableSplit } from '@/hooks/useResizableSplit'
 
@@ -205,6 +206,8 @@ export default function ProjectMailsPage() {
   // 手動登録モーダル (E-3 営業打ち合わせ 2026-05-25)
   const [showCreate, setShowCreate] = useState(false)
   const [showBody, setShowBody] = useState(false)
+  // 「元メール本文」展開時に、その位置まで自動スクロールして見やすくする (展開部が画面下に出て気付きにくい問題の解消)
+  const mailBodyRef = useRef<HTMLDivElement>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [expandedItem, setExpandedItem] = useState<ProjectMail | null>(null)
   const [expandLoading, setExpandLoading] = useState(false)
@@ -1226,8 +1229,12 @@ export default function ProjectMailsPage() {
             </div>
 
             {/* 元メール */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <button onClick={() => setShowBody(v => !v)}
+            <div ref={mailBodyRef} className="bg-white rounded-xl border border-gray-200 overflow-hidden scroll-mt-4">
+              <button onClick={() => setShowBody(v => {
+                const next = !v
+                if (next) setTimeout(() => mailBodyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+                return next
+              })}
                 className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-100">
                 <span>元メール本文</span>
                 <span className="text-gray-400">{showBody ? '▲ 閉じる' : '▼ 開く'}</span>
@@ -1237,7 +1244,7 @@ export default function ProjectMailsPage() {
                   <p className="text-xs text-gray-400 mb-2">件名: {selected.email?.subject}</p>
                   {selected.email?.body_text ? (
                     <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans">
-                      {highlightBody(
+                      {renderMailBody(
                         selected.email.body_text,
                         [
                           ...(appliedSearch ? [appliedSearch] : []),
@@ -1681,7 +1688,7 @@ function ReviewRow({
                 <div>
                   <p className="text-xs font-semibold text-gray-500 mb-1.5">メール本文</p>
                   <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto font-mono">
-                    {highlightBody(
+                    {renderMailBody(
                       expandedDetail.email.body_text.slice(0, 1500),
                       [
                         ...(appliedSearch ? [appliedSearch] : []),
@@ -1752,40 +1759,6 @@ function extractKeywordsFromReasons(reasons: string[]): string[] {
       const kw = r.slice(colonIdx + 1)
       return kw.length >= 2 ? [kw] : []
     })
-}
-
-function highlightBody(text: string, keywords: string[]): React.ReactNode {
-  const kws = keywords.filter(k => k.length >= 2)
-  if (!kws.length) return text
-
-  // URL部分はハイライト対象外（cc.php → PHP 等の誤マッチを防ぐ）
-  const urlPattern = /https?:\/\/[^\s\u3000"'<>「」【】）)]+/g
-  const segments: { text: string; isUrl: boolean }[] = []
-  let lastIndex = 0
-  let urlMatch: RegExpExecArray | null
-  while ((urlMatch = urlPattern.exec(text)) !== null) {
-    if (urlMatch.index > lastIndex) segments.push({ text: text.slice(lastIndex, urlMatch.index), isUrl: false })
-    segments.push({ text: urlMatch[0], isUrl: true })
-    lastIndex = urlMatch.index + urlMatch[0].length
-  }
-  if (lastIndex < text.length) segments.push({ text: text.slice(lastIndex), isUrl: false })
-
-  // 前後がアルファベット・数字・スラッシュ・ドットに隣接する場合はマッチしない
-  // （例: .go.jp / go.php のような URL 断片・パスへの誤マッチを防ぐ）
-  const kwPattern = new RegExp(
-    `(?<![a-zA-Z0-9/.])(${kws.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![a-zA-Z0-9/.])`,
-    'gi'
-  )
-
-  return segments.flatMap((seg, si) => {
-    if (seg.isUrl) return [seg.text]
-    const parts = seg.text.split(kwPattern)
-    return parts.map((part, pi) =>
-      kws.some(k => k.toLowerCase() === part.toLowerCase())
-        ? <mark key={`${si}-${pi}`} style={{ background: '#fef08a', borderRadius: 2, padding: '0 1px' }}>{part}</mark>
-        : part
-    )
-  })
 }
 
 // ── ユーティリティ ────────────────────────────────────────
