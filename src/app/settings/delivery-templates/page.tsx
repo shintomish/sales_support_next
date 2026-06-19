@@ -29,7 +29,20 @@ type EditForm = {
   is_active: boolean;
 };
 
-const EMPTY: EditForm = { purpose: 'standard', name: '', subject: '', body_text: '', is_active: true };
+// 新規テンプレ本文のひな型。<%Name%>(送信時に宛先名へ置換)・<送信者>(署名設定の氏名へ置換)を
+// 最初から入れておく。署名ブロックは書かない（配信フォームで選択時に署名設定から自動付与される）。
+const BODY_SCAFFOLD = `<%Name%> 様
+
+いつもお世話になっております。
+株式会社アイゼン・ソリューションの<送信者>です。
+
+（ここに案内文を記入してください）
+
+何かご不明な点やご質問がございましたら、お気軽にご連絡いただければ幸いです。
+引き続き何卒よろしくお願いいたします。
+--`;
+
+const EMPTY: EditForm = { purpose: 'standard', name: '', subject: '', body_text: BODY_SCAFFOLD, is_active: true };
 
 export default function DeliveryTemplatesPage() {
   const [templates, setTemplates] = useState<DeliveryTemplate[]>([]);
@@ -199,16 +212,18 @@ export default function DeliveryTemplatesPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              本文
-              <span className="text-gray-400 font-normal ml-1">（&lt;%Name%&gt; は送信時に宛先名へ置換）</span>
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">本文</label>
             <textarea
               value={form.body_text}
               onChange={e => setForm(f => ({ ...f, body_text: e.target.value }))}
               rows={12}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
             />
+            <ul className="text-xs text-gray-400 mt-1 space-y-0.5 leading-snug">
+              <li>・<code className="text-gray-500">&lt;%Name%&gt;</code> … 送信時に各宛先の名前へ自動置換</li>
+              <li>・<code className="text-gray-500">&lt;送信者&gt;</code> … 配信時に「メール署名設定」の氏名へ置換</li>
+              <li>・署名ブロックは書かない（配信フォームで選択時に署名設定から自動で付きます）</li>
+            </ul>
           </div>
 
           <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">

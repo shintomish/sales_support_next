@@ -813,6 +813,8 @@ export default function DeliveriesPage() {
   }
 
   // テンプレ選択 → 件名/本文をプリフィル
+  // 本文は applyTemplate で <送信者> を署名設定の氏名に置換し、末尾に署名ブロックを自動付与する
+  // （テンプレ本文には署名を書かない運用。<%Name%> は送信時にバックエンドが宛先名へ置換）。
   const handleTemplateSelect = (id: string) => {
     setSelectedTemplateId(id)
     if (!id) return
@@ -821,7 +823,7 @@ export default function DeliveriesPage() {
     setSendForm(f => ({
       ...f,
       subject: tpl.subject ?? f.subject,
-      body:    tpl.body_text ?? f.body,
+      body:    tpl.body_text ? applyTemplate(tpl.body_text, emailTemplate) : f.body,
     }))
   }
 
