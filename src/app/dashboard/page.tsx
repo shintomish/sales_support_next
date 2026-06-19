@@ -244,7 +244,10 @@ export default function DashboardPage() {
       {hasSales && (
         <Card className="mb-4 md:mb-6 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-gray-700">📊 月別売上 確定（SES台帳ベース・過去6ヶ月）</CardTitle>
+            <CardTitle className="text-base text-gray-700">📊 月別売上 契約ベース（SES台帳・過去6ヶ月）</CardTitle>
+            <p className="text-xs text-gray-400 mt-1 leading-snug">
+              ※ アクティブ契約の月額合計（ラン・レート）です。請求・入金で確定した金額ではありません。
+            </p>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
