@@ -166,6 +166,7 @@ export default function Sidebar() {
       type: 'group', key: 'settings', label: '設定', icon: '⚙️',
       items: [
         { label: 'メール署名設定',   path: '/settings/email-template', icon: '✍️' },
+        { label: '配信テンプレ',     path: '/settings/delivery-templates', icon: '📝', sesOnly: true },
         { label: '請求書発行元設定', path: '/settings/invoice-issuer', icon: '🏢', sesOnly: true },
         { label: '日次レポート配信先', path: '/settings/report-recipients', icon: '📊', sesOnly: true },
         { label: '不具合・要望を送る', path: '/settings/feedback', icon: '💬' },

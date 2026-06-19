@@ -131,6 +131,23 @@ type EmailBodyTemplate = {
 
 type DeliveryType = 'project' | 'engineer'
 
+// 配信目的軸（delivery_campaigns.delivery_purpose）。配信用とリアル案件用で文面を分ける。
+type DeliveryPurpose = 'standard' | 'real_spot'
+const DELIVERY_PURPOSES: { value: DeliveryPurpose; label: string }[] = [
+  { value: 'standard',  label: '配信用' },
+  { value: 'real_spot', label: 'リアル案件用' },
+]
+
+// 配信テンプレライブラリ（email_delivery_templates・テナント共有）
+type DeliveryTemplate = {
+  id: number
+  purpose: DeliveryPurpose
+  name: string
+  subject: string | null
+  body_text: string | null
+  is_active: boolean
+}
+
 type ThreadLastActivity = {
   type: 'sent' | 'received'
   subject: string | null
@@ -543,6 +560,10 @@ export default function DeliveriesPage() {
 
   // 新規配信
   const [deliveryType, setDeliveryType] = useState<DeliveryType>('project')
+  // 配信目的軸 + テンプレライブラリ
+  const [deliveryPurpose, setDeliveryPurpose] = useState<DeliveryPurpose>('standard')
+  const [deliveryTemplates, setDeliveryTemplates] = useState<DeliveryTemplate[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [projectMails, setProjectMails] = useState<ProjectMail[]>([])
   const [engineerMails, setEngineerMails] = useState<EngineerMail[]>([])
   const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
@@ -685,6 +706,10 @@ export default function DeliveriesPage() {
         setSendForm(f => ({ ...f, body: applyTemplate(currentBase, tpl) }))
       })
       .catch(() => {})
+    // 配信テンプレライブラリ（有効分を一括取得し purpose でクライアント絞り込み）
+    axios.get('/api/v1/email-delivery-templates', { params: { only_active: 1 } })
+      .then(res => setDeliveryTemplates(res.data ?? []))
+      .catch(() => {})
     // deliveryType を依存に入れると配信タイプ切替時に不要な API 再呼び出しが
     // 発生する。タイプ切替時は handleDeliveryTypeChange が個別に setSendForm を
     // 呼ぶため、本 effect は tab='send' への切替時の初期化のみで十分。
@@ -779,6 +804,25 @@ export default function DeliveriesPage() {
     setPmSearch('')
     setMailBodyText('')
     setMailBodyOpen(false)
+  }
+
+  // 配信目的の切替（テンプレ選択はリセット。文面は明示選択するまで変えない）
+  const handleDeliveryPurposeChange = (purpose: DeliveryPurpose) => {
+    setDeliveryPurpose(purpose)
+    setSelectedTemplateId('')
+  }
+
+  // テンプレ選択 → 件名/本文をプリフィル
+  const handleTemplateSelect = (id: string) => {
+    setSelectedTemplateId(id)
+    if (!id) return
+    const tpl = deliveryTemplates.find(t => String(t.id) === id)
+    if (!tpl) return
+    setSendForm(f => ({
+      ...f,
+      subject: tpl.subject ?? f.subject,
+      body:    tpl.body_text ?? f.body,
+    }))
   }
 
   // ── CSVインポート ─────────────────────────────────────
@@ -1012,6 +1056,7 @@ export default function DeliveriesPage() {
       formData.append('subject', sendForm.subject)
       formData.append('body',    sendForm.body)
       formData.append('delivery_type', deliveryType)
+      formData.append('delivery_purpose', deliveryPurpose)
       if (deliveryType === 'project' && sendForm.project_mail_id)
         formData.append('project_mail_id', sendForm.project_mail_id)
       if (deliveryType === 'engineer' && sendForm.engineer_mail_source_id)
@@ -2071,6 +2116,47 @@ export default function DeliveriesPage() {
                   </label>
                 ))}
               </div>
+            </div>
+
+            {/* 配信目的（配信用 / リアル案件用）+ テンプレ選択 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">配信目的</label>
+              <div className="flex gap-6 mb-3">
+                {DELIVERY_PURPOSES.map(p => (
+                  <label key={p.value} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="deliveryPurpose"
+                      value={p.value}
+                      checked={deliveryPurpose === p.value}
+                      onChange={() => handleDeliveryPurposeChange(p.value)}
+                      className="accent-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">{p.label}</span>
+                  </label>
+                ))}
+              </div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                配信テンプレ
+                <span className="text-gray-400 font-normal ml-1">（任意・選択で件名/本文をプリフィル）</span>
+              </label>
+              <select
+                value={selectedTemplateId}
+                onChange={e => handleTemplateSelect(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              >
+                <option value="">テンプレを選択しない</option>
+                {deliveryTemplates
+                  .filter(t => t.purpose === deliveryPurpose)
+                  .map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+              </select>
+              {deliveryTemplates.filter(t => t.purpose === deliveryPurpose).length === 0 && (
+                <p className="text-xs text-gray-400 mt-1">
+                  この目的のテンプレは未登録です（設定 &gt; 配信テンプレ で追加）
+                </p>
+              )}
             </div>
 
             {/* 紐づきメール（任意） */}
