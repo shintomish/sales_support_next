@@ -582,6 +582,23 @@ export default function ProjectMailsPage() {
     } catch { setSaveMsg({ type: 'err', text: '削除に失敗しました' }) }
   }
 
+  // 技術者メールへ移動（案件として誤分類されたメールの手動再分類）
+  const [moving, setMoving] = useState(false)
+  const handleMoveToEngineer = async () => {
+    if (!selected) return
+    if (!confirm(`「${selected.title || `案件メール #${selected.id}`}」を技術者メールへ移動します。よろしいですか？`)) return
+    setMoving(true)
+    try {
+      await axios.post(`/api/v1/project-mails/${selected.id}/move-to-engineer`)
+      setSelected(null)
+      setForm({})
+      fetchList()
+      setSaveMsg({ type: 'ok', text: '技術者メールへ移動しました' })
+    } catch {
+      setSaveMsg({ type: 'err', text: '移動に失敗しました' })
+    } finally { setMoving(false) }
+  }
+
   const set = (key: keyof ProjectMail, val: unknown) => setForm(f => ({ ...f, [key]: val }))
   const arrToStr = (v: string[] | null | undefined) => (v ?? []).join(', ')
 
@@ -1037,6 +1054,12 @@ export default function ProjectMailsPage() {
                     disabled={rescoringOne}
                     className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
                     {rescoringOne ? '再スコア中…' : '再スコア'}
+                  </button>
+                  <button onClick={handleMoveToEngineer}
+                    disabled={moving}
+                    title="技術者メールとして誤分類されている場合に移動します"
+                    className="text-xs border border-teal-300 text-teal-700 px-3 py-1.5 rounded-lg hover:bg-teal-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {moving ? '移動中…' : '→ 技術者へ移動'}
                   </button>
                   {sourceMode === 'manual' && (
                     <button
