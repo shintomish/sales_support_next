@@ -309,6 +309,10 @@ export default function EngineerMailsPage() {
   // デフォルトは「全て」(ステータス指定なし) で受信日順表示
   const [statusFilter, setStatusFilter] = useState('')
   const [scoreFilter, setScoreFilter] = useState('all')
+  const [sort, setSort] = useState('arrived_at')   // 確定済みソートキー（fetch に反映される値）
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc')
+  const [sortInput, setSortInput] = useState('arrived_at')   // 入力中（「適用」押下まで未確定）
+  const [orderInput, setOrderInput] = useState<'asc' | 'desc'>('desc')
   const [search, setSearch] = useState('')               // 入力欄の値 (未確定)
   const [appliedSearch, setAppliedSearch] = useState('') // Enter/🔍 で確定された値
   const [searchBody, setSearchBody] = useState(false)    // 本文も検索
@@ -394,13 +398,15 @@ export default function EngineerMailsPage() {
           score_min:   sf.scoreMin,
           score_max:   sf.scoreMax,
           source:      sourceMode,
+          sort,
+          order,
         }
       })
       setItems(res.data)
     } finally {
       setListLoading(false)
     }
-  }, [statusFilter, scoreFilter, appliedSearch, searchBody, page, sourceMode])
+  }, [statusFilter, scoreFilter, appliedSearch, searchBody, page, sourceMode, sort, order])
 
   useEffect(() => { fetchList() }, [fetchList])
 
@@ -881,6 +887,29 @@ export default function EngineerMailsPage() {
                 </button>
               ))}
             </div>
+            <div className="flex gap-1 items-center">
+              <select
+                value={sortInput}
+                onChange={e => setSortInput(e.target.value)}
+                className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                <option value="arrived_at">着信日時</option>
+                <option value="score">スコア</option>
+                <option value="unit_price_max">単価</option>
+                <option value="received_at">送信日時</option>
+              </select>
+              <button
+                onClick={() => setOrderInput(o => o === 'desc' ? 'asc' : 'desc')}
+                title={orderInput === 'desc' ? '降順（大→小）' : '昇順（小→大）'}
+                className="text-xs px-2 py-1 rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 min-w-[32px]">
+                {orderInput === 'desc' ? '▼' : '▲'}
+              </button>
+              <button
+                onClick={() => { setSort(sortInput); setOrder(orderInput); setPage(1); setExpandedId(null); setSelected(null) }}
+                disabled={sortInput === sort && orderInput === order}
+                className="text-xs px-2.5 py-1 rounded-md border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 disabled:opacity-40 disabled:cursor-default font-medium">
+                適用
+              </button>
+            </div>
             <form
               onSubmit={e => { e.preventDefault(); setAppliedSearch(search.trim()); setPage(1) }}
               className="flex gap-1.5 items-center"
@@ -1080,6 +1109,31 @@ export default function EngineerMailsPage() {
                 {sf.label}
               </button>
             ))}
+          </div>
+
+          {/* 並び替え（コンパクト・メール選択時） */}
+          <div className="flex gap-1 items-center">
+            <select
+              value={sortInput}
+              onChange={e => setSortInput(e.target.value)}
+              className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="arrived_at">着信日時</option>
+              <option value="score">スコア</option>
+              <option value="unit_price_max">単価</option>
+              <option value="received_at">送信日時</option>
+            </select>
+            <button
+              onClick={() => setOrderInput(o => o === 'desc' ? 'asc' : 'desc')}
+              title={orderInput === 'desc' ? '降順（大→小）' : '昇順（小→大）'}
+              className="text-xs px-2 py-1 rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 min-w-[32px]">
+              {orderInput === 'desc' ? '▼' : '▲'}
+            </button>
+            <button
+              onClick={() => { setSort(sortInput); setOrder(orderInput); setPage(1); setExpandedId(null); setSelected(null) }}
+              disabled={sortInput === sort && orderInput === order}
+              className="text-xs px-2.5 py-1 rounded-md border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 disabled:opacity-40 disabled:cursor-default font-medium">
+              適用
+            </button>
           </div>
         </div>
 

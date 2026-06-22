@@ -173,6 +173,16 @@ function scoreRank(score: number) {
   return { label: '×', cls: 'bg-gray-400 text-white' }
 }
 
+// 単価表示。decimal カラムは JSON で "0.00" 文字列になり truthy 判定をすり抜けるため、
+// 数値化して正の値だけを「単価あり」とみなす（0/null/"0.00" は単価なし扱い）。末尾 .00 も落とす。
+function priceText(min: number | null, max: number | null): string | null {
+  const nMin = Number(min) || 0
+  const nMax = Number(max) || 0
+  if (nMin <= 0 && nMax <= 0) return null
+  const fmt = (n: number) => (n > 0 ? String(Math.round(n)) : '?')
+  return `${fmt(nMin)}〜${fmt(nMax)}万`
+}
+
 // ── メインコンポーネント ──────────────────────────────────
 
 export default function ProjectMailsPage() {
@@ -189,6 +199,10 @@ export default function ProjectMailsPage() {
   // デフォルトは「全て」(ステータス指定なし) で受信日順表示
   const [statusFilter, setStatusFilter] = useState('')
   const [scoreFilter, setScoreFilter] = useState('all')
+  const [sort, setSort] = useState('arrived_at')   // 確定済みソートキー（fetch に反映される値）
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc')
+  const [sortInput, setSortInput] = useState('arrived_at')   // 入力中（「適用」押下まで未確定）
+  const [orderInput, setOrderInput] = useState<'asc' | 'desc'>('desc')
   const [search, setSearch] = useState('')             // 入力欄の値 (未確定)
   const [appliedSearch, setAppliedSearch] = useState('') // Enter/🔍 で確定された検索値
   const [searchBody, setSearchBody] = useState(false)  // 本文も検索
@@ -261,13 +275,15 @@ export default function ProjectMailsPage() {
           score_min:   sf.scoreMin,
           score_max:   sf.scoreMax,
           source:      sourceMode,
+          sort,
+          order,
         }
       })
       setItems(res.data)
     } finally {
       setListLoading(false)
     }
-  }, [statusFilter, scoreFilter, appliedSearch, searchBody, page, sourceMode])
+  }, [statusFilter, scoreFilter, appliedSearch, searchBody, page, sourceMode, sort, order])
 
   useEffect(() => { fetchList() }, [fetchList])
 
@@ -611,6 +627,29 @@ export default function ProjectMailsPage() {
                 </button>
               ))}
             </div>
+            <div className="flex gap-1 items-center">
+              <select
+                value={sortInput}
+                onChange={e => setSortInput(e.target.value)}
+                className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                <option value="arrived_at">着信日時</option>
+                <option value="score">スコア</option>
+                <option value="unit_price_max">単価</option>
+                <option value="received_at">送信日時</option>
+              </select>
+              <button
+                onClick={() => setOrderInput(o => o === 'desc' ? 'asc' : 'desc')}
+                title={orderInput === 'desc' ? '降順（大→小）' : '昇順（小→大）'}
+                className="text-xs px-2 py-1 rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 min-w-[32px]">
+                {orderInput === 'desc' ? '▼' : '▲'}
+              </button>
+              <button
+                onClick={() => { setSort(sortInput); setOrder(orderInput); setPage(1); setExpandedId(null) }}
+                disabled={sortInput === sort && orderInput === order}
+                className="text-xs px-2.5 py-1 rounded-md border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 disabled:opacity-40 disabled:cursor-default font-medium">
+                適用
+              </button>
+            </div>
             <form
               onSubmit={e => { e.preventDefault(); setAppliedSearch(search.trim()); setPage(1) }}
               className="flex gap-1.5 items-center"
@@ -811,6 +850,31 @@ export default function ProjectMailsPage() {
               </button>
             ))}
           </div>
+
+          {/* 並び替え（コンパクト・メール選択時） */}
+          <div className="flex gap-1 items-center">
+            <select
+              value={sortInput}
+              onChange={e => setSortInput(e.target.value)}
+              className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="arrived_at">着信日時</option>
+              <option value="score">スコア</option>
+              <option value="unit_price_max">単価</option>
+              <option value="received_at">送信日時</option>
+            </select>
+            <button
+              onClick={() => setOrderInput(o => o === 'desc' ? 'asc' : 'desc')}
+              title={orderInput === 'desc' ? '降順（大→小）' : '昇順（小→大）'}
+              className="text-xs px-2 py-1 rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 min-w-[32px]">
+              {orderInput === 'desc' ? '▼' : '▲'}
+            </button>
+            <button
+              onClick={() => { setSort(sortInput); setOrder(orderInput); setPage(1); setExpandedId(null) }}
+              disabled={sortInput === sort && orderInput === order}
+              className="text-xs px-2.5 py-1 rounded-md border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 disabled:opacity-40 disabled:cursor-default font-medium">
+              適用
+            </button>
+          </div>
         </div>
 
         {/* リスト */}
@@ -832,9 +896,9 @@ export default function ProjectMailsPage() {
                   <span className="text-sm text-gray-600 truncate min-w-0">
                     {item.customer_name || item.email?.from_name || item.email?.from_address || '—'}
                   </span>
-                  {item.unit_price_min && (
+                  {priceText(item.unit_price_min, item.unit_price_max) && (
                     <span className="text-xs text-gray-400 flex-shrink-0">
-                      {item.unit_price_min}〜{item.unit_price_max ?? '?'}万
+                      {priceText(item.unit_price_min, item.unit_price_max)}
                     </span>
                   )}
                   <span className="text-xs text-gray-400 ml-auto flex-shrink-0"
@@ -1661,8 +1725,8 @@ function ReviewRow({
 
         {/* 単価・場所 */}
         <div className="hidden sm:flex flex-col items-end gap-0.5 flex-shrink-0 text-xs text-gray-500">
-          {item.unit_price_min
-            ? <span>💴 {item.unit_price_min}〜{item.unit_price_max ?? '?'}万</span>
+          {priceText(item.unit_price_min, item.unit_price_max)
+            ? <span>💴 {priceText(item.unit_price_min, item.unit_price_max)}</span>
             : <span className="text-gray-300">単価なし</span>
           }
           {item.work_location && <span>📍 {item.work_location}</span>}
@@ -1721,8 +1785,8 @@ function ReviewRow({
                 {expandedDetail.work_location && (
                   <div><span className="text-gray-400">勤務地</span><p className="font-medium text-gray-700">{expandedDetail.work_location}{expandedDetail.remote_ok ? ' (リモート可)' : ''}</p></div>
                 )}
-                {(expandedDetail.unit_price_min || expandedDetail.unit_price_max) && (
-                  <div><span className="text-gray-400">単価</span><p className="font-medium text-gray-700">{expandedDetail.unit_price_min ?? '?'}〜{expandedDetail.unit_price_max ?? '?'}万</p></div>
+                {priceText(expandedDetail.unit_price_min, expandedDetail.unit_price_max) && (
+                  <div><span className="text-gray-400">単価</span><p className="font-medium text-gray-700">{priceText(expandedDetail.unit_price_min, expandedDetail.unit_price_max)}</p></div>
                 )}
                 {expandedDetail.start_date && (
                   <div><span className="text-gray-400">開始</span><p className="font-medium text-gray-700">{expandedDetail.start_date}</p></div>
