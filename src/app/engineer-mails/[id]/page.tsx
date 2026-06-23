@@ -558,6 +558,22 @@ function BulkSendModalToBp({
   )
 }
 
+// ── スコアバー（案件側 /matching と同じ5軸内訳表示）────────
+function ScoreBar({ label, value, max }: { label: string; value: number; max: number }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
+        <span style={{ color: '#374151' }}>{label}</span>
+        <span style={{ fontWeight: 600, color: '#1d4ed8' }}>{value}/{max}</span>
+      </div>
+      <div style={{ height: 5, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: '#3b82f6', borderRadius: 3, transition: 'width 0.3s' }} />
+      </div>
+    </div>
+  )
+}
+
 // ── 案件カード ────────────────────────────────────────
 function ProjectCard({ project, onPropose, generating, checked, onCheck }: {
   project: MatchedProject
@@ -667,6 +683,7 @@ function FreshPmsCard({ item, onPropose, generating, checked, onCheck, engineerM
   requirementMatchingEnabled: boolean
 }) {
   const color = rankColor(item.score)
+  const [showBreak, setShowBreak] = useState(false)
   const badgeMap: Record<string, { label: string; color: string }> = {
     new: { label: '新規', color: '#2563eb' },
     registered: { label: '登録済', color: '#16a34a' },
@@ -730,6 +747,30 @@ function FreshPmsCard({ item, onPropose, generating, checked, onCheck, engineerM
             )}
           </div>
         )}
+        {/* スコア内訳（案件カードと同じ5軸・既定は折り畳み） */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowBreak(v => !v)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#6b7280', padding: 0, fontWeight: 600 }}
+          >
+            {showBreak ? '▲ スコア内訳を隠す' : '▼ スコア内訳'}
+          </button>
+          {showBreak && (
+            <div style={{ marginTop: 6 }}>
+              <ScoreBar label="必須条件 (国籍・年齢・稼働形態)" value={item.breakdown.requirements} max={40} />
+              <ScoreBar label="スキルマッチ" value={item.breakdown.skills} max={25} />
+              <ScoreBar label="条件一致 (単価・場所・契約)" value={item.breakdown.conditions} max={20} />
+              <ScoreBar label="稼働可否・時期" value={item.breakdown.availability} max={10} />
+              <ScoreBar label="実績" value={item.breakdown.track_record} max={5} />
+              {item.reasons.length > 0 && (
+                <div style={{ marginTop: 6 }}>
+                  {item.reasons.map((r, i) => <p key={i} style={{ fontSize: 11, color: '#374151', margin: '2px 0' }}>• {r}</p>)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* カードフッター */}
