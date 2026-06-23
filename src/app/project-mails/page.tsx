@@ -208,6 +208,9 @@ export default function ProjectMailsPage() {
   const [searchBody, setSearchBody] = useState(false)  // 本文も検索
   const [listLoading, setListLoading] = useState(false) // 一覧取得中
   const [page, setPage] = useState(1)
+  // 左ペイン表示状態(ソート/フィルタ/検索/ページ)の sessionStorage 保持。マッチング往復で復元する。
+  const VIEW_KEY = 'projectMails:view'
+  const [viewHydrated, setViewHydrated] = useState(false)
   const [rescoring, setRescoring] = useState(false)
   const [extracting, setExtracting] = useState(false)
   const [scoreMsg, setScoreMsg] = useState('')
@@ -285,32 +288,64 @@ export default function ProjectMailsPage() {
     }
   }, [statusFilter, scoreFilter, appliedSearch, searchBody, page, sourceMode, sort, order])
 
-  useEffect(() => { fetchList() }, [fetchList])
+  // 一覧取得は表示状態の復元(hydrate)完了後に実行（既定値での無駄な二重 fetch を防ぐ）
+  useEffect(() => { if (viewHydrated) fetchList() }, [fetchList, viewHydrated])
 
-  // URLパラメータ select={id} でメール自動選��
+  // 左ペインの表示状態(ソート/フィルタ/検索/ページ)を sessionStorage から復元し、
+  // select={id} があれば該当メールを選択する（マッチング画面から戻った時に状態を保持するため）。
   useEffect(() => {
+    let hadSaved = false
+    try {
+      const raw = sessionStorage.getItem(VIEW_KEY)
+      if (raw) {
+        const v = JSON.parse(raw)
+        hadSaved = true
+        if (typeof v.statusFilter === 'string') setStatusFilter(v.statusFilter)
+        if (typeof v.scoreFilter === 'string') setScoreFilter(v.scoreFilter)
+        if (typeof v.sort === 'string') { setSort(v.sort); setSortInput(v.sort) }
+        if (v.order === 'asc' || v.order === 'desc') { setOrder(v.order); setOrderInput(v.order) }
+        if (typeof v.appliedSearch === 'string') setAppliedSearch(v.appliedSearch)
+        if (typeof v.search === 'string') setSearch(v.search)
+        if (typeof v.searchBody === 'boolean') setSearchBody(v.searchBody)
+        if (typeof v.page === 'number') setPage(v.page)
+      }
+    } catch { /* noop */ }
+
     const selectId = searchParams.get('select')
-    if (!selectId) return
-    const id = parseInt(selectId)
-    if (isNaN(id)) return
-    // ステータスフィルタを解除して全件から探す
-    setStatusFilter('')
-    axios.get(`/api/v1/project-mails/${id}`).then(res => {
-      setSelected(res.data)
-      setForm(res.data)
-      setSaveMsg(null)
-      setShowBody(false)
-      setMemoText('')
-      setMemoMsg(null)
-      // スレッド取得
-      setThreadLoading(true)
-      axios.get(`/api/v1/project-mails/${id}/thread`).then(tres => {
-        setThreadItems(tres.data.thread ?? [])
-      }).catch(() => setThreadItems([])).finally(() => setThreadLoading(false))
-    }).catch(() => {})
-    // URLパラメータをクリア
-    router.replace('/project-mails')
+    if (selectId) {
+      const id = parseInt(selectId)
+      if (!isNaN(id)) {
+        // 直リンク(保存状態なし)の時だけ全件表示にして探す。戻り遷移は保存フィルタを維持。
+        if (!hadSaved) setStatusFilter('')
+        axios.get(`/api/v1/project-mails/${id}`).then(res => {
+          setSelected(res.data)
+          setForm(res.data)
+          setSaveMsg(null)
+          setShowBody(false)
+          setMemoText('')
+          setMemoMsg(null)
+          // スレッド取得
+          setThreadLoading(true)
+          axios.get(`/api/v1/project-mails/${id}/thread`).then(tres => {
+            setThreadItems(tres.data.thread ?? [])
+          }).catch(() => setThreadItems([])).finally(() => setThreadLoading(false))
+        }).catch(() => {})
+      }
+      // select パラメータをクリア（表示状態は sessionStorage 側で保持）
+      router.replace(pathname || '/project-mails')
+    }
+    setViewHydrated(true)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 表示状態を sessionStorage に保存（マッチング往復で復元）
+  useEffect(() => {
+    if (!viewHydrated) return
+    try {
+      sessionStorage.setItem(VIEW_KEY, JSON.stringify({
+        statusFilter, scoreFilter, sort, order, appliedSearch, search, searchBody, page,
+      }))
+    } catch { /* noop */ }
+  }, [viewHydrated, statusFilter, scoreFilter, sort, order, appliedSearch, search, searchBody, page])
 
   // 連続クリック時の async race 対策 (docs/730 §High #5):
   // 古いレスポンスが新しい選択を上書きしないよう、選択 id を hook で追跡。
