@@ -7,6 +7,7 @@ import axios from '@/lib/axios'
 import { useAuthStore } from '@/store/authStore'
 import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
+import ScoreBreakdown from '@/components/ScoreBreakdown'
 import { renderMailBody } from '@/components/mailBody'
 import { ResizeHandle } from '@/components/ResizeHandle'
 import { useResizableSplit } from '@/hooks/useResizableSplit'
@@ -1018,12 +1019,8 @@ export default function ProjectMailsPage() {
                     </div>
                   )})()}
                 </div>
-                {/* 判定理由 */}
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {(selected.score_reasons ?? []).map((r, i) => (
-                    <ScoreReasonChip key={i} reason={r} />
-                  ))}
-                </div>
+                {/* スコア内訳（点数の判定理由を読みやすく表示） */}
+                <ScoreBreakdown reasons={selected.score_reasons} score={selected.score} />
               </div>
 
               {/* ステータス + アクションボタン */}
