@@ -1131,7 +1131,7 @@ export default function EngineerMailMatchingPage() {
     return (
       <div style={{ padding: 32, color: '#dc2626' }}>
         <p>{error ?? 'データを取得できませんでした'}</p>
-        <button onClick={() => router.back()} style={{ marginTop: 12, color: '#2563eb' }}>← 戻る</button>
+        <button onClick={() => router.push(`/engineer-mails?select=${id}`)} style={{ marginTop: 12, color: '#2563eb' }}>← 戻る</button>
       </div>
     )
   }
@@ -1202,7 +1202,7 @@ export default function EngineerMailMatchingPage() {
 
       {/* ヘッダー */}
       <div style={{ background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)', color: '#fff', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <button onClick={() => router.back()} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← 戻る</button>
+        <button onClick={() => router.push(`/engineer-mails?select=${id}`)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>← 戻る</button>
         <div style={{ flex: 1, minWidth: 200 }}>
           <p style={{ fontSize: 11, opacity: 0.85, margin: 0 }}>技術者マッチング</p>
           <p style={{ fontSize: 15, fontWeight: 700, margin: '2px 0 0' }}>{mail.name ?? '（氏名未取得）'}{mail.age ? ` / ${mail.age}歳` : ''}{mail.affiliation ? ` / ${mail.affiliation}` : ''}</p>
