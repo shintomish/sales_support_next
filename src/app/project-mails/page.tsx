@@ -31,6 +31,7 @@ type ProjectMail = {
   email_id: number
   score: number
   score_reasons: string[]
+  score_breakdown?: { label: string; points: number }[] | null
   engine: string
   customer_name: string | null
   sales_contact: string | null
@@ -1020,7 +1021,7 @@ export default function ProjectMailsPage() {
                   )})()}
                 </div>
                 {/* スコア内訳（点数の判定理由を読みやすく表示） */}
-                <ScoreBreakdown reasons={selected.score_reasons} score={selected.score} />
+                <ScoreBreakdown reasons={selected.score_reasons} breakdown={selected.score_breakdown} score={selected.score} />
               </div>
 
               {/* ステータス + アクションボタン */}

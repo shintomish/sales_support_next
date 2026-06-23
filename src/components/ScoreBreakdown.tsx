@@ -60,14 +60,30 @@ export function formatScoreReason(reason: string): { label: string; kind: Kind }
   return { label: reason, kind: 'neutral' }
 }
 
+export interface ScoreBreakdownItem { label: string; points: number }
+
 /**
  * 右ペイン詳細用のスコア内訳ボタン。
- * 「▼ スコア内訳（N点）」をクリックで、判定理由を読みやすいラベル＋加点(緑)/減点(赤)で表示する。
+ * 「▼ スコア内訳（N点）」をクリックで内訳を表示する。
+ *  - breakdown（項目ごとの加点）があれば「項目 +N点」で点数まで表示し、合計も出す。
+ *  - 無ければ（バックフィル未済の旧データ等）判定理由を読みやすいラベルで表示する（フォールバック）。
  */
-export default function ScoreBreakdown({ reasons, score }: { reasons: string[] | null | undefined; score?: number | null }) {
+export default function ScoreBreakdown({
+  reasons,
+  breakdown,
+  score,
+}: {
+  reasons?: string[] | null
+  breakdown?: ScoreBreakdownItem[] | null
+  score?: number | null
+}) {
   const [open, setOpen] = useState(false)
-  const list = reasons ?? []
-  if (list.length === 0) return null
+  const bd = (breakdown ?? []).filter(b => b && typeof b.points === 'number')
+  const reasonList = reasons ?? []
+  if (bd.length === 0 && reasonList.length === 0) return null
+
+  const total = bd.reduce((s, b) => s + b.points, 0)
+
   return (
     <div className="mt-2">
       <button
@@ -78,19 +94,39 @@ export default function ScoreBreakdown({ reasons, score }: { reasons: string[] |
         {open ? '▲ スコア内訳を隠す' : `▼ スコア内訳${score != null ? `（${score}点）` : ''}`}
       </button>
       {open && (
-        <div className="flex flex-wrap gap-1 mt-2">
-          {list.map((r, i) => {
-            const f = formatScoreReason(r)
-            const cls = f.kind === 'plus'
-              ? 'bg-green-50 border-green-300 text-green-700'
-              : f.kind === 'minus'
-                ? 'bg-red-50 border-red-300 text-red-700'
-                : 'bg-gray-100 border-gray-200 text-gray-600'
-            return (
-              <span key={i} className={`text-xs px-2 py-0.5 rounded-full border ${cls}`}>{f.label}</span>
-            )
-          })}
-        </div>
+        bd.length > 0 ? (
+          <div className="mt-2 flex flex-col gap-1">
+            {bd.map((b, i) => {
+              const plus = b.points >= 0
+              return (
+                <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-gray-700">{b.label}</span>
+                  <span className={`font-semibold tabular-nums ${plus ? 'text-green-700' : 'text-red-600'}`}>
+                    {plus ? '+' : ''}{b.points}点
+                  </span>
+                </div>
+              )
+            })}
+            <div className="flex items-center justify-between gap-2 text-xs border-t border-gray-200 mt-1 pt-1">
+              <span className="text-gray-500">合計{score != null && score !== total ? '（上限調整前）' : ''}</span>
+              <span className="font-bold tabular-nums text-blue-700">{total}点</span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {reasonList.map((r, i) => {
+              const f = formatScoreReason(r)
+              const cls = f.kind === 'plus'
+                ? 'bg-green-50 border-green-300 text-green-700'
+                : f.kind === 'minus'
+                  ? 'bg-red-50 border-red-300 text-red-700'
+                  : 'bg-gray-100 border-gray-200 text-gray-600'
+              return (
+                <span key={i} className={`text-xs px-2 py-0.5 rounded-full border ${cls}`}>{f.label}</span>
+              )
+            })}
+          </div>
+        )
       )}
     </div>
   )

@@ -44,6 +44,7 @@ type EngineerMail = {
   email_id: number
   score: number
   score_reasons: string[]
+  score_breakdown?: { label: string; points: number }[] | null
   engine: string
   name: string | null
   age: number | null
@@ -1307,7 +1308,7 @@ export default function EngineerMailsPage() {
                   )})()}
                 </div>
                 {/* スコア内訳（点数の判定理由を読みやすく表示） */}
-                <ScoreBreakdown reasons={selected.score_reasons} score={selected.score} />
+                <ScoreBreakdown reasons={selected.score_reasons} breakdown={selected.score_breakdown} score={selected.score} />
               </div>
 
               {/* ステータス + アクションボタン */}
