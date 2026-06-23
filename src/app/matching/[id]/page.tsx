@@ -372,6 +372,9 @@ interface ProposalDraft {
   // モーダル内 ▼アコーディオン表示用 (登録済モード=PMS本文 / 鮮度モード=EMS本文)
   original_mail_body?: string | null
   original_mail_label?: string
+  // 鮮度モードで original_mail_body=技術者ご紹介メール の場合に、加えて紹介元の案件メール本文も表示する用。
+  // 登録済モードは original_mail_body が既に案件メールなので未使用 (重複表示を避ける)。
+  project_mail_body?: string | null
 }
 
 interface EmailAttachment {
@@ -619,6 +622,8 @@ function ProposalModal({ draft, onClose }: { draft: ProposalDraft; onClose: () =
         {/* 本文 */}
         <div style={{ padding: '16px 20px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <OriginalMailAccordion body={draft.original_mail_body} label={draft.original_mail_label ?? '元メール本文'} />
+          {/* 鮮度マッチ経由で original が技術者メールの場合は、加えて紹介元の案件メール本文も表示 */}
+          <OriginalMailAccordion body={draft.project_mail_body} label="紹介元案件メール 本文" />
           {matchEnabled && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#374151', background: '#eff6ff', padding: '6px 10px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
               <input
@@ -2025,6 +2030,7 @@ export default function MatchingPage() {
       engineer_mail_source_id: item.engineer_mail_source_id,
       original_mail_body: item.email_body,
       original_mail_label: '技術者ご紹介メール 本文',
+      project_mail_body: pickMailBody(mail?.email),
     })
   }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { renderMailBody } from '@/components/mailBody'
 
 /**
  * 提案メールモーダル等で、元メール本文を ▼ で開閉表示するアコーディオン。
@@ -35,7 +36,7 @@ export default function OriginalMailAccordion({
           color: '#4b5563', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           borderTop: '1px solid #e5e7eb', maxHeight: 240, overflowY: 'auto', fontFamily: 'inherit',
         }}>
-          {body}
+          {renderMailBody(body, [])}
         </pre>
       )}
     </div>
