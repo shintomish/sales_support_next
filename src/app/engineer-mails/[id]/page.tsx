@@ -139,9 +139,10 @@ function formatDate(iso: string | null): string | null {
 }
 
 function priceStr(min: number | null, max: number | null): string {
+  // unit_price は万単位で保存（63 = 63万）。÷10000 すると 0 になるため除算しない。
   if (!min && !max) return '—'
-  if (min && max && min !== max) return `${(min / 10000).toFixed(0)}〜${(max / 10000).toFixed(0)}万`
-  return `${((max ?? min ?? 0) / 10000).toFixed(0)}万`
+  if (min && max && min !== max) return `${min}〜${max}万`
+  return `${max ?? min ?? 0}万`
 }
 
 // EMS の構造化フィールドから「【技術者情報】◇〜」ブロックを組み立てる
