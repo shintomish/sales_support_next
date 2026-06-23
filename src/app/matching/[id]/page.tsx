@@ -2086,7 +2086,7 @@ export default function MatchingPage() {
     return (
       <div style={{ padding: 32, color: '#dc2626' }}>
         <p>{error ?? 'データを取得できませんでした'}</p>
-        <button onClick={() => router.back()} style={{ marginTop: 12, color: '#2563eb' }}>← 戻る</button>
+        <button onClick={() => router.push(`/project-mails?select=${id}`)} style={{ marginTop: 12, color: '#2563eb' }}>← 戻る</button>
       </div>
     )
   }
@@ -2180,7 +2180,7 @@ export default function MatchingPage() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push(`/project-mails?select=${id}`)}
             style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 13 }}
           >
             ← 戻る
