@@ -61,6 +61,14 @@ export function pickMailBody(
  *
  * 本文を pickMailBody() で取得済みのプレーンテキストに対して使う想定。
  */
+// 案件条件・定型句など「氏名ではない」語を弾くガード（"外国籍不可" 等の誤抽出防止）。
+const NAME_BLOCKLIST_RE = /(不可|可否|以上|以下|前後|程度|歳|万円|円|ヶ月|カ月|即日|リモート|出社|常駐|経験|スキル|案件|募集|外国籍|日本語|英語|面談|単価|単金|期間|工程|勤務|場所|契約|言語|稼働|必須|歓迎|要員|時給|月給|可能|対応|連絡|確認|検討|大丈夫|同様|予定|別途|本日|明日|宜しく|よろしく|お願|御願|ありがとう|有難う|世話|担当|営業部|採用|参画|交代|交替|延長|新規|急募)/u
+
+function isPlausiblePersonName(s: string): boolean {
+  const t = s.replace(/[\s　]+/g, '')
+  return t.length >= 2 && t.length <= 8 && !NAME_BLOCKLIST_RE.test(t)
+}
+
 export function extractRecipientName(body: string | null | undefined): string | null {
   if (!body) return null
   const lines = body.split('\n').map(l => l.trim()).filter(l => l.length > 0)
@@ -69,13 +77,25 @@ export function extractRecipientName(body: string | null | undefined): string | 
   // 1) 「担当：山田太郎」「営業担当: ○○」
   for (const l of lines) {
     const m = l.match(/^(?:営業)?担当(?:者)?[：:]\s*([^\s<【\[（(]{2,15})/u)
-    if (m) return m[1].trim()
+    if (m && isPlausiblePersonName(m[1])) return m[1].trim()
+  }
+
+  // 1.5) 自己紹介の署名「(会社名)○○と申します／でございます／です」から氏名を抽出。
+  //   「MKCソリューション内田です」→ 内田。[一-龯](漢字)のみなのでカタカナ社名は巻き込まない。
+  //   と申します/でございます を優先、です は行末限定（文中の「〜です」の誤検出を避ける）。
+  for (const l of lines) {
+    const m = l.match(/([一-龯]{2,4})(?:と申します|でございます)/u)
+    if (m && isPlausiblePersonName(m[1])) return m[1]
+  }
+  for (const l of lines) {
+    const m = l.match(/([一-龯]{2,4})です[。.！!\s　]*$/u)
+    if (m && isPlausiblePersonName(m[1])) return m[1]
   }
 
   // 2) 「山田 太郎 <foo@bar>」「山田太郎(yamada@bar)」
   for (const l of lines) {
     const m = l.match(/^([一-龯ぁ-んァ-ヶー々〆〤]{1,5}[\s　]?[一-龯ぁ-んァ-ヶー々〆〤]{1,5})\s*[<(（]/u)
-    if (m) return m[1].replace(/\s+/g, ' ').trim()
+    if (m && isPlausiblePersonName(m[1])) return m[1].replace(/\s+/g, ' ').trim()
   }
 
   // 3) 末尾署名: 下から見て「住所/TEL/FAX/MAIL/URL/会社名」より上の氏名行
@@ -86,7 +106,7 @@ export function extractRecipientName(body: string | null | undefined): string | 
     if (excludeRe.test(l)) continue
     // 「山田 太郎」「山田太郎」「ヤマダ タロウ」「Yamada Taro」
     const jp = l.match(/^([一-龯ぁ-んァ-ヶー々〆〤]{2,6}[\s　]?[一-龯ぁ-んァ-ヶー々〆〤]{1,6})$/u)
-    if (jp) return jp[1].replace(/\s+/g, ' ').trim()
+    if (jp && isPlausiblePersonName(jp[1])) return jp[1].replace(/\s+/g, ' ').trim()
     const en = l.match(/^([A-Z][a-z]+\s+[A-Z][a-z]+)$/)
     if (en) return en[1]
   }
