@@ -118,6 +118,8 @@ interface ProposalDraft {
   // ▼アコーディオン表示用
   original_mail_body?: string | null
   original_mail_label?: string
+  // 技術者ご紹介メール（このページの技術者メール）本文。紹介元案件メール本文の上に表示。
+  engineer_mail_body?: string | null
 }
 
 // ── ユーティリティ ────────────────────────────────────
@@ -323,6 +325,8 @@ function ProposalModal({ draft, engineerMailId, onClose, engineerAttachments }: 
           </div>
         </div>
         <div style={{ padding: '16px 20px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* 技術者ご紹介メール本文（このページの技術者メール）を紹介元案件メール本文の上に表示（案件側と同様） */}
+          <OriginalMailAccordion body={draft.engineer_mail_body} label="技術者ご紹介メール 本文" />
           <OriginalMailAccordion body={draft.original_mail_body} label={draft.original_mail_label ?? '元メール本文'} />
           {matchEnabled && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#374151', background: '#eff6ff', padding: '6px 10px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
@@ -1130,6 +1134,7 @@ export default function EngineerMailMatchingPage() {
         project_id: project.project_id,
         original_mail_body: project.pms_email_body,
         original_mail_label: '紹介元案件メール 本文',
+        engineer_mail_body: pickMailBody(mail?.email),
       })
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status
@@ -1155,6 +1160,7 @@ export default function EngineerMailMatchingPage() {
       project_mail_id: item.project_mail_id,
       original_mail_body: item.email_body,
       original_mail_label: '紹介元案件メール 本文',
+      engineer_mail_body: pickMailBody(mail?.email),
     })
   }
 
