@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/authStore';
 import UserFilter from '@/components/UserFilter';
 import SortableHeader from '@/components/SortableHeader';
 import type { ApiError } from '@/lib/error-helpers';
+import { hoursToHhmm } from '@/lib/hours';
 
 // ── 型定義 ────────────────────────────────────────────────────
 interface SesContract {
@@ -444,7 +445,7 @@ function SesContractsPage() {
               <div className="flex gap-2 items-center flex-wrap">
                 <div className="relative flex-1 min-w-48">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-                  <Input className="pl-8 bg-white" placeholder="氏名・顧客・案件名で検索"
+                  <Input className="pl-8 bg-white" placeholder="氏名・顧客・案件名・所属で検索"
                     value={searchInput} onChange={e => setSearchInput(e.target.value)} />
                 </div>
                 <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} className={selectCls}>
@@ -612,15 +613,15 @@ function SesContractsPage() {
                             <td className="py-2.5 px-3 pl-4 text-gray-400 text-xs">{c.project_number ?? <Em />}</td>
                             <td className="px-3 font-semibold text-blue-600 text-xs truncate max-w-0">{c.engineer_name ?? <Em />}</td>
                             <td className="px-3 text-xs text-gray-600">{fmt(c.client_deduction_unit_price)}</td>
-                            <td className="px-3 text-xs text-gray-600">{c.client_deduction_hours ?? '—'}</td>
+                            <td className="px-3 text-xs text-gray-600">{hoursToHhmm(c.client_deduction_hours) || '—'}</td>
                             <td className="px-3 text-xs text-gray-600">{fmt(c.client_overtime_unit_price)}</td>
-                            <td className="px-3 text-xs text-gray-600">{c.client_overtime_hours ?? '—'}</td>
+                            <td className="px-3 text-xs text-gray-600">{hoursToHhmm(c.client_overtime_hours) || '—'}</td>
                             <td className="px-3 text-xs text-gray-600">{c.settlement_unit_minutes ?? '—'}</td>
                             <td className="px-3 text-xs text-gray-600">{c.payment_site ?? '—'}</td>
                             <td className="px-3 text-xs text-gray-500">{fmt(c.vendor_deduction_unit_price)}</td>
-                            <td className="px-3 text-xs text-gray-500">{c.vendor_deduction_hours ?? '—'}</td>
+                            <td className="px-3 text-xs text-gray-500">{hoursToHhmm(c.vendor_deduction_hours) || '—'}</td>
                             <td className="px-3 text-xs text-gray-500">{fmt(c.vendor_overtime_unit_price)}</td>
-                            <td className="px-3 text-xs text-gray-500">{c.vendor_overtime_hours ?? '—'}</td>
+                            <td className="px-3 text-xs text-gray-500">{hoursToHhmm(c.vendor_overtime_hours) || '—'}</td>
                             <td className="px-3 text-xs text-gray-500">{c.vendor_payment_site ?? '—'}</td>
                           </tr>
                         ))}

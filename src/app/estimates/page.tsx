@@ -58,7 +58,8 @@ type SortField = 'invoice_number' | 'customer' | 'subject' | 'year_month' | 'iss
 export default function EstimatesPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const initialCreate   = searchParams.get('create') === '1';
+  const initialSourceEmailId = searchParams.get('source_email_id');
+  const initialCreate   = searchParams.get('create') === '1' || !!initialSourceEmailId;
 
   const [items, setItems]               = useState<EstimateListItem[]>([]);
   const [busyId, setBusyId]             = useState<number | null>(null);
@@ -77,7 +78,11 @@ export default function EstimatesPage() {
     project_name: string | null; contract_period_end: string | null;
   };
   const [createOpen, setCreateOpen]     = useState(initialCreate);
-  const [createMode, setCreateMode]     = useState<EstimateMode>('normal');
+  // 見積依頼メールからの作成時は例外モード（売上先指定）を初期選択
+  const [createMode, setCreateMode]     = useState<EstimateMode>(initialSourceEmailId ? 'exception' : 'normal');
+  // 起点となった見積依頼メール（/emails の「見積を作成」から遷移時にセット）
+  const [sourceEmailId] = useState<string | null>(initialSourceEmailId);
+  const [sourceEmail, setSourceEmail]   = useState<{ id: number; subject: string | null; from_address: string | null; from_name: string | null } | null>(null);
   const [isEnglish, setIsEnglish]       = useState(false);     // 英文見積モード（normal時のみ意味あり）
   const [titleTranslating, setTitleTranslating] = useState(false);
   const [creating, setCreating]         = useState(false);
@@ -186,6 +191,29 @@ export default function EstimatesPage() {
   }, [createOpen, createMode, sesSearch, isEnglish]);
 
 
+  // 見積依頼メールの内容をプリフィル（件名・売上先候補）
+  useEffect(() => {
+    if (!sourceEmailId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiClient.get(`/api/v1/emails/${sourceEmailId}`);
+        if (cancelled) return;
+        const em = res.data;
+        setSourceEmail({ id: em.id, subject: em.subject ?? null, from_address: em.from_address ?? null, from_name: em.from_name ?? null });
+        setForm(f => ({
+          ...f,
+          subject_name: f.subject_name || (em.subject ?? ''),
+          // メールに顧客が紐付いていれば売上先として初期選択
+          customer_id: f.customer_id || (em.customer_id ?? ''),
+        }));
+      } catch {
+        // 取得失敗時もモーダルは開いたまま（手動入力で継続可能）
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [sourceEmailId]);
+
   const handleCreate = async () => {
     if (createMode === 'normal' && !form.deal_id) { alert('SES台帳から案件を選択してください'); return; }
     if (createMode === 'exception' && !form.customer_id) { alert('取引先を選択してください'); return; }
@@ -200,6 +228,7 @@ export default function EstimatesPage() {
       };
       if (createMode === 'normal') payload.deal_id = Number(form.deal_id);
       else payload.customer_id = Number(form.customer_id);
+      if (sourceEmailId) payload.source_email_id = Number(sourceEmailId);
 
       const res = await apiClient.post('/api/v1/estimates', payload);
       setCreateOpen(false);
@@ -224,7 +253,7 @@ export default function EstimatesPage() {
   };
 
   const handleDuplicate = async (id: number) => {
-    if (!confirm('この見積書を翌月扱いで複写して下書きを作成します。よろしいですか？')) return;
+    if (!confirm('この見積書を本日付・当月扱いで複写して下書きを作成します。よろしいですか？')) return;
     setBusyId(id);
     try {
       const res = await apiClient.post<{ id: number }>(`/api/v1/invoices/${id}/duplicate`);
@@ -411,7 +440,7 @@ export default function EstimatesPage() {
                         onClick={() => handleDuplicate(r.id)}
                         disabled={busyId === r.id}
                         className="text-xs text-indigo-600 hover:underline disabled:opacity-50"
-                        title="翌月扱いで複写して下書き作成"
+                        title="本日付・当月扱いで複写して下書き作成"
                       >複写</button>
                       {!r.approved && (
                         <button
@@ -435,6 +464,16 @@ export default function EstimatesPage() {
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setCreateOpen(false)}>
           <div data-modal-scroll className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-gray-800 mb-2">新規見積発行</h2>
+
+            {/* 見積依頼メールからの作成 */}
+            {sourceEmail && (
+              <div className="mb-3 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                <div className="font-semibold">✉️ 見積依頼メールから作成</div>
+                <div className="mt-0.5 truncate" title={sourceEmail.subject ?? ''}>件名: {sourceEmail.subject ?? '(件名なし)'}</div>
+                <div className="truncate" title={sourceEmail.from_address ?? ''}>差出人: {sourceEmail.from_name || sourceEmail.from_address || '-'}</div>
+                <div className="mt-0.5 text-[10px] text-blue-600">作成後、この見積と依頼メールが紐付きます（記録一元化）。売上先を選択してください。</div>
+              </div>
+            )}
 
             {/* モード切替 */}
             <div className="flex flex-wrap gap-2 md:gap-4 text-sm mb-3 border-b border-gray-200 pb-2 items-center">

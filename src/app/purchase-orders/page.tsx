@@ -247,7 +247,7 @@ export default function PurchaseOrdersPage() {
   };
 
   const handleDuplicate = async (id: number) => {
-    if (!confirm('この注文書を翌月扱いで複写して下書きを作成します。よろしいですか？')) return;
+    if (!confirm('この注文書を本日付・当月扱いで複写して下書きを作成します。よろしいですか？')) return;
     setBusyId(id);
     try {
       const res = await apiClient.post<{ id: number }>(`/api/v1/invoices/${id}/duplicate`);
@@ -557,7 +557,7 @@ export default function PurchaseOrdersPage() {
                         onClick={() => handleDuplicate(r.id)}
                         disabled={busyId === r.id}
                         className="text-xs text-indigo-600 hover:underline disabled:opacity-50"
-                        title="翌月扱いで複写して下書き作成"
+                        title="本日付・当月扱いで複写して下書き作成"
                       >複写</button>
                     </div>
                   </td>

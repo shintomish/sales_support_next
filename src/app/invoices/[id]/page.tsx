@@ -77,6 +77,11 @@ interface Invoice {
   engineer_name_snapshot: string | null;
   customer?: { id: number; company_name: string };
   deal?: { id: number; title: string };
+  // 見積の起点となった受信メール（見積依頼）。記録一元化の表示用。
+  source_email?: {
+    id: number; subject: string | null; from_address: string | null;
+    from_name: string | null; received_at: string | null; category: string | null;
+  } | null;
   lines: InvoiceLine[];
 }
 
@@ -721,6 +726,23 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto bg-white rounded-lg border border-gray-200 p-4 md:p-6 space-y-4 md:space-y-6">
+        {/* 見積依頼メール（記録一元化: 受信依頼→見積→送信/郵送 を1画面に） */}
+        {invoice.source_email && (
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-blue-800">✉️ 見積依頼メール</p>
+              <a href="/emails" target="_blank" rel="noopener noreferrer"
+                className="text-[11px] text-blue-600 hover:underline">メール画面で開く</a>
+            </div>
+            <p className="text-sm text-gray-800 mt-1 truncate" title={invoice.source_email.subject ?? ''}>
+              {invoice.source_email.subject ?? '(件名なし)'}
+            </p>
+            <p className="text-[11px] text-gray-500 truncate">
+              差出人: {invoice.source_email.from_name || invoice.source_email.from_address || '-'}
+              {invoice.source_email.received_at ? ` ／ 受信: ${new Date(invoice.source_email.received_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}` : ''}
+            </p>
+          </div>
+        )}
         {/* メタ情報 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
           <Field label={invoice.doc_type === 'estimate' ? '見積日'

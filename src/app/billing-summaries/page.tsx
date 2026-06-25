@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, Suspense, type ChangeEvent } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import SortableHeader from '@/components/SortableHeader';
+import { HhmmInput } from '@/components/HhmmInput';
+import { hoursToHhmm } from '@/lib/hours';
 
 type GroupType = 'deal' | 'customer';
 
@@ -29,6 +31,33 @@ interface DealRow {
   invoice_id: number | null;
   invoice_status: 'draft' | 'issued' | null;
   invoice_pdf_path: string | null;
+  // 勤務表入力済みか（false = この画面で実時間を入力して作成する未入力行）
+  has_work_record: boolean;
+  // 未入力行のライブ試算用の顧客側精算条件
+  client_deduction_hours: number | null;
+  client_overtime_hours: number | null;
+  client_deduction_unit_price: number | null;
+  client_overtime_unit_price: number | null;
+}
+
+/** 未入力行の入力（実時間・交通費）からのライブ試算（BillingCalculationService と同じ式） */
+function calcDraftPreview(r: DealRow, hoursStr: string, transStr: string) {
+  const actual = hoursStr.trim() === '' ? null : Number(hoursStr);
+  const transportation = transStr.trim() === '' ? 0 : Number(transStr);
+  const basic = Number(r.basic);
+  const du = r.client_deduction_unit_price ?? 0;
+  const ou = r.client_overtime_unit_price ?? 0;
+  let deduction = 0, overtime = 0;
+  if (actual !== null && !Number.isNaN(actual)) {
+    const dh = r.client_deduction_hours;
+    const oh = r.client_overtime_hours;
+    if (dh != null && dh > 0 && actual < dh) deduction = (dh - actual) * du;
+    if (oh != null && oh > 0 && actual > oh) overtime = (actual - oh) * ou;
+  }
+  const subtotal = basic - deduction + overtime + transportation;
+  const tax = subtotal * (r.tax_rate ?? 0.1);
+  const total = subtotal + tax;
+  return { actual, deduction, overtime, transportation, subtotal, tax, total };
 }
 
 interface CustomerRow {
@@ -65,11 +94,154 @@ const recentMonths = (): string[] => {
   return arr;
 };
 
-export default function BillingSummariesPage() {
+/** 当月 (YYYY-MM)。対象月のデフォルト。 */
+const thisMonth = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/** 勤務表入力モーダル（billing 画面から遷移せず deal×月 の勤務記録を編集）*/
+function TimesheetEditModal({ deal, yearMonth, onClose, onSaved }: {
+  deal: DealRow;
+  yearMonth: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [form, setForm] = useState({
+    timesheet_received_date: '',
+    actual_hours: '',          // decimal 時間の文字列（hh:mm 入力で変換）
+    absence_days: '',
+    paid_leave_days: '',
+    transportation_fee: '',
+    notes: '',
+  });
+  const [contract, setContract] = useState<{
+    client_deduction_hours: number | null; client_overtime_hours: number | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await apiClient.get(`/api/v1/deals/${deal.deal_id}/work-records`);
+        if (cancelled) return;
+        setContract(res.data.contract ?? null);
+        const rec = (res.data.records ?? []).find((x: { year_month: string }) => x.year_month === yearMonth);
+        if (rec) {
+          setForm({
+            timesheet_received_date: rec.timesheet_received_date ? String(rec.timesheet_received_date).slice(0, 10) : '',
+            actual_hours:       rec.actual_hours != null ? String(rec.actual_hours) : '',
+            absence_days:       rec.absence_days != null ? String(rec.absence_days) : '',
+            paid_leave_days:    rec.paid_leave_days != null ? String(rec.paid_leave_days) : '',
+            transportation_fee: rec.transportation_fee != null ? String(rec.transportation_fee) : '',
+            notes:              rec.notes ?? '',
+          });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [deal.deal_id, yearMonth]);
+
+  // 精算（控除/超過）プレビュー
+  const actual = form.actual_hours.trim() === '' ? null : Number(form.actual_hours);
+  let excessLabel = '—';
+  if (actual !== null && !Number.isNaN(actual) && contract) {
+    const lo = contract.client_deduction_hours;
+    const hi = contract.client_overtime_hours;
+    if (hi != null && hi > 0 && actual > hi) excessLabel = `+${hoursToHhmm(actual - hi)}（超過）`;
+    else if (lo != null && lo > 0 && actual < lo) excessLabel = `-${hoursToHhmm(lo - actual)}（控除）`;
+    else excessLabel = '範囲内';
+  }
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await apiClient.put(`/api/v1/deals/${deal.deal_id}/work-records/${yearMonth}`, {
+        timesheet_received_date: form.timesheet_received_date || null,
+        actual_hours:       form.actual_hours.trim() === '' ? null : Number(form.actual_hours),
+        absence_days:       form.absence_days.trim() === '' ? null : Number(form.absence_days),
+        paid_leave_days:    form.paid_leave_days.trim() === '' ? null : Number(form.paid_leave_days),
+        transportation_fee: form.transportation_fee.trim() === '' ? null : Number(form.transportation_fee),
+        notes:              form.notes || null,
+      });
+      onSaved();
+      onClose();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '勤務表の保存に失敗しました';
+      alert(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const set = (k: keyof typeof form) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }));
+  const labelCls = 'block text-xs font-semibold text-gray-700 mb-1';
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <h2 className="text-lg font-bold text-gray-800 mb-1">勤務表入力</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          {deal.customer_name ?? '-'} / {deal.deal_title}（{deal.engineer_name ?? '-'}） ・ 対象月 {yearMonth}
+        </p>
+        {loading ? (
+          <p className="text-sm text-gray-400 py-8 text-center">読み込み中…</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>実時間 (hh:mm)</label>
+                <HhmmInput value={form.actual_hours} onChange={v => setForm(f => ({ ...f, actual_hours: v }))} placeholder="hh:mm" />
+                <p className="text-[11px] text-gray-500 mt-1">精算: {excessLabel}</p>
+              </div>
+              <div>
+                <label className={labelCls}>交通費 (円)</label>
+                <Input type="number" min="0" value={form.transportation_fee} onChange={set('transportation_fee')} />
+              </div>
+              <div>
+                <label className={labelCls}>勤務表受領日</label>
+                <Input type="date" value={form.timesheet_received_date} onChange={set('timesheet_received_date')} />
+              </div>
+              <div>
+                <label className={labelCls}>欠勤日数</label>
+                <Input type="number" step="0.5" min="0" value={form.absence_days} onChange={set('absence_days')} />
+              </div>
+              <div>
+                <label className={labelCls}>有給日数</label>
+                <Input type="number" step="0.5" min="0" value={form.paid_leave_days} onChange={set('paid_leave_days')} />
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className={labelCls}>備考</label>
+              <textarea rows={2} value={form.notes} onChange={set('notes')}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <Button variant="outline" onClick={onClose}>キャンセル</Button>
+              <Button onClick={save} disabled={saving}>{saving ? '保存中…' : '保存'}</Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BillingSummariesInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const months = recentMonths();
-  // デフォルトは当月。Refinitiv 取込モーダルの請求月初期値にも伝播する
-  const [yearMonth, setYearMonth] = useState<string>(months[0]);
+  // デフォルトは当月。?year_month= があればそれを初期値に（案件編集から戻った時に同じ月へ復帰）。
+  const ymParam = searchParams.get('year_month');
+  const [yearMonth, setYearMonth] = useState<string>(
+    ymParam && /^\d{4}-(0[1-9]|1[0-2])$/.test(ymParam) ? ymParam : thisMonth()
+  );
   const [group,     setGroup]     = useState<GroupType>('deal');
   const [q,         setQ]         = useState<string>('');
   const [items,     setItems]     = useState<(DealRow | CustomerRow)[]>([]);
@@ -79,6 +251,10 @@ export default function BillingSummariesPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [refModalOpen, setRefModalOpen] = useState(false);
   const [deletingWrId, setDeletingWrId] = useState<number | null>(null);
+  // 勤務表未入力行の入力（実時間・交通費）。deal_id でキー。
+  const [draftInputs, setDraftInputs] = useState<Record<number, { actual_hours: string; transportation: string }>>({});
+  // 勤務表入力モーダル（遷移せずこの画面で編集）。対象行 or null。
+  const [timesheetDeal, setTimesheetDeal] = useState<DealRow | null>(null);
   const [sortBy,    setSortBy]    = useState<string>('customer');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -107,7 +283,6 @@ export default function BillingSummariesPage() {
     const get = (r: DealRow | CustomerRow): string | number => {
       switch (sortBy) {
         case 'customer':       return r.customer_name ?? '';
-        case 'invoice_code':   return r.invoice_code ?? '';
         case 'deal':           return (r as DealRow).deal_title ?? '';
         case 'engineer':       return (r as DealRow).engineer_name ?? '';
         case 'deal_count':     return (r as CustomerRow).deal_count ?? 0;
@@ -131,19 +306,44 @@ export default function BillingSummariesPage() {
     return arr;
   }, [items, sortBy, sortOrder]);
 
+  // 勤務表入力済み行: 請求書下書きを作成し、この画面に留まる（行が「下書き」表示に更新）
   const issueInvoice = async (dealId: number, customerName: string | null) => {
     if (!confirm(`${customerName ?? ''} / ${yearMonth} の請求書 下書きを作成します。よろしいですか？`)) return;
     setIssuingId(dealId);
     try {
-      const res = await apiClient.post<{ id: number }>('/api/v1/invoices', {
-        deal_id:    dealId,
-        year_month: yearMonth,
-      });
-      router.push(`/invoices/${res.data.id}`);
+      await apiClient.post('/api/v1/invoices', { deal_id: dealId, year_month: yearMonth });
+      await fetchData();
     } catch (err: unknown) {
       const data = (err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } })?.response?.data;
       const msg = data?.errors?.deal_id?.[0] ?? data?.message ?? '請求書の発行に失敗しました';
       alert(msg);
+    } finally {
+      setIssuingId(null);
+    }
+  };
+
+  // 勤務表未入力行: 入力した実時間/交通費で勤務表を保存 → 請求書下書きを作成 → この画面に留まる
+  const createFromInput = async (r: DealRow) => {
+    const d = draftInputs[r.deal_id] ?? { actual_hours: '', transportation: '' };
+    if (d.actual_hours.trim() === '' || Number.isNaN(Number(d.actual_hours))) {
+      alert('実時間を入力してください'); return;
+    }
+    if (!r.invoice_code) { alert('取引先に顧客コードが未設定です'); return; }
+    if (!confirm(`${r.customer_name ?? ''} / ${yearMonth} の勤務表を保存し、請求書 下書きを作成します。よろしいですか？`)) return;
+    setIssuingId(r.deal_id);
+    try {
+      await apiClient.put(`/api/v1/deals/${r.deal_id}/work-records/${yearMonth}`, {
+        actual_hours: Number(d.actual_hours),
+        transportation_fee: d.transportation.trim() === '' ? null : Number(d.transportation),
+      });
+      await apiClient.post('/api/v1/invoices', { deal_id: r.deal_id, year_month: yearMonth });
+      setDraftInputs(s => { const n = { ...s }; delete n[r.deal_id]; return n; });
+      await fetchData();
+    } catch (err: unknown) {
+      const data = (err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } })?.response?.data;
+      const msg = data?.errors?.deal_id?.[0] ?? data?.message ?? '請求書の作成に失敗しました';
+      alert(msg);
+    } finally {
       setIssuingId(null);
     }
   };
@@ -199,7 +399,7 @@ export default function BillingSummariesPage() {
       <div className="flex-shrink-0 mb-4">
         <h1 className="text-2xl font-bold text-gray-800">請求書作成</h1>
         <p className="text-xs text-gray-400 mt-1">
-          月別の請求金額を案件別・取引先別で試算（消費税10%、軽減税率は未対応）
+          対象月の全SES案件を表示。<span className="text-amber-600">未入力</span>の案件は実時間を入力して〔請求書を作成〕でこの画面から発行できます（消費税10%、軽減税率は未対応）
         </p>
       </div>
 
@@ -278,6 +478,16 @@ export default function BillingSummariesPage() {
         }}
       />
 
+      {/* 勤務表入力モーダル（遷移せずこの画面で編集）*/}
+      {timesheetDeal && (
+        <TimesheetEditModal
+          deal={timesheetDeal}
+          yearMonth={yearMonth}
+          onClose={() => setTimesheetDeal(null)}
+          onSaved={fetchData}
+        />
+      )}
+
       {/* テーブル */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
@@ -287,26 +497,24 @@ export default function BillingSummariesPage() {
                 {group === 'deal' ? (
                   <>
                     <SortableHeader label="取引先"       field="customer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[140px] whitespace-nowrap" />
-                    <SortableHeader label="顧客コード"   field="invoice_code" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[110px] whitespace-nowrap" />
                     <SortableHeader label="案件"         field="deal"         sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px] whitespace-nowrap" />
                     <SortableHeader label="技術者"       field="engineer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[100px] whitespace-nowrap" />
                   </>
                 ) : (
                   <>
                     <SortableHeader label="取引先"       field="customer"     sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[200px] whitespace-nowrap" />
-                    <SortableHeader label="顧客コード"   field="invoice_code" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 w-[120px] whitespace-nowrap" />
                     <th className="text-right px-2 py-3 font-semibold w-[70px] whitespace-nowrap">案件数</th>
                   </>
                 )}
-                <th className="text-right px-2 py-3 font-semibold w-[60px] whitespace-nowrap">実時間</th>
+                <th className="text-right px-2 py-3 font-semibold w-[92px] whitespace-nowrap">実時間</th>
                 <th className="text-right px-2 py-3 font-semibold w-[80px] whitespace-nowrap">基本額</th>
                 <th className="text-right px-2 py-3 font-semibold w-[70px] whitespace-nowrap">控除</th>
                 <th className="text-right px-2 py-3 font-semibold w-[70px] whitespace-nowrap">超過</th>
-                <th className="text-right px-2 py-3 font-semibold w-[70px] whitespace-nowrap">交通費</th>
+                <th className="text-right px-2 py-3 font-semibold w-[92px] whitespace-nowrap">交通費</th>
                 <th className="text-right px-2 py-3 font-semibold w-[80px] whitespace-nowrap">小計</th>
                 <th className="text-right px-2 py-3 font-semibold w-[70px] whitespace-nowrap">消費税</th>
                 <SortableHeader label="請求合計" field="total" sortField={sortBy} sortOrder={sortOrder} onSort={handleSort} className="px-2 py-3 text-right w-[130px] whitespace-nowrap" />
-                {group === 'deal' && <th className="text-center px-2 py-3 font-semibold w-[230px] whitespace-nowrap">操作</th>}
+                {group === 'deal' && <th className="text-right px-2 py-3 font-semibold w-[280px] whitespace-nowrap">操作</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -315,92 +523,127 @@ export default function BillingSummariesPage() {
               ) : sortedItems.length === 0 ? (
                 <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-400">該当データなし</td></tr>
               ) : group === 'deal' ? (
-                (sortedItems as DealRow[]).map((r, idx) => (
-                  <tr key={r.deal_id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
+                (sortedItems as DealRow[]).map((r, idx) => {
+                  // 勤務表未入力かつ未請求の行は、この画面で実時間/交通費を入力して作成する
+                  const editable = !r.invoice_id && !r.has_work_record;
+                  const draft = draftInputs[r.deal_id] ?? { actual_hours: '', transportation: '' };
+                  const pv = editable ? calcDraftPreview(r, draft.actual_hours, draft.transportation) : null;
+                  const setDraft = (patch: Partial<{ actual_hours: string; transportation: string }>) =>
+                    setDraftInputs(s => ({ ...s, [r.deal_id]: { ...draft, ...patch } }));
+                  return (
+                  <tr key={r.deal_id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/30'} hover:bg-blue-50/60 transition-colors ${editable ? 'border-l-2 border-l-amber-300' : ''}`}>
                     <td className="px-2 py-3 text-gray-800 truncate" title={r.customer_name ?? ''}>{r.customer_name ?? '-'}</td>
-                    <td className="px-2 py-3 text-gray-500 text-xs truncate" title={r.invoice_code ?? ''}>{r.invoice_code ?? '-'}</td>
-                    <td className="px-2 py-3 truncate" title={r.deal_title ?? ''}>{r.deal_title}</td>
+                    <td className="px-2 py-3 truncate" title={r.deal_title ?? ''}>
+                      {r.deal_title}
+                      {editable && <span className="ml-1.5 text-[10px] text-amber-600 border border-amber-300 rounded px-1 align-middle">未入力</span>}
+                    </td>
                     <td className="px-2 py-3 text-gray-600 truncate" title={r.engineer_name ?? ''}>{r.engineer_name ?? '-'}</td>
-                    <td className="px-2 py-3 text-right tabular-nums">{r.actual_hours ?? '-'}</td>
+                    {/* 実時間（hh:mm。未入力行は入力欄）*/}
+                    <td className="px-2 py-3 text-right tabular-nums">
+                      {editable
+                        ? <HhmmInput value={draft.actual_hours} onChange={v => setDraft({ actual_hours: v })}
+                            placeholder="hh:mm" className="w-full h-7 text-right text-xs px-1" />
+                        : (hoursToHhmm(r.actual_hours) || '-')}
+                    </td>
                     <td className="px-2 py-3 text-right tabular-nums">{yen(r.basic)}</td>
-                    <td className="px-2 py-3 text-right tabular-nums text-red-600">{r.deduction ? `-${yen(r.deduction).slice(1)}` : '-'}</td>
-                    <td className="px-2 py-3 text-right tabular-nums">{r.overtime ? yen(r.overtime) : '-'}</td>
-                    <td className="px-2 py-3 text-right tabular-nums">{r.transportation ? yen(r.transportation) : '-'}</td>
-                    <td className="px-2 py-3 text-right tabular-nums">{yen(r.subtotal)}</td>
-                    <td className="px-2 py-3 text-right tabular-nums">{yen(r.tax)}</td>
-                    <td className="px-2 py-3 text-right tabular-nums font-semibold">{yen(r.total)}</td>
-                    <td className="px-2 py-3 text-center whitespace-nowrap">
-                      <div className="inline-flex items-center gap-1">
+                    <td className="px-2 py-3 text-right tabular-nums text-red-600">
+                      {editable
+                        ? (pv && pv.deduction ? `-${yen(pv.deduction).slice(1)}` : '-')
+                        : (r.deduction ? `-${yen(r.deduction).slice(1)}` : '-')}
+                    </td>
+                    <td className="px-2 py-3 text-right tabular-nums">
+                      {editable ? (pv && pv.overtime ? yen(pv.overtime) : '-') : (r.overtime ? yen(r.overtime) : '-')}
+                    </td>
+                    {/* 交通費（未入力行は入力欄）*/}
+                    <td className="px-2 py-3 text-right tabular-nums">
+                      {editable
+                        ? <input type="number" step="1" min="0" value={draft.transportation}
+                            onChange={e => setDraft({ transportation: e.target.value })} placeholder="交通費"
+                            className="w-full text-right border border-gray-300 rounded px-1 py-1 text-xs h-7" />
+                        : (r.transportation ? yen(r.transportation) : '-')}
+                    </td>
+                    <td className="px-2 py-3 text-right tabular-nums">{editable ? (pv ? yen(pv.subtotal) : '-') : yen(r.subtotal)}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{editable ? (pv ? yen(pv.tax) : '-') : yen(r.tax)}</td>
+                    <td className="px-2 py-3 text-right tabular-nums font-semibold">{editable ? (pv ? yen(pv.total) : '-') : yen(r.total)}</td>
+                    <td className="px-2 py-3 whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* 副操作: 勤務表(モーダル) / 案件編集 */}
+                        <button
+                          onClick={() => setTimesheetDeal(r)}
+                          title="勤務表を入力（この画面で編集）"
+                          className="text-xs px-1.5 py-1 rounded text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                        >勤務表</button>
                         <Link
-                          href={`/ses-contracts/${r.deal_id}/timesheets`}
-                          title="勤務表を編集"
-                          className="text-xs px-2 py-1 rounded text-gray-700 hover:bg-gray-100"
-                        >✏️</Link>
-                        <Link
-                          href={`/ses-contracts/${r.deal_id}/edit`}
+                          href={`/ses-contracts/${r.deal_id}/edit?from=${encodeURIComponent(`/billing-summaries?year_month=${yearMonth}`)}`}
                           title="案件・契約を編集"
-                          className="text-xs px-2 py-1 rounded text-gray-700 hover:bg-gray-100"
-                        >⚙️</Link>
-                        {/* 削除ボタン（請求書 or 勤務表）— 歯車の右に配置 */}
-                        {r.invoice_id ? (
-                          <button
-                            onClick={() => deleteInvoice(r.invoice_id!, r.invoice_status!, r.customer_name)}
-                            disabled={deletingId === r.invoice_id}
-                            title="請求書を削除（誤発行のリカバリ用）"
-                            className="text-xs px-2 py-1 rounded text-red-600 hover:bg-red-50 disabled:opacity-50 inline-block w-[32px] text-center"
-                          >
-                            {deletingId === r.invoice_id ? '...' : '🗑️'}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => deleteWorkRecord(r.deal_id, r.deal_title)}
-                            disabled={deletingWrId === r.deal_id}
-                            title="勤務表を削除（請求集計から外す）"
-                            className="text-xs px-2 py-1 rounded text-red-600 hover:bg-red-50 disabled:opacity-50 inline-block w-[32px] text-center"
-                          >
-                            {deletingWrId === r.deal_id ? '...' : '🗑️'}
-                          </button>
-                        )}
-                        {r.invoice_status === 'issued' && r.invoice_pdf_path ? (
-                          <a
-                            href={r.invoice_pdf_path}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="請求書PDFをダウンロード"
-                            className="text-xs px-2 py-1 rounded text-gray-700 hover:bg-gray-100 inline-block w-[32px] text-center"
-                          >📥</a>
-                        ) : (
-                          <span className="inline-block w-[32px]" aria-hidden="true" />
-                        )}
-                        {r.invoice_id ? (
-                          <Link
-                            href={`/invoices/${r.invoice_id}`}
-                            title={r.invoice_status === 'issued' ? '発行済の請求書を表示' : '下書きの請求書を編集'}
-                            className={`text-xs px-2 py-1 rounded text-white inline-block w-[72px] text-center ${
-                              r.invoice_status === 'issued' ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'
-                            }`}
-                          >
-                            {r.invoice_status === 'issued' ? '📋 発行済' : '📋 下書き'}
-                          </Link>
-                        ) : (
-                          <button
-                            onClick={() => issueInvoice(r.deal_id, r.customer_name)}
-                            disabled={issuingId === r.deal_id || !r.invoice_code}
-                            title={!r.invoice_code ? '取引先に顧客コードが未設定です' : '請求書の下書きを作成'}
-                            className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-block w-[72px] text-center"
-                          >
-                            {issuingId === r.deal_id ? '...' : '📝 下書き'}
-                          </button>
-                        )}
+                          className="text-xs px-1.5 py-1 rounded text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                        >案件</Link>
+                        <span className="text-gray-200" aria-hidden="true">│</span>
+                        {/* 主操作: 固定幅スロットで全行を揃える（未入力/未作成=作成 / 下書き=開く / 発行済=表示）*/}
+                        <div className="w-[96px] flex justify-end">
+                          {editable || !r.invoice_id ? (
+                            <button
+                              onClick={() => (editable ? createFromInput(r) : issueInvoice(r.deal_id, r.customer_name))}
+                              disabled={issuingId === r.deal_id || !r.invoice_code || (editable && draft.actual_hours.trim() === '')}
+                              title={!r.invoice_code ? '取引先に顧客コードが未設定です' : (editable ? '実時間を入力して請求書下書きを作成' : '勤務表から請求書の下書きを作成')}
+                              className="w-full text-center text-xs font-semibold px-2.5 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                            >
+                              {issuingId === r.deal_id ? '作成中…' : '請求書を作成'}
+                            </button>
+                          ) : r.invoice_status === 'issued' ? (
+                            <Link
+                              href={`/invoices/${r.invoice_id}`}
+                              title="発行済の請求書を表示"
+                              className="w-full text-center text-xs font-semibold px-2.5 py-1 rounded bg-green-600 text-white hover:bg-green-700"
+                            >請求書を表示</Link>
+                          ) : (
+                            <Link
+                              href={`/invoices/${r.invoice_id}`}
+                              title="下書きの請求書を編集"
+                              className="w-full text-center text-xs font-semibold px-2.5 py-1 rounded bg-amber-500 text-white hover:bg-amber-600"
+                            >下書きを開く</Link>
+                          )}
+                        </div>
+                        {/* 末尾: PDF / 削除（固定幅スロットで揃える）*/}
+                        <div className="w-[52px] flex justify-end items-center gap-1">
+                          {r.invoice_id && r.invoice_status === 'issued' && r.invoice_pdf_path && (
+                            <a
+                              href={r.invoice_pdf_path}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="請求書PDFをダウンロード"
+                              className="text-xs px-1 py-1 rounded text-gray-600 hover:bg-gray-100"
+                            >📥</a>
+                          )}
+                          {r.invoice_id ? (
+                            <button
+                              onClick={() => deleteInvoice(r.invoice_id!, r.invoice_status!, r.customer_name)}
+                              disabled={deletingId === r.invoice_id}
+                              title="請求書を削除（誤発行のリカバリ用）"
+                              className="text-xs px-1 py-1 rounded text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            >
+                              {deletingId === r.invoice_id ? '…' : '🗑️'}
+                            </button>
+                          ) : r.has_work_record ? (
+                            <button
+                              onClick={() => deleteWorkRecord(r.deal_id, r.deal_title)}
+                              disabled={deletingWrId === r.deal_id}
+                              title="勤務表を削除（請求集計から外す）"
+                              className="text-xs px-1 py-1 rounded text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            >
+                              {deletingWrId === r.deal_id ? '…' : '🗑️'}
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 (sortedItems as CustomerRow[]).map((r, idx) => (
-                  <tr key={r.customer_id ?? 0} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
+                  <tr key={r.customer_id ?? 0} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/30'} hover:bg-blue-50/60 transition-colors`}>
                     <td className="px-2 py-3 text-gray-800 truncate" title={r.customer_name ?? ''}>{r.customer_name ?? '-'}</td>
-                    <td className="px-2 py-3 text-gray-500 text-xs truncate" title={r.invoice_code ?? ''}>{r.invoice_code ?? '-'}</td>
                     <td className="px-2 py-3 text-right tabular-nums">{r.deal_count}</td>
                     <td className="px-2 py-3 text-right tabular-nums">{r.actual_hours}</td>
                     <td className="px-2 py-3 text-right tabular-nums">{yen(r.basic)}</td>
@@ -417,7 +660,7 @@ export default function BillingSummariesPage() {
             {totals && sortedItems.length > 0 && (
               <tfoot className="bg-gray-50 sticky bottom-0">
                 <tr className="font-semibold">
-                  <td className="px-3 py-3" colSpan={group === 'deal' ? 4 : 3}>合計</td>
+                  <td className="px-3 py-3" colSpan={group === 'deal' ? 3 : 2}>合計</td>
                   <td className="px-3 py-3"></td>
                   <td className="px-3 py-3 text-right tabular-nums">{yen(totals.basic)}</td>
                   <td className="px-3 py-3 text-right tabular-nums text-red-600">{totals.deduction ? `-${yen(totals.deduction).slice(1)}` : '-'}</td>
@@ -433,6 +676,15 @@ export default function BillingSummariesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// useSearchParams は Suspense 境界が必要（Next.js 15）
+export default function BillingSummariesPage() {
+  return (
+    <Suspense>
+      <BillingSummariesInner />
+    </Suspense>
   );
 }
 

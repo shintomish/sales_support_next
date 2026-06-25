@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { HhmmInput } from '@/components/HhmmInput';
 import type { ApiError } from '@/lib/error-helpers';
 
 const SES_STATUSES = ['稼働中', '更新交渉中', '新規', '提案', '交渉', '成約', '失注', '期限切れ'];
@@ -77,9 +78,13 @@ const toDateStr = (v: string | null | undefined): string => {
   try { return new Date(v).toISOString().slice(0, 10); } catch { return ''; }
 };
 
-export default function SesContractEditPage() {
+function SesContractEditInner() {
   const router = useRouter();
   const { id } = useParams();
+  const searchParams = useSearchParams();
+  // 遷移元（?from=）があればそこへ戻る。請求書作成画面など呼び出し元に復帰するため。内部パスのみ許可。
+  const fromParam = searchParams.get('from');
+  const backTo = fromParam && fromParam.startsWith('/') ? fromParam : '/ses-contracts';
   const [form, setForm]           = useState<FormData | null>(null);
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
@@ -158,6 +163,9 @@ export default function SesContractEditPage() {
   const set = (key: keyof FormData) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm(f => f ? { ...f, [key]: e.target.value } : f);
+  // 値を直接受け取るセッター（HhmmInput 等のカスタム入力用）
+  const setVal = (key: keyof FormData) =>
+    (value: string) => setForm(f => f ? { ...f, [key]: value } : f);
 
   const handlePromote = async () => {
     if (!confirm('この案件を商談管理に登録しますか？')) return;
@@ -184,7 +192,7 @@ export default function SesContractEditPage() {
         payload[k] = v === '' ? null : v;
       });
       await apiClient.put(`/api/v1/ses-contracts/${id}`, payload);
-      router.push('/ses-contracts');
+      router.push(backTo);
     } catch (err: unknown) {
       if ((err as ApiError).response?.data?.errors) setErrors(((err as ApiError).response?.data?.errors ?? {}) as unknown as Record<string, string>);
       else alert('保存に失敗しました');
@@ -227,7 +235,7 @@ export default function SesContractEditPage() {
             className="border-emerald-300 text-emerald-600 hover:bg-emerald-50">
             📅 月別勤務表
           </Button>
-          <Button variant="outline" onClick={() => router.push('/ses-contracts')}>← 戻る</Button>
+          <Button variant="outline" onClick={() => router.push(backTo)}>← 戻る</Button>
         </div>
       </div>
 
@@ -382,9 +390,9 @@ export default function SesContractEditPage() {
             <CardHeader><CardTitle className="text-base text-gray-700">精算条件（顧客側）</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div><label className={labelCls}>控除単価</label><Input type="number" value={form.client_deduction_unit_price} onChange={set('client_deduction_unit_price')} /></div>
-              <div><label className={labelCls}>控除時間</label><Input type="number" value={form.client_deduction_hours} onChange={set('client_deduction_hours')} /></div>
+              <div><label className={labelCls}>控除時間</label><HhmmInput value={form.client_deduction_hours} onChange={setVal('client_deduction_hours')} /></div>
               <div><label className={labelCls}>超過単価</label><Input type="number" value={form.client_overtime_unit_price} onChange={set('client_overtime_unit_price')} /></div>
-              <div><label className={labelCls}>超過時間</label><Input type="number" value={form.client_overtime_hours} onChange={set('client_overtime_hours')} /></div>
+              <div><label className={labelCls}>超過時間</label><HhmmInput value={form.client_overtime_hours} onChange={setVal('client_overtime_hours')} /></div>
               <div><label className={labelCls}>精算単位（分）</label><Input type="number" value={form.settlement_unit_minutes} onChange={set('settlement_unit_minutes')} /></div>
               <div><label className={labelCls}>入金サイト（日）</label><Input type="number" value={form.payment_site} onChange={set('payment_site')} /></div>
               <div><label className={labelCls}>注文番号</label><Input value={form.order_number} onChange={set('order_number')} placeholder="ORD-XXX-..." /></div>
@@ -395,9 +403,9 @@ export default function SesContractEditPage() {
             <CardHeader><CardTitle className="text-base text-gray-700">精算条件（仕入側）</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div><label className={labelCls}>控除単価</label><Input type="number" value={form.vendor_deduction_unit_price} onChange={set('vendor_deduction_unit_price')} /></div>
-              <div><label className={labelCls}>控除時間</label><Input type="number" value={form.vendor_deduction_hours} onChange={set('vendor_deduction_hours')} /></div>
+              <div><label className={labelCls}>控除時間</label><HhmmInput value={form.vendor_deduction_hours} onChange={setVal('vendor_deduction_hours')} /></div>
               <div><label className={labelCls}>超過単価</label><Input type="number" value={form.vendor_overtime_unit_price} onChange={set('vendor_overtime_unit_price')} /></div>
-              <div><label className={labelCls}>超過時間</label><Input type="number" value={form.vendor_overtime_hours} onChange={set('vendor_overtime_hours')} /></div>
+              <div><label className={labelCls}>超過時間</label><HhmmInput value={form.vendor_overtime_hours} onChange={setVal('vendor_overtime_hours')} /></div>
               <div><label className={labelCls}>精算単位（分）</label><Input type="number" value={form.vendor_settlement_unit_minutes} onChange={set('vendor_settlement_unit_minutes')} /></div>
               <div><label className={labelCls}>支払サイト（日）</label><Input type="number" value={form.vendor_payment_site} onChange={set('vendor_payment_site')} /></div>
             </CardContent>
@@ -447,8 +455,17 @@ export default function SesContractEditPage() {
           className="border-blue-300 text-blue-600 hover:bg-blue-50">
           {promoting ? '登録中...' : '💼 商談管理に登録'}
         </Button>
-        <Button variant="outline" onClick={() => router.push('/ses-contracts')}>キャンセル</Button>
+        <Button variant="outline" onClick={() => router.push(backTo)}>キャンセル</Button>
       </div>
     </div>
+  );
+}
+
+// useSearchParams は Suspense 境界が必要（Next.js 15）
+export default function SesContractEditPage() {
+  return (
+    <Suspense>
+      <SesContractEditInner />
+    </Suspense>
   );
 }

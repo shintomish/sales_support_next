@@ -6,6 +6,7 @@ import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { HhmmInput } from '@/components/HhmmInput';
 import type { ApiError } from '@/lib/error-helpers';
 
 const SES_STATUSES = ['稼働中', '更新交渉中', '新規', '提案', '交渉', '成約', '失注', '期限切れ'];
@@ -81,6 +82,9 @@ export default function SesContractCreatePage() {
 
   const set = (key: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [key]: e.target.value }));
+  // 値を直接受け取るセッター（HhmmInput 等のカスタム入力用）
+  const setVal = (key: keyof FormData) => (value: string) =>
+    setForm(f => ({ ...f, [key]: value }));
 
   const handleSubmit = async () => {
     if (!form.engineer_name.trim()) { setErrors({ engineer_name: '氏名は必須です' }); return; }
@@ -231,9 +235,9 @@ export default function SesContractCreatePage() {
             <CardHeader><CardTitle className="text-base text-gray-700">精算条件（顧客側）</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div><label className={labelCls}>控除単価</label><Input type="number" value={form.client_deduction_unit_price} onChange={set('client_deduction_unit_price')} placeholder="0" /></div>
-              <div><label className={labelCls}>控除時間</label><Input type="number" value={form.client_deduction_hours} onChange={set('client_deduction_hours')} placeholder="140" /></div>
+              <div><label className={labelCls}>控除時間</label><HhmmInput value={form.client_deduction_hours} onChange={setVal('client_deduction_hours')} placeholder="140:00" /></div>
               <div><label className={labelCls}>超過単価</label><Input type="number" value={form.client_overtime_unit_price} onChange={set('client_overtime_unit_price')} placeholder="0" /></div>
-              <div><label className={labelCls}>超過時間</label><Input type="number" value={form.client_overtime_hours} onChange={set('client_overtime_hours')} placeholder="180" /></div>
+              <div><label className={labelCls}>超過時間</label><HhmmInput value={form.client_overtime_hours} onChange={setVal('client_overtime_hours')} placeholder="180:00" /></div>
               <div><label className={labelCls}>精算単位（分）</label><Input type="number" value={form.settlement_unit_minutes} onChange={set('settlement_unit_minutes')} placeholder="30" /></div>
               <div><label className={labelCls}>入金サイト（日）</label><Input type="number" value={form.payment_site} onChange={set('payment_site')} placeholder="50" /></div>
               <div><label className={labelCls}>注文番号</label><Input value={form.order_number} onChange={set('order_number')} placeholder="ORD-XXX-..." /></div>
@@ -244,9 +248,9 @@ export default function SesContractCreatePage() {
             <CardHeader><CardTitle className="text-base text-gray-700">精算条件（仕入側）</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div><label className={labelCls}>控除単価</label><Input type="number" value={form.vendor_deduction_unit_price} onChange={set('vendor_deduction_unit_price')} placeholder="0" /></div>
-              <div><label className={labelCls}>控除時間</label><Input type="number" value={form.vendor_deduction_hours} onChange={set('vendor_deduction_hours')} placeholder="140" /></div>
+              <div><label className={labelCls}>控除時間</label><HhmmInput value={form.vendor_deduction_hours} onChange={setVal('vendor_deduction_hours')} placeholder="140:00" /></div>
               <div><label className={labelCls}>超過単価</label><Input type="number" value={form.vendor_overtime_unit_price} onChange={set('vendor_overtime_unit_price')} placeholder="0" /></div>
-              <div><label className={labelCls}>超過時間</label><Input type="number" value={form.vendor_overtime_hours} onChange={set('vendor_overtime_hours')} placeholder="180" /></div>
+              <div><label className={labelCls}>超過時間</label><HhmmInput value={form.vendor_overtime_hours} onChange={setVal('vendor_overtime_hours')} placeholder="180:00" /></div>
               <div><label className={labelCls}>精算単位（分）</label><Input type="number" value={form.vendor_settlement_unit_minutes} onChange={set('vendor_settlement_unit_minutes')} placeholder="15" /></div>
               <div><label className={labelCls}>支払サイト（日）</label><Input type="number" value={form.vendor_payment_site} onChange={set('vendor_payment_site')} placeholder="45" /></div>
             </CardContent>
