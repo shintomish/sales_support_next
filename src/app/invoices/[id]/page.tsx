@@ -29,13 +29,14 @@ interface MailTemplate {
   candidates: MailCandidate[];
   delivery_method: 'mail' | 'post' | 'both' | null;
 }
+type AttachmentMeta = string | { name: string; url: string };
 interface SendHistoryRow {
   id: number;
-  method: 'mail' | 'post';
+  method: 'mail' | 'post' | 'partner';
   to_emails: string[] | null;
   cc_emails: string[] | null;
   subject: string | null;
-  attachments_meta: string[] | null;
+  attachments_meta: AttachmentMeta[] | null;
   status: 'sent' | 'failed';
   error_message: string | null;
   sent_at: string | null;
@@ -463,6 +464,70 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       });
       setPostModalOpen(false);
       showToast('記録しました', 'success');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '記録に失敗しました';
+      alert(msg);
+    } finally { setBusy(false); }
+  };
+
+  // 送信履歴ハブ（①メール送信 ②partner送信 ③郵送記録 を1つにまとめる）
+  const [historyHubOpen, setHistoryHubOpen] = useState(false);
+  const openHistoryHub = async () => {
+    setBusy(true);
+    try {
+      const res = await apiClient.get<{ data: SendHistoryRow[] }>(`/api/v1/invoices/${id}/send-histories`);
+      setSendHistories(res.data.data ?? []);
+    } catch { /* 履歴取得失敗でもハブは開く */ }
+    finally { setBusy(false); setHistoryHubOpen(true); }
+  };
+  // 各チャネルの最新レコードを取り出すヘルパー
+  const latestHistory = (m: 'mail' | 'partner' | 'post'): SendHistoryRow | null =>
+    sendHistories.filter(h => h.method === m)
+      .sort((a, b) => (b.sent_at ?? '').localeCompare(a.sent_at ?? ''))[0] ?? null;
+
+  // ② partner送信モーダル（郵送記録と同型・同封物の代わりに添付ファイル）
+  const [partnerModalOpen, setPartnerModalOpen] = useState(false);
+  const [partnerSentAt, setPartnerSentAt]       = useState<string>(new Date().toISOString().slice(0, 10));
+  const [partnerNote, setPartnerNote]           = useState('');
+  const [partnerTo, setPartnerTo]               = useState<string[]>([]);
+  const [partnerCandidates, setPartnerCandidates] = useState<MailCandidate[]>([]);
+  const [partnerFiles, setPartnerFiles]         = useState<File[]>([]);
+
+  const openPartnerModal = async () => {
+    setHistoryHubOpen(false);
+    setBusy(true);
+    try {
+      const res = await apiClient.get<{
+        latest: { sent_at: string | null; note: string | null; to_recipients: string[] | null } | null;
+        candidates: MailCandidate[];
+      }>(`/api/v1/invoices/${id}/latest-partner`);
+      setPartnerCandidates(res.data.candidates ?? []);
+      const latest = res.data.latest;
+      setPartnerSentAt(latest?.sent_at ?? new Date().toISOString().slice(0, 10));
+      setPartnerNote(latest?.note ?? '');
+      setPartnerTo(latest?.to_recipients ?? []);
+      setPartnerFiles([]);
+      setPartnerModalOpen(true);
+    } catch {
+      setPartnerSentAt(new Date().toISOString().slice(0, 10));
+      setPartnerNote(''); setPartnerTo([]); setPartnerFiles([]);
+      setPartnerModalOpen(true);
+    } finally { setBusy(false); }
+  };
+
+  const recordPartner = async () => {
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('sent_at', partnerSentAt);
+      if (partnerNote) fd.append('note', partnerNote);
+      partnerTo.forEach(t => fd.append('to_recipients[]', t));
+      partnerFiles.forEach(f => fd.append('attachments[]', f));
+      await apiClient.post(`/api/v1/invoices/${id}/record-partner`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setPartnerModalOpen(false);
+      showToast('partner送信を記録しました', 'success');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '記録に失敗しました';
       alert(msg);
@@ -939,19 +1004,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <Button variant="outline" onClick={() => setEnvelopeModalOpen(true)} disabled={busy}>
             ✉️ 長3封筒 PDF
           </Button>
-          <Button variant="outline" onClick={openMailModal}
+          <Button variant="outline" onClick={openHistoryHub}
             disabled={busy || (invoice.doc_type !== 'estimate' && !invoice.approved)}
             title={invoice.doc_type === 'estimate'
-              ? '見積書をメール送信'
-              : (invoice.approved ? '帳票をメール送信' : '承認済みのみメール送信できます')}>
-            📧 メール送信
-          </Button>
-          <Button variant="outline" onClick={openPostModal}
-            disabled={busy || (invoice.doc_type !== 'estimate' && !invoice.approved)}
-            title={invoice.doc_type === 'estimate'
-              ? '見積書の郵送記録を残す'
-              : (invoice.approved ? '郵送記録を残す' : '承認済みのみ郵送記録できます')}>
-            📮 郵送記録
+              ? '送信履歴（メール送信／partner送信／郵送記録）'
+              : (invoice.approved ? '送信履歴（メール送信／partner送信／郵送記録）' : '承認済みのみ送信・記録できます')}>
+            📨 送信履歴
           </Button>
 
           {/* 承認ワークフロー（estimate は担当者ベースのため非表示） */}
@@ -983,6 +1041,109 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           </Button>
         </div>
       </div>
+
+      {/* 送信履歴ハブ（①メール送信 ②partner送信 ③郵送記録）*/}
+      {historyHubOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setHistoryHubOpen(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-1">📨 送信履歴</h2>
+            <p className="text-xs text-gray-500 mb-4">{invoice.invoice_number}・各手段の最新状態。ボタンから記録・送信できます。</p>
+            <div className="space-y-3">
+              {([
+                { key: 'mail'    as const, label: '① メール送信',  latest: latestHistory('mail'),    onClick: () => { setHistoryHubOpen(false); openMailModal(); }, btn: 'メール送信' },
+                { key: 'partner' as const, label: '② partner送信', latest: latestHistory('partner'), onClick: () => openPartnerModal(),                            btn: 'partner送信' },
+                { key: 'post'    as const, label: '③ 郵送記録',     latest: latestHistory('post'),    onClick: () => { setHistoryHubOpen(false); openPostModal(); }, btn: '郵送記録' },
+              ]).map(row => (
+                <div key={row.key} className="border border-gray-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">{row.label}</p>
+                      {row.latest ? (
+                        <p className={`text-xs mt-0.5 ${row.latest.status === 'failed' ? 'text-red-600' : 'text-emerald-700'}`}>
+                          {row.latest.status === 'failed' ? '⚠ 失敗' : '✓ 済'}
+                          {row.latest.sent_at ? ` ・ ${new Date(row.latest.sent_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}
+                          {row.latest.to_emails && row.latest.to_emails.length > 0 ? ` ・ 宛先: ${row.latest.to_emails.join(', ')}` : ''}
+                        </p>
+                      ) : <p className="text-xs text-gray-400 mt-0.5">未実施</p>}
+                      {row.latest?.attachments_meta && row.latest.attachments_meta.length > 0 && (
+                        <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                          添付: {row.latest.attachments_meta.map((a, i) => {
+                            const nm = typeof a === 'string' ? a : a.name;
+                            const u  = typeof a === 'string' ? null : a.url;
+                            const sep = i < row.latest!.attachments_meta!.length - 1 ? '、' : '';
+                            return u
+                              ? <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{nm}{sep}</a>
+                              : <span key={i}>{nm}{sep}</span>;
+                          })}
+                        </p>
+                      )}
+                    </div>
+                    <Button variant="outline" onClick={row.onClick} disabled={busy} className="flex-shrink-0">{row.btn}</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end mt-5">
+              <Button variant="outline" onClick={() => setHistoryHubOpen(false)}>閉じる</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ② partner送信モーダル（郵送記録と同型・同封物の代わりに添付ファイル）*/}
+      {partnerModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setPartnerModalOpen(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-4 md:p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-1">② partner送信の記録</h2>
+            <p className="text-xs text-gray-500 mb-4">partner@ 経由で客先へ送った記録（実送信なし）。いつ・誰に・何を を残します。</p>
+            <div className="space-y-3">
+              {partnerCandidates.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">候補（クリックで宛先に追加）:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {partnerCandidates.map(c => (
+                      <button key={c.email || c.name} type="button"
+                        onClick={() => { if (!partnerTo.includes(c.name)) setPartnerTo([...partnerTo, c.name]); }}
+                        className="text-xs px-2 py-0.5 rounded bg-gray-100 hover:bg-blue-100 text-gray-700">{c.name}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">宛先（カンマ区切り）</label>
+                <Input value={partnerTo.join(', ')}
+                  onChange={e => setPartnerTo(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                  placeholder="氏名 / 会社名 等" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">送信日</label>
+                <Input type="date" value={partnerSentAt} onChange={e => setPartnerSentAt(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">添付ファイル（送ったもの）</label>
+                <input type="file" multiple onChange={e => setPartnerFiles(Array.from(e.target.files ?? []))}
+                  className="block w-full text-sm text-gray-700" />
+                {partnerFiles.length > 0 && (
+                  <ul className="mt-1 text-xs text-gray-600 list-disc list-inside">
+                    {partnerFiles.map((f, i) => <li key={i}>{f.name}</li>)}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">備考（任意）</label>
+                <textarea value={partnerNote} onChange={e => setPartnerNote(e.target.value)} rows={2}
+                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <Button variant="outline" onClick={() => setPartnerModalOpen(false)} disabled={busy}>キャンセル</Button>
+              <Button onClick={recordPartner} disabled={busy} className="bg-blue-600 hover:bg-blue-700 text-white">
+                {busy ? '保存中…' : '記録する'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 郵送記録モーダル */}
       {postModalOpen && (
