@@ -41,6 +41,8 @@ type Email = {
   contact?: { id: number; name: string } | null
   deal?: { id: number; name: string } | null
   customer?: { id: number; name: string } | null
+  // このメール（見積依頼等）から作成済みの見積/帳票（⑤ 記録一元化）
+  sourced_invoices?: { id: number; invoice_number: string; doc_type: string; status: string }[]
 }
 
 type PaginatedEmails = {
@@ -499,6 +501,30 @@ export default function EmailsPage() {
                   <p><span className="text-gray-400">送信:</span> {formatDateFull(selectedEmail.received_at)}</p>
                   <p><span className="text-gray-400">取込:</span> {formatDateFull(selectedEmail.created_at)}</p>
                 </div>
+              </div>
+
+              {/* ⑤ 見積作成導線 + このメールから作成済みの帳票（記録一元化） */}
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => router.push(`/estimates?source_email_id=${selectedEmail.id}`)}
+                  title="このメール（見積依頼等）から見積書を作成（メールと紐付け）"
+                  className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >📄 見積を作成</button>
+                {selectedEmail.sourced_invoices && selectedEmail.sourced_invoices.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="text-gray-500">この依頼から:</span>
+                    {selectedEmail.sourced_invoices.map(inv => {
+                      const label = inv.doc_type === 'estimate' ? '見積書' : inv.doc_type === 'purchase_order' ? '注文書' : '請求書'
+                      const href = inv.doc_type === 'estimate' ? `/estimates/${inv.id}` : inv.doc_type === 'purchase_order' ? `/purchase-orders/${inv.id}` : `/invoices/${inv.id}`
+                      return (
+                        <a key={inv.id} href={href} target="_blank" rel="noopener noreferrer"
+                          className="text-emerald-700 hover:underline">
+                          {label} {inv.invoice_number}（{inv.status === 'issued' ? '発行済' : '下書き'}）
+                        </a>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* 紐付け情報 */}
