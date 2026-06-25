@@ -492,7 +492,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [partnerTo, setPartnerTo]               = useState<string[]>([]);
   const [partnerCandidates, setPartnerCandidates] = useState<MailCandidate[]>([]);
   const [partnerItems, setPartnerItems]         = useState({ invoice: false, cover: false, timesheet: false, transport: false });
-  const [partnerFiles, setPartnerFiles]         = useState<File[]>([]);
 
   const docLabel = () => invoice?.doc_type === 'estimate' ? '見積書' : invoice?.doc_type === 'purchase_order' ? '注文書' : '請求書';
 
@@ -509,7 +508,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       setPartnerSentAt(latest?.sent_at ?? new Date().toISOString().slice(0, 10));
       setPartnerNote(latest?.note ?? '');
       setPartnerTo(latest?.to_recipients ?? []);
-      setPartnerFiles([]);
       // 前回の同封物チェックを復元（attachments_meta の文字列要素）
       const names = (latest?.attachments_meta ?? []).filter((x): x is string => typeof x === 'string');
       const dn = docLabel();
@@ -519,7 +517,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       setPartnerModalOpen(true);
     } catch {
       setPartnerSentAt(new Date().toISOString().slice(0, 10));
-      setPartnerNote(''); setPartnerTo([]); setPartnerFiles([]);
+      setPartnerNote(''); setPartnerTo([]);
       setPartnerItems({ invoice: true, cover: false, timesheet: false, transport: false });
       setPartnerModalOpen(true);
     } finally { setBusy(false); }
@@ -540,7 +538,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       if (partnerNote) fd.append('note', partnerNote);
       partnerTo.forEach(t => fd.append('to_recipients[]', t));
       items.forEach(it => fd.append('items[]', it));
-      partnerFiles.forEach(f => fd.append('attachments[]', f)); // 任意
       await apiClient.post(`/api/v1/invoices/${id}/record-partner`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -923,8 +920,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
                   <th className="text-left px-2 py-2 font-semibold w-2/5">摘要</th>
-                  <th className="text-right px-2 py-2 font-semibold w-20">数量</th>
-                  <th className="text-left px-2 py-2 font-semibold w-16">単位</th>
+                  <th className="text-right px-2 py-2 font-semibold w-36">数量</th>
                   <th className="text-right px-2 py-2 font-semibold w-32">単価</th>
                   <th className="text-center px-2 py-2 font-semibold w-24">税率</th>
                   <th className="text-center px-2 py-2 font-semibold w-16" title="経費(非課税)。オン=「経費」行で合算">経費</th>
@@ -943,9 +939,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                       <td className="px-2 py-1">
                         <Input type="number" step="0.01" className="text-right" value={l.quantity}
                           onChange={(e) => updateLine(i, 'quantity', e.target.value)} />
-                      </td>
-                      <td className="px-2 py-1">
-                        <Input value={l.unit ?? ''} onChange={(e) => updateLine(i, 'unit', e.target.value)} />
                       </td>
                       <td className="px-2 py-1">
                         <Input type="number" className="text-right" value={l.unit_price}
@@ -972,24 +965,24 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               </tbody>
               <tfoot className="bg-gray-50">
                 <tr>
-                  <td colSpan={6} className="px-2 py-2 text-right text-gray-600">小計</td>
+                  <td colSpan={5} className="px-2 py-2 text-right text-gray-600">小計</td>
                   <td className="px-2 py-2 text-right tabular-nums">{yen(preview.subtotal)}</td>
                   <td></td>
                 </tr>
                 <tr>
-                  <td colSpan={6} className="px-2 py-2 text-right text-gray-600">消費税</td>
+                  <td colSpan={5} className="px-2 py-2 text-right text-gray-600">消費税</td>
                   <td className="px-2 py-2 text-right tabular-nums">{yen(preview.tax)}</td>
                   <td></td>
                 </tr>
                 {preview.expense > 0 && (
                   <tr>
-                    <td colSpan={6} className="px-2 py-2 text-right text-gray-600">経費</td>
+                    <td colSpan={5} className="px-2 py-2 text-right text-gray-600">経費</td>
                     <td className="px-2 py-2 text-right tabular-nums">{yen(preview.expense)}</td>
                     <td></td>
                   </tr>
                 )}
                 <tr className="font-semibold">
-                  <td colSpan={6} className="px-2 py-2 text-right">合計</td>
+                  <td colSpan={5} className="px-2 py-2 text-right">合計</td>
                   <td className="px-2 py-2 text-right tabular-nums text-blue-700">{yen(preview.total)}</td>
                   <td></td>
                 </tr>
@@ -1164,17 +1157,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     );
                   })}
                 </div>
-                <p className="text-xs text-gray-400 mt-1">タップで選択／解除</p>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">添付ファイル（任意・選択しなくても記録できます）</label>
-                <input type="file" multiple onChange={e => setPartnerFiles(Array.from(e.target.files ?? []))}
-                  className="block w-full text-sm text-gray-700" />
-                {partnerFiles.length > 0 && (
-                  <ul className="mt-1 text-xs text-gray-600 list-disc list-inside">
-                    {partnerFiles.map((f, i) => <li key={i}>{f.name}</li>)}
-                  </ul>
-                )}
+                <p className="text-xs text-gray-400 mt-1">タップで選択／解除（チェックした同封物が送付物の記録になります）</p>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">備考（任意）</label>
