@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import Toast from '@/components/Toast';
 import SignedScanUploadModal from '@/components/SignedScanUploadModal';
 import { buildSignedScanFilename, downloadSignedScanPdf } from '@/lib/signedScan';
+import { hoursToHhmmPadded } from '@/lib/hours';
 import { useAuthStore } from '@/store/authStore';
 
 interface InvoiceLine {
@@ -939,6 +940,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                       <td className="px-2 py-1">
                         <Input type="number" step="0.01" className="text-right" value={l.quantity}
                           onChange={(e) => updateLine(i, 'quantity', e.target.value)} />
+                        {l.unit === 'h' && Number(l.quantity) ? (
+                          <p className="text-[10px] text-gray-400 text-right mt-0.5">({hoursToHhmmPadded(Number(l.quantity))})</p>
+                        ) : null}
                       </td>
                       <td className="px-2 py-1">
                         <Input type="number" className="text-right" value={l.unit_price}

@@ -20,6 +20,14 @@ export function hoursToHhmm(value: string | number | null | undefined): string {
   return `${sign}${h}:${String(m).padStart(2, '0')}`;
 }
 
+/** decimal 時間 → "HH:MM"（時を2桁ゼロ詰め。例: 1.25→"01:15"）。空・無効は ''。 */
+export function hoursToHhmmPadded(value: string | number | null | undefined): string {
+  const base = hoursToHhmm(value);
+  if (!base.includes(':')) return base;
+  const [h, m] = base.split(':');
+  return `${h.padStart(2, '0')}:${m}`;
+}
+
 /**
  * "h:mm" / "h"（分省略可）→ decimal 時間の文字列（"8.5"）。
  * 空文字は '' を返す。形式不正は null（呼び出し側で無視できる）。
