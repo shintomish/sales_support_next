@@ -278,7 +278,7 @@ export default function InvoicesPage() {
         </div>
         <div className="flex-1 min-w-[200px]">
           <label className="block text-xs font-semibold text-gray-700 mb-1">検索</label>
-          <Input type="text" placeholder="請求書番号・取引先名" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Input type="text" placeholder="請求書番号・取引先名・件名" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <span className="text-sm text-gray-500 self-center">全 {sortedItems.length} 件</span>
         <Button variant="outline" onClick={fetchData} disabled={loading}>

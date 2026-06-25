@@ -385,7 +385,7 @@ export default function PurchaseOrdersPage() {
         </div>
         <div className="flex-1 min-w-[200px]">
           <label className="block text-xs font-semibold text-gray-700 mb-1">検索</label>
-          <Input type="text" placeholder="注文番号・取引先名" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Input type="text" placeholder="注文番号・取引先名・件名・請書番号" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <span className="text-sm text-gray-500 self-center">全 {sortedItems.length} 件</span>
         <Button variant="outline" onClick={fetchData} disabled={loading}>
