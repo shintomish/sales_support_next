@@ -485,20 +485,23 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     sendHistories.filter(h => h.method === m)
       .sort((a, b) => (b.sent_at ?? '').localeCompare(a.sent_at ?? ''))[0] ?? null;
 
-  // ② partner送信モーダル（郵送記録と同型・同封物の代わりに添付ファイル）
+  // ② partner送信モーダル（郵送記録と同型：同封物チェック ＋ 添付ファイルは任意）
   const [partnerModalOpen, setPartnerModalOpen] = useState(false);
   const [partnerSentAt, setPartnerSentAt]       = useState<string>(new Date().toISOString().slice(0, 10));
   const [partnerNote, setPartnerNote]           = useState('');
   const [partnerTo, setPartnerTo]               = useState<string[]>([]);
   const [partnerCandidates, setPartnerCandidates] = useState<MailCandidate[]>([]);
+  const [partnerItems, setPartnerItems]         = useState({ invoice: false, cover: false, timesheet: false, transport: false });
   const [partnerFiles, setPartnerFiles]         = useState<File[]>([]);
+
+  const docLabel = () => invoice?.doc_type === 'estimate' ? '見積書' : invoice?.doc_type === 'purchase_order' ? '注文書' : '請求書';
 
   const openPartnerModal = async () => {
     setHistoryHubOpen(false);
     setBusy(true);
     try {
       const res = await apiClient.get<{
-        latest: { sent_at: string | null; note: string | null; to_recipients: string[] | null } | null;
+        latest: { sent_at: string | null; note: string | null; to_recipients: string[] | null; attachments_meta: AttachmentMeta[] | null } | null;
         candidates: MailCandidate[];
       }>(`/api/v1/invoices/${id}/latest-partner`);
       setPartnerCandidates(res.data.candidates ?? []);
@@ -507,10 +510,17 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       setPartnerNote(latest?.note ?? '');
       setPartnerTo(latest?.to_recipients ?? []);
       setPartnerFiles([]);
+      // 前回の同封物チェックを復元（attachments_meta の文字列要素）
+      const names = (latest?.attachments_meta ?? []).filter((x): x is string => typeof x === 'string');
+      const dn = docLabel();
+      setPartnerItems(latest
+        ? { invoice: names.includes(dn), cover: names.includes('送付状'), timesheet: names.includes('勤務表'), transport: names.includes('交通費明細書') }
+        : { invoice: true, cover: false, timesheet: false, transport: false });
       setPartnerModalOpen(true);
     } catch {
       setPartnerSentAt(new Date().toISOString().slice(0, 10));
       setPartnerNote(''); setPartnerTo([]); setPartnerFiles([]);
+      setPartnerItems({ invoice: true, cover: false, timesheet: false, transport: false });
       setPartnerModalOpen(true);
     } finally { setBusy(false); }
   };
@@ -518,11 +528,19 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const recordPartner = async () => {
     setBusy(true);
     try {
+      const dn = docLabel();
+      const items = [
+        partnerItems.invoice   ? dn             : null,
+        partnerItems.cover     ? '送付状'        : null,
+        partnerItems.timesheet ? '勤務表'        : null,
+        partnerItems.transport ? '交通費明細書'  : null,
+      ].filter(Boolean) as string[];
       const fd = new FormData();
       fd.append('sent_at', partnerSentAt);
       if (partnerNote) fd.append('note', partnerNote);
       partnerTo.forEach(t => fd.append('to_recipients[]', t));
-      partnerFiles.forEach(f => fd.append('attachments[]', f));
+      items.forEach(it => fd.append('items[]', it));
+      partnerFiles.forEach(f => fd.append('attachments[]', f)); // 任意
       await apiClient.post(`/api/v1/invoices/${id}/record-partner`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -1120,7 +1138,36 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <Input type="date" value={partnerSentAt} onChange={e => setPartnerSentAt(e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">添付ファイル（送ったもの）</label>
+                <p className="text-xs font-semibold text-gray-700 mb-2">同封物</p>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { key: 'invoice'   as const, label: docLabel() },
+                    { key: 'cover'     as const, label: '送付状' },
+                    { key: 'timesheet' as const, label: '勤務表' },
+                    { key: 'transport' as const, label: '交通費明細書' },
+                  ]).map((it) => {
+                    const checked = partnerItems[it.key];
+                    return (
+                      <button key={it.key} type="button"
+                        onClick={() => setPartnerItems(p => ({ ...p, [it.key]: !p[it.key] }))}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          padding: '6px 12px', borderRadius: 999,
+                          background: checked ? '#2563eb' : '#f3f4f6',
+                          color: checked ? '#fff' : '#374151',
+                          border: checked ? '2px solid #2563eb' : '2px solid #d1d5db',
+                          fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                        }}>
+                        <span style={{ fontSize: 14, lineHeight: 1 }}>{checked ? '✓' : '＋'}</span>
+                        {it.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">タップで選択／解除</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">添付ファイル（任意・選択しなくても記録できます）</label>
                 <input type="file" multiple onChange={e => setPartnerFiles(Array.from(e.target.files ?? []))}
                   className="block w-full text-sm text-gray-700" />
                 {partnerFiles.length > 0 && (
