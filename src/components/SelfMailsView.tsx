@@ -6,7 +6,6 @@
 // /emails・/project-mails・/engineer-mails の3画面で使い回す。
 // E-4: 右ペインに返信フォーム（Cc/Bcc/添付対応）。POST /api/v1/emails/{id}/reply で送信。
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import axios from '@/lib/axios'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
 import { renderMailBody } from '@/components/mailBody'
@@ -124,16 +123,11 @@ type ReplyForm = {
   files: File[]
 }
 
-type LinkedInvoice = { id: number; invoice_number: string; doc_type: string; status: string }
-
 export default function SelfMailsView() {
-  const router = useRouter()
   const [owners, setOwners] = useState<Owner[]>([])
   const [sel, setSel] = useState<string>(ALL_SELF)
   const [list, setList] = useState<Paginated | null>(null)
   const [selected, setSelected] = useState<MailRow | null>(null)
-  // 選択メールから作成済みの見積/帳票（記録一元化の導線表示）
-  const [linkedInvoices, setLinkedInvoices] = useState<LinkedInvoice[]>([])
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')           // 入力中（未確定）
@@ -188,15 +182,13 @@ export default function SelfMailsView() {
     selectGuard.mark(m.id)
     setSelected(m)
     setAttachments([])
-    setLinkedInvoices([])
     setReplyForm(null)
     setReplyMsg(null)
-    // 詳細取得: 添付一覧 + このメールから作成済みの見積（紐付け表示用）
+    // 詳細取得: 添付ファイル一覧
     axios.get(`/api/v1/emails/${m.id}`)
       .then(res => {
         if (selectGuard.isStale(m.id)) return
         setAttachments(res.data.attachments ?? [])
-        setLinkedInvoices(res.data.sourced_invoices ?? [])
       })
       .catch(() => {})
   }
@@ -368,24 +360,6 @@ export default function SelfMailsView() {
               </a>
             )}
             {!selected.reply_to_campaign_id && <div className="mb-2" />}
-            {/* このメール（見積依頼）から作成済みの見積/帳票（記録一元化）*/}
-            {linkedInvoices.length > 0 && (
-              <div className="mb-3 rounded border border-emerald-200 bg-emerald-50 px-3 py-2">
-                <p className="text-[11px] font-semibold text-emerald-800 mb-1">この依頼から作成した帳票</p>
-                <div className="flex flex-wrap gap-2">
-                  {linkedInvoices.map(inv => {
-                    const label = inv.doc_type === 'estimate' ? '見積書' : inv.doc_type === 'purchase_order' ? '注文書' : '請求書'
-                    const href  = inv.doc_type === 'estimate' ? `/estimates/${inv.id}` : inv.doc_type === 'purchase_order' ? `/purchase-orders/${inv.id}` : `/invoices/${inv.id}`
-                    return (
-                      <a key={inv.id} href={href} target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-emerald-700 hover:text-emerald-900 hover:underline">
-                        {label} {inv.invoice_number}（{inv.status === 'issued' ? '発行済' : '下書き'}）
-                      </a>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
             {attachments.length > 0 && (
               <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <p className="text-xs font-medium text-amber-700 mb-2">📎 添付ファイル（{attachments.length}件）</p>
@@ -418,21 +392,12 @@ export default function SelfMailsView() {
                 </p>
               )}
               {!replyForm ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={openReply}
-                    className="text-xs px-3 py-1.5 bg-teal-600 text-white rounded-md hover:bg-teal-700"
-                  >
-                    ↩ 返信
-                  </button>
-                  <button
-                    onClick={() => router.push(`/estimates?source_email_id=${selected.id}`)}
-                    title="この見積依頼メールから見積書を作成（メールと紐付け）"
-                    className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    📄 見積を作成
-                  </button>
-                </div>
+                <button
+                  onClick={openReply}
+                  className="text-xs px-3 py-1.5 bg-teal-600 text-white rounded-md hover:bg-teal-700"
+                >
+                  ↩ 返信
+                </button>
               ) : (
                 <div className="space-y-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
                   <p className="text-xs font-semibold text-gray-700">返信</p>
