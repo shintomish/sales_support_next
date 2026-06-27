@@ -806,6 +806,7 @@ interface MatchedEngineer {
     track_record: number
   }
   reasons: string[]
+  flags?: MatchFlagsT | null
   availability_status: string | null
   available_from: string | null
   work_style: string | null
@@ -839,8 +840,43 @@ interface FreshEms {
     track_record: number
   }
   reasons: string[]
+  flags?: MatchFlagsT | null
   badge: 'new' | 'registered' | 'proposed'
   registered_engineer_id: number | null
+}
+
+// マッチの分かりやすさ用フラグ（必須スキル適合/不足・情報不足）
+type MatchFlagsT = {
+  required_skills_matched: string[]
+  required_skills_missing: string[]
+  required_skills_total: number
+  info_missing: string[]
+}
+
+// 必須スキル不足（赤）・情報不足（グレー）を一目で示すバッジ群
+function MatchFlags({ flags }: { flags?: MatchFlagsT | null }) {
+  if (!flags) return null
+  const missing = flags.required_skills_missing ?? []
+  const info = flags.info_missing ?? []
+  const total = flags.required_skills_total ?? 0
+  const matched = (flags.required_skills_matched ?? []).length
+  if (!missing.length && !info.length && total === 0) return null
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+      {total > 0 && (
+        <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, fontWeight: 600,
+          background: missing.length ? '#fee2e2' : '#dcfce7', color: missing.length ? '#b91c1c' : '#15803d' }}>
+          必須スキル {matched}/{total}{missing.length ? `（不足: ${missing.join(',')}）` : ' ✓'}
+        </span>
+      )}
+      {info.length > 0 && (
+        <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: '#f3f4f6', color: '#6b7280' }}
+          title="これらが不明なため中間点で加点されています（スコアが実態より高めの可能性）">
+          情報不足: {info.join('・')}
+        </span>
+      )}
+    </div>
+  )
 }
 
 // ── ユーティリティ ────────────────────────────────────
@@ -1225,6 +1261,7 @@ function EngineerCard({
             )}
           </div>
         )}
+        <MatchFlags flags={eng.flags} />
       </div>
 
       {/* カードフッター: ボタン */}
@@ -1815,6 +1852,7 @@ function FreshEmsList({
                   {item.reasons.slice(0, 3).join(' / ')}
                 </div>
               )}
+              <MatchFlags flags={item.flags} />
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
                 <div style={{ fontSize: 10, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }} title={item.email_subject ?? ''}>
                   📧 {item.email_subject ?? '—'}
