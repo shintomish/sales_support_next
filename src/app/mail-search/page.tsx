@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
@@ -42,24 +42,12 @@ const badgeColor = (s: Source) =>
   : s === 'engineer_mail' ? 'bg-teal-100 text-teal-700'
   : 'bg-emerald-100 text-emerald-700';
 
-function ResultCard({ r, queryIntent, isFav, onToggleFav }: { r: Row; queryIntent: string; isFav: boolean; onToggleFav: () => void }) {
+type Verdict = { verdict: string; reason: string };
+
+function ResultCard({ r, verdict, judging, onJudge, isFav, onToggleFav }: {
+  r: Row; verdict: Verdict | null; judging: boolean; onJudge: () => void; isFav: boolean; onToggleFav: () => void;
+}) {
   const matched = new Set(r.matched_skills.map(s => s.toLowerCase()));
-  const [verdict, setVerdict] = useState<{ verdict: string; reason: string } | null>(null);
-  const [judging, setJudging] = useState(false);
-  const judge = async () => {
-    setJudging(true);
-    try {
-      const res = await apiClient.post<{ verdict: string; reason: string }>('/api/v1/mail-search/judge', {
-        query: queryIntent || '条件指定なし',
-        item: {
-          type: r.source_label, title: r.title, skills: r.skills.join(','),
-          price: priceText(r.unit_price_min, r.unit_price_max), sub: r.sub ?? '', location: r.location ?? '',
-        },
-      });
-      setVerdict(res.data);
-    } catch { setVerdict({ verdict: '△', reason: '判定に失敗しました' }); }
-    finally { setJudging(false); }
-  };
   const vColor = (vd: string) => vd === '◯' ? 'text-green-700 bg-green-100' : vd === '×' ? 'text-red-700 bg-red-100' : 'text-amber-700 bg-amber-100';
   return (
     <div className="border border-gray-200 rounded-lg p-3 hover:bg-blue-50/40 transition-colors">
@@ -97,9 +85,9 @@ function ResultCard({ r, queryIntent, isFav, onToggleFav }: { r: Row; queryInten
             {verdict.verdict} {verdict.reason}
           </span>
         )}
-        <button onClick={judge} disabled={judging}
+        <button onClick={onJudge} disabled={judging}
           className="text-xs px-2 py-0.5 rounded border border-violet-300 text-violet-700 hover:bg-violet-50 disabled:opacity-50">
-          {judging ? 'AI判定中…' : '🤖 AI判定'}
+          {judging ? 'AI判定中…' : verdict ? '🤖 再判定' : '🤖 AI判定'}
         </button>
         <Link href={r.detail_url} className="text-xs text-blue-600 hover:underline">詳細・提案 →</Link>
       </div>
@@ -107,25 +95,31 @@ function ResultCard({ r, queryIntent, isFav, onToggleFav }: { r: Row; queryInten
   );
 }
 
-function ResultColumn({ title, kind, res, loading, page, setPage, queryIntent, favIds, onToggleFav }: {
-  title: string; kind: Kind; res: Res | null; loading: boolean; page: number; setPage: (k: Kind, p: number) => void; queryIntent: string;
+function ResultColumn({ title, kind, res, loading, page, setPage, verdicts, judgingKeys, onJudge, onlyOk, favIds, onToggleFav }: {
+  title: string; kind: Kind; res: Res | null; loading: boolean; page: number; setPage: (k: Kind, p: number) => void;
+  verdicts: Record<string, Verdict>; judgingKeys: Set<string>; onJudge: (r: Row) => void; onlyOk: boolean;
   favIds: Set<string>; onToggleFav: (source: string, id: number) => void;
 }) {
+  const rows = (res?.data ?? []).filter(r => !onlyOk || verdicts[`${r.source}:${r.id}`]?.verdict === '◯');
   return (
     <div className="flex-1 min-w-0 flex flex-col">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-bold text-gray-700">{title}</h2>
-        <span className="text-xs text-gray-400">{res ? `${res.total} 件` : ''}</span>
+        <span className="text-xs text-gray-400">{res ? (onlyOk ? `${rows.length} / ${res.total} 件` : `${res.total} 件`) : ''}</span>
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto">
         {loading ? (
           <p className="text-xs text-gray-400 py-6 text-center">検索中...</p>
-        ) : !res || res.data.length === 0 ? (
-          <p className="text-xs text-gray-400 py-6 text-center">該当なし</p>
-        ) : res.data.map(r => (
-          <ResultCard key={`${r.source}-${r.id}`} r={r} queryIntent={queryIntent}
-            isFav={favIds.has(`${r.source}:${r.id}`)} onToggleFav={() => onToggleFav(r.source, r.id)} />
-        ))}
+        ) : !res || rows.length === 0 ? (
+          <p className="text-xs text-gray-400 py-6 text-center">{onlyOk && res && res.data.length > 0 ? '◯判定の候補はありません' : '該当なし'}</p>
+        ) : rows.map(r => {
+          const k = `${r.source}:${r.id}`;
+          return (
+            <ResultCard key={`${r.source}-${r.id}`} r={r}
+              verdict={verdicts[k] ?? null} judging={judgingKeys.has(k)} onJudge={() => onJudge(r)}
+              isFav={favIds.has(k)} onToggleFav={() => onToggleFav(r.source, r.id)} />
+          );
+        })}
       </div>
       {res && res.last_page > 1 && (
         <div className="flex items-center justify-center gap-2 mt-2 text-xs">
@@ -150,6 +144,11 @@ export default function MailSearchPage() {
   const [parsing, setParsing]   = useState(false);
   const [favIds, setFavIds]     = useState<Set<string>>(new Set());  // "source:id"
   const [favMode, setFavMode]   = useState(false);  // ★お気に入りのみ表示
+  const [verdicts, setVerdicts]       = useState<Record<string, Verdict>>({}); // "source:id" -> 判定
+  const [judgingKeys, setJudgingKeys] = useState<Set<string>>(new Set());      // 判定中の "source:id"
+  const [bulkJudging, setBulkJudging] = useState(false);
+  const [onlyOk, setOnlyOk]           = useState(false);  // ◯のみ表示
+  const [autoJudge, setAutoJudge]     = useState(true);   // 検索後に上位を自動AI判定
 
   const [projectRes, setProjectRes]   = useState<Res | null>(null);
   const [engineerRes, setEngineerRes] = useState<Res | null>(null);
@@ -159,9 +158,42 @@ export default function MailSearchPage() {
   const [loadingE, setLoadingE] = useState(false);
   const [searched, setSearched] = useState(false);
 
+  // AI判定の「探している条件」を ref で保持（判定実行時に最新値を読む・依存配列の揺れを避ける）
+  const queryIntentRef = useRef('');
+  const autoJudgeRef   = useRef(autoJudge);
+  autoJudgeRef.current = autoJudge;
+  const verdictsRef    = useRef<Record<string, Verdict>>({});
+  verdictsRef.current  = verdicts;
+
   // 検索条件を明示的に渡せるようにする（自然文AI解釈の直後など state 反映待ちを避けるため）
   type Crit = { skill: string; keyword: string; priceMin: string; priceMax: string };
   const buildCrit = useCallback((): Crit => ({ skill, keyword, priceMin, priceMax }), [skill, keyword, priceMin, priceMax]);
+
+  // 複数候補を一括AI判定（キャッシュ優先・並列。サーバ側で未判定のみ最大30件/回）。
+  const judgeMany = useCallback(async (rows: Row[], refresh = false) => {
+    const targets = rows.filter(r => refresh || !verdictsRef.current[`${r.source}:${r.id}`]);
+    if (targets.length === 0) return;
+    const intent = queryIntentRef.current.trim() || '条件指定なし';
+    const items = targets.map(r => ({
+      type: r.source, label: r.source_label, id: r.id, title: r.title,
+      skills: r.skills.join(','), price: priceText(r.unit_price_min, r.unit_price_max),
+      sub: r.sub ?? '', location: r.location ?? '',
+    }));
+    const keys = targets.map(r => `${r.source}:${r.id}`);
+    setJudgingKeys(prev => { const n = new Set(prev); keys.forEach(k => n.add(k)); return n; });
+    try {
+      const res = await apiClient.post<{ data: { type: string; id: number; verdict: string | null; reason: string | null }[] }>(
+        '/api/v1/mail-search/judge-bulk', { query: intent, items, refresh });
+      setVerdicts(prev => {
+        const n = { ...prev };
+        (res.data.data ?? []).forEach(d => { if (d.verdict) n[`${d.type}:${d.id}`] = { verdict: d.verdict, reason: d.reason ?? '' }; });
+        return n;
+      });
+    } catch { /* noop */ }
+    finally { setJudgingKeys(prev => { const n = new Set(prev); keys.forEach(k => n.delete(k)); return n; }); }
+  }, []);
+
+  const judgeOne = useCallback((r: Row) => judgeMany([r], true), [judgeMany]);
 
   const fetchKind = useCallback(async (kind: Kind, page: number, crit?: Crit) => {
     const c = crit ?? { skill, keyword, priceMin, priceMax };
@@ -182,8 +214,12 @@ export default function MailSearchPage() {
       if (c.priceMax.trim()) params.set('price_max', c.priceMax.trim());
       const res = await apiClient.get<Res>(`/api/v1/mail-search?${params}`);
       setRes(res.data);
+      // 上位を自動AI判定（条件がある時のみ・キャッシュ優先なので再検索は安価）
+      if (autoJudgeRef.current && queryIntentRef.current.trim() !== '') {
+        judgeMany((res.data.data ?? []).slice(0, 10));
+      }
     } finally { setLoading(false); }
-  }, [skill, keyword, priceMin, priceMax, sort, category, favMode]);
+  }, [skill, keyword, priceMin, priceMax, sort, category, favMode, judgeMany]);
 
   const runWith = useCallback((crit: Crit) => {
     setSearched(true);
@@ -253,6 +289,19 @@ export default function MailSearchPage() {
     (priceMin.trim() || priceMax.trim()) ? `単価:${priceMin || ''}〜${priceMax || ''}万` : '',
     keyword.trim(),
   ].filter(Boolean).join(' ');
+  queryIntentRef.current = queryIntent;
+
+  // 表示中の候補をまとめてAI判定（列ごとに送信。1列≤50件、サーバ側は未判定のみ最大30件/回）
+  const judgeVisible = useCallback(async () => {
+    if (queryIntent.trim() === '') { alert('AI判定には検索条件（スキル/単価/自然文 等）が必要です。'); return; }
+    setBulkJudging(true);
+    try {
+      await Promise.all([
+        projectRes?.data?.length ? judgeMany(projectRes.data) : Promise.resolve(),
+        engineerRes?.data?.length ? judgeMany(engineerRes.data) : Promise.resolve(),
+      ]);
+    } finally { setBulkJudging(false); }
+  }, [queryIntent, projectRes, engineerRes, judgeMany]);
 
   return (
     <div className="h-full flex flex-col p-6 max-w-7xl mx-auto w-full">
@@ -336,13 +385,33 @@ export default function MailSearchPage() {
 
       {/* 結果 */}
       {searched ? (
-        <div className="flex-1 min-h-0 flex gap-4">
-          {target !== 'engineer' && (
-            <ResultColumn title="案件" kind="project" res={projectRes} loading={loadingP} page={projectPage} setPage={setPage} queryIntent={queryIntent} favIds={favIds} onToggleFav={toggleFav} />
-          )}
-          {target !== 'project' && (
-            <ResultColumn title="技術者" kind="engineer" res={engineerRes} loading={loadingE} page={engineerPage} setPage={setPage} queryIntent={queryIntent} favIds={favIds} onToggleFav={toggleFav} />
-          )}
+        <div className="flex-1 min-h-0 flex flex-col">
+          {/* AIツールバー */}
+          <div className="flex-shrink-0 flex flex-wrap items-center gap-3 mb-2 text-sm">
+            <button onClick={judgeVisible} disabled={bulkJudging || favMode}
+              className="px-3 py-1 rounded-md border border-violet-300 text-violet-700 hover:bg-violet-50 disabled:opacity-50 font-medium">
+              {bulkJudging ? '🤖 一括判定中…' : '🤖 表示中をAI判定'}
+            </button>
+            <label className="flex items-center gap-1.5 text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={onlyOk} onChange={e => setOnlyOk(e.target.checked)} />
+              ◯のみ表示
+            </label>
+            <label className="flex items-center gap-1.5 text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={autoJudge} onChange={e => setAutoJudge(e.target.checked)} />
+              検索後に上位10件を自動判定
+            </label>
+            <span className="text-xs text-gray-400">◯=よく合う / △=一部・情報不足 / ×=合わない（AI・参考）</span>
+          </div>
+          <div className="flex-1 min-h-0 flex gap-4">
+            {target !== 'engineer' && (
+              <ResultColumn title="案件" kind="project" res={projectRes} loading={loadingP} page={projectPage} setPage={setPage}
+                verdicts={verdicts} judgingKeys={judgingKeys} onJudge={judgeOne} onlyOk={onlyOk} favIds={favIds} onToggleFav={toggleFav} />
+            )}
+            {target !== 'project' && (
+              <ResultColumn title="技術者" kind="engineer" res={engineerRes} loading={loadingE} page={engineerPage} setPage={setPage}
+                verdicts={verdicts} judgingKeys={judgingKeys} onJudge={judgeOne} onlyOk={onlyOk} favIds={favIds} onToggleFav={toggleFav} />
+            )}
+          </div>
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">条件を入力して「検索」を押してください</div>
