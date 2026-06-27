@@ -154,6 +154,7 @@ export default function Sidebar() {
       type: 'group', key: 'mails', label: 'メール', icon: '✉️',
       items: [
         { label: 'メール',           path: '/emails',                icon: '✉️',  badge: unreadEmails },
+        { label: '検索マッチング',   path: '/mail-search',           icon: '🔎', sesOnly: true },
         { label: '案件メール',       path: '/project-mails',         icon: '📨', sesOnly: true },
         { label: '技術者メール',     path: '/engineer-mails',        icon: '👤', sesOnly: true },
         { label: '手動登録 案件',     path: '/project-mails/manual',  icon: '🗂', sesOnly: true },
