@@ -42,7 +42,7 @@ const badgeColor = (s: Source) =>
   : s === 'engineer_mail' ? 'bg-teal-100 text-teal-700'
   : 'bg-emerald-100 text-emerald-700';
 
-function ResultCard({ r, queryIntent }: { r: Row; queryIntent: string }) {
+function ResultCard({ r, queryIntent, isFav, onToggleFav }: { r: Row; queryIntent: string; isFav: boolean; onToggleFav: () => void }) {
   const matched = new Set(r.matched_skills.map(s => s.toLowerCase()));
   const [verdict, setVerdict] = useState<{ verdict: string; reason: string } | null>(null);
   const [judging, setJudging] = useState(false);
@@ -68,7 +68,13 @@ function ResultCard({ r, queryIntent }: { r: Row; queryIntent: string }) {
           <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${badgeColor(r.source)}`}>{r.source_label}</span>
           <span className="font-semibold text-gray-900 truncate" title={r.title}>{r.title}</span>
         </div>
-        <span className="text-sm font-semibold tabular-nums text-gray-800 flex-shrink-0">{priceText(r.unit_price_min, r.unit_price_max)}</span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <span className="text-sm font-semibold tabular-nums text-gray-800">{priceText(r.unit_price_min, r.unit_price_max)}</span>
+          <button onClick={onToggleFav} title={isFav ? 'お気に入り解除' : 'お気に入りに追加'}
+            className={`text-base leading-none ${isFav ? 'text-amber-400' : 'text-gray-300 hover:text-amber-400'}`}>
+            {isFav ? '★' : '☆'}
+          </button>
+        </div>
       </div>
       <div className="mt-0.5 text-xs text-gray-500 flex flex-wrap gap-x-3">
         {r.sub && <span className="truncate">{r.sub}</span>}
@@ -101,8 +107,9 @@ function ResultCard({ r, queryIntent }: { r: Row; queryIntent: string }) {
   );
 }
 
-function ResultColumn({ title, kind, res, loading, page, setPage, queryIntent }: {
+function ResultColumn({ title, kind, res, loading, page, setPage, queryIntent, favIds, onToggleFav }: {
   title: string; kind: Kind; res: Res | null; loading: boolean; page: number; setPage: (k: Kind, p: number) => void; queryIntent: string;
+  favIds: Set<string>; onToggleFav: (source: string, id: number) => void;
 }) {
   return (
     <div className="flex-1 min-w-0 flex flex-col">
@@ -115,7 +122,10 @@ function ResultColumn({ title, kind, res, loading, page, setPage, queryIntent }:
           <p className="text-xs text-gray-400 py-6 text-center">検索中...</p>
         ) : !res || res.data.length === 0 ? (
           <p className="text-xs text-gray-400 py-6 text-center">該当なし</p>
-        ) : res.data.map(r => <ResultCard key={`${r.source}-${r.id}`} r={r} queryIntent={queryIntent} />)}
+        ) : res.data.map(r => (
+          <ResultCard key={`${r.source}-${r.id}`} r={r} queryIntent={queryIntent}
+            isFav={favIds.has(`${r.source}:${r.id}`)} onToggleFav={() => onToggleFav(r.source, r.id)} />
+        ))}
       </div>
       {res && res.last_page > 1 && (
         <div className="flex items-center justify-center gap-2 mt-2 text-xs">
@@ -138,6 +148,8 @@ export default function MailSearchPage() {
   const [category, setCategory] = useState<Category>('all');
   const [nlText, setNlText]     = useState('');     // 自然文検索（AI解釈）
   const [parsing, setParsing]   = useState(false);
+  const [favIds, setFavIds]     = useState<Set<string>>(new Set());  // "source:id"
+  const [favMode, setFavMode]   = useState(false);  // ★お気に入りのみ表示
 
   const [projectRes, setProjectRes]   = useState<Res | null>(null);
   const [engineerRes, setEngineerRes] = useState<Res | null>(null);
@@ -157,6 +169,12 @@ export default function MailSearchPage() {
     const setRes = kind === 'project' ? setProjectRes : setEngineerRes;
     setLoading(true);
     try {
+      if (favMode) {
+        // ★お気に入りのみ: 検索条件は無視してお気に入り一覧を取得
+        const res = await apiClient.get<{ data: Row[]; total: number }>(`/api/v1/favorites?kind=${kind}`);
+        setRes({ data: res.data.data ?? [], total: res.data.total ?? 0, current_page: 1, last_page: 1 });
+        return;
+      }
       const params = new URLSearchParams({ kind, sort, category, page: String(page) });
       if (c.skill.trim())    params.set('skill', c.skill.trim());
       if (c.keyword.trim())  params.set('keyword', c.keyword.trim());
@@ -165,7 +183,7 @@ export default function MailSearchPage() {
       const res = await apiClient.get<Res>(`/api/v1/mail-search?${params}`);
       setRes(res.data);
     } finally { setLoading(false); }
-  }, [skill, keyword, priceMin, priceMax, sort, category]);
+  }, [skill, keyword, priceMin, priceMax, sort, category, favMode]);
 
   const runWith = useCallback((crit: Crit) => {
     setSearched(true);
@@ -202,12 +220,32 @@ export default function MailSearchPage() {
     else { setEngineerPage(p); fetchKind('engineer', p); }
   };
 
-  // 対象・分類・並び替えを変更したら、検索済みなら自動で再検索（ボタン不要）。
+  // お気に入りIDをロード（★表示用）
+  const loadFavIds = useCallback(async () => {
+    try {
+      const res = await apiClient.get<Record<string, number[]>>('/api/v1/favorites/ids');
+      const s = new Set<string>();
+      Object.entries(res.data || {}).forEach(([type, ids]) => (ids ?? []).forEach(id => s.add(`${type}:${id}`)));
+      setFavIds(s);
+    } catch { /* noop */ }
+  }, []);
+  useEffect(() => { loadFavIds(); }, [loadFavIds]);
+
+  const toggleFav = useCallback(async (source: string, id: number) => {
+    const key = `${source}:${id}`;
+    try {
+      const res = await apiClient.post<{ favorited: boolean }>('/api/v1/favorites/toggle', { target_type: source, target_id: id });
+      setFavIds(prev => { const n = new Set(prev); if (res.data.favorited) n.add(key); else n.delete(key); return n; });
+      if (favMode) runSearch(); // お気に入り表示中に解除したら一覧から除く
+    } catch { /* noop */ }
+  }, [favMode, runSearch]);
+
+  // 対象・分類・並び替え・お気に入りモードを変更したら自動で再検索（ボタン不要）。
   // テキスト入力(スキル/単価/キーワード/自然文)は従来どおり Enter/ボタンで実行。
   useEffect(() => {
-    if (searched) runSearch();
+    if (searched || favMode) runSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, category, sort]);
+  }, [target, category, sort, favMode]);
 
   // AI判定で使う「探している条件」テキスト（自然文があれば優先）
   const queryIntent = nlText.trim() || [
@@ -288,7 +326,11 @@ export default function MailSearchPage() {
               <option value="skill_match">一致スキル数</option>
             </select>
           </div>
-          <Button onClick={runSearch} className="ml-auto">🔎 検索</Button>
+          <label className="flex items-center gap-1.5 text-sm text-gray-700 ml-auto cursor-pointer">
+            <input type="checkbox" checked={favMode} onChange={e => setFavMode(e.target.checked)} />
+            ★お気に入りのみ
+          </label>
+          <Button onClick={runSearch}>🔎 検索</Button>
         </div>
       </div>
 
@@ -296,10 +338,10 @@ export default function MailSearchPage() {
       {searched ? (
         <div className="flex-1 min-h-0 flex gap-4">
           {target !== 'engineer' && (
-            <ResultColumn title="案件" kind="project" res={projectRes} loading={loadingP} page={projectPage} setPage={setPage} queryIntent={queryIntent} />
+            <ResultColumn title="案件" kind="project" res={projectRes} loading={loadingP} page={projectPage} setPage={setPage} queryIntent={queryIntent} favIds={favIds} onToggleFav={toggleFav} />
           )}
           {target !== 'project' && (
-            <ResultColumn title="技術者" kind="engineer" res={engineerRes} loading={loadingE} page={engineerPage} setPage={setPage} queryIntent={queryIntent} />
+            <ResultColumn title="技術者" kind="engineer" res={engineerRes} loading={loadingE} page={engineerPage} setPage={setPage} queryIntent={queryIntent} favIds={favIds} onToggleFav={toggleFav} />
           )}
         </div>
       ) : (
