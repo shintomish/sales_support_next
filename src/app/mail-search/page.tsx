@@ -26,6 +26,7 @@ interface Res { data: Row[]; total: number; current_page: number; last_page: num
 
 type Kind = 'project' | 'engineer';
 type Target = 'both' | 'project' | 'engineer';
+type Category = 'all' | 'mail' | 'self' | 'bp';
 type Sort = 'price_asc' | 'price_desc' | 'recent' | 'skill_match';
 
 const priceText = (min: number | null, max: number | null) => {
@@ -108,6 +109,7 @@ export default function MailSearchPage() {
   const [priceMax, setPriceMax] = useState('');
   const [sort, setSort]         = useState<Sort>('price_asc');
   const [target, setTarget]     = useState<Target>('both');
+  const [category, setCategory] = useState<Category>('all');
 
   const [projectRes, setProjectRes]   = useState<Res | null>(null);
   const [engineerRes, setEngineerRes] = useState<Res | null>(null);
@@ -122,7 +124,7 @@ export default function MailSearchPage() {
     const setRes = kind === 'project' ? setProjectRes : setEngineerRes;
     setLoading(true);
     try {
-      const params = new URLSearchParams({ kind, sort, page: String(page) });
+      const params = new URLSearchParams({ kind, sort, category, page: String(page) });
       if (skill.trim())    params.set('skill', skill.trim());
       if (keyword.trim())  params.set('keyword', keyword.trim());
       if (priceMin.trim()) params.set('price_min', priceMin.trim());
@@ -130,7 +132,7 @@ export default function MailSearchPage() {
       const res = await apiClient.get<Res>(`/api/v1/mail-search?${params}`);
       setRes(res.data);
     } finally { setLoading(false); }
-  }, [skill, keyword, priceMin, priceMax, sort]);
+  }, [skill, keyword, priceMin, priceMax, sort, category]);
 
   const runSearch = useCallback(() => {
     setSearched(true);
@@ -182,6 +184,15 @@ export default function MailSearchPage() {
               <option value="both">両方</option>
               <option value="project">案件のみ</option>
               <option value="engineer">技術者のみ</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">分類</label>
+            <select value={category} onChange={e => setCategory(e.target.value as Category)} className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white">
+              <option value="all">全て</option>
+              <option value="mail">メール</option>
+              <option value="self">自社</option>
+              <option value="bp">BP</option>
             </select>
           </div>
           <div>
