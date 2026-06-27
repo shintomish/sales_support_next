@@ -11,6 +11,8 @@ import ScoreBreakdown from '@/components/ScoreBreakdown'
 import { renderMailBody } from '@/components/mailBody'
 import { ResizeHandle } from '@/components/ResizeHandle'
 import { useResizableSplit } from '@/hooks/useResizableSplit'
+import { useFavorites } from '@/lib/useFavorites'
+import FavStar from '@/components/FavStar'
 
 // ── 型定義 ─────────────────────────────────────────────────
 
@@ -198,6 +200,7 @@ export default function ProjectMailsPage() {
   const sourceMode: 'imap' | 'manual' = pathname?.endsWith('/manual') ? 'manual' : 'imap'
   const [items, setItems] = useState<Paginated | null>(null)
   const [selected, setSelected] = useState<ProjectMail | null>(null)
+  const fav = useFavorites('project_mail')
   // デフォルトは「全て」(ステータス指定なし) で受信日順表示
   const [statusFilter, setStatusFilter] = useState('')
   const [scoreFilter, setScoreFilter] = useState('all')
@@ -764,6 +767,8 @@ export default function ProjectMailsPage() {
               expandedDetail={expandedId === item.id ? expandedItem : null}
               expandLoading={expandedId === item.id && expandLoading}
               appliedSearch={appliedSearch}
+              isFav={fav.isFav(item.id)}
+              onToggleFav={() => fav.toggle(item.id)}
               onExpand={() => handleExpand(item)}
               onQuickStatus={handleQuickStatus}
             />
@@ -944,6 +949,7 @@ export default function ProjectMailsPage() {
                   selected?.id === item.id ? 'bg-blue-100 border-l-2 border-l-blue-500 ring-1 ring-inset ring-blue-300' : ''
                 }`}>
                 <div className="flex items-center gap-2 mb-0.5">
+                  <FavStar active={fav.isFav(item.id)} onToggle={() => fav.toggle(item.id)} />
                   <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${rank.cls}`}>
                     {rank.label} {item.score}
                   </span>
@@ -1738,6 +1744,8 @@ function ReviewRow({
   expandedDetail,
   expandLoading,
   appliedSearch,
+  isFav,
+  onToggleFav,
   onExpand,
   onQuickStatus,
 }: {
@@ -1746,6 +1754,8 @@ function ReviewRow({
   expandedDetail: ProjectMail | null
   expandLoading: boolean
   appliedSearch: string
+  isFav: boolean
+  onToggleFav: () => void
   onExpand: () => void
   onQuickStatus: (id: number, status: string) => void
 }) {
@@ -1759,6 +1769,7 @@ function ReviewRow({
         className="flex flex-wrap md:flex-nowrap items-center gap-2 md:gap-3 px-3 md:px-4 py-3 cursor-pointer select-none"
         onClick={onExpand}
       >
+        <FavStar active={isFav} onToggle={onToggleFav} />
         {/* スコアバッジ */}
         <span className={`flex-shrink-0 text-xs font-bold px-2 py-1 rounded-lg w-14 md:w-16 text-center ${rank.cls}`}>
           {rank.label} {item.score}
