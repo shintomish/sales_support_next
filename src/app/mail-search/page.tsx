@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import apiClient from '@/lib/axios';
 import { Button } from '@/components/ui/button';
@@ -201,6 +201,13 @@ export default function MailSearchPage() {
     if (kind === 'project') { setProjectPage(p); fetchKind('project', p); }
     else { setEngineerPage(p); fetchKind('engineer', p); }
   };
+
+  // 対象・分類・並び替えを変更したら、検索済みなら自動で再検索（ボタン不要）。
+  // テキスト入力(スキル/単価/キーワード/自然文)は従来どおり Enter/ボタンで実行。
+  useEffect(() => {
+    if (searched) runSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target, category, sort]);
 
   // AI判定で使う「探している条件」テキスト（自然文があれば優先）
   const queryIntent = nlText.trim() || [
