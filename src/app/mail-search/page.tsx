@@ -225,17 +225,19 @@ export default function MailSearchPage() {
 
       {/* 検索フォーム */}
       <div className="flex-shrink-0 bg-white p-4 rounded-lg border border-gray-200 mb-4">
-        {/* 自然文検索（AI解釈）*/}
-        <div className="flex items-end gap-2 mb-3 pb-3 border-b border-gray-100">
-          <div className="flex-1 min-w-0">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">🤖 自然文で検索（AIが条件に変換）</label>
-            <Input value={nlText} onChange={e => setNlText(e.target.value)}
-              placeholder="例: Javaできて即日入れる人、70万くらい"
-              onKeyDown={e => { if (e.key === 'Enter') parseAndSearch(); }} />
+        {/* 自然文 / メール貼り付け で AI 検索 */}
+        <div className="mb-3 pb-3 border-b border-gray-100">
+          <label className="block text-xs font-semibold text-gray-700 mb-1">🤖 自然文 / メール貼り付けでAI検索</label>
+          <div className="flex items-start gap-2">
+            <textarea value={nlText} onChange={e => setNlText(e.target.value)} rows={3}
+              placeholder="例: Javaできて即日入れる人、70万くらい ／ または 案件・技術者メールの本文をそのまま貼り付け"
+              onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) parseAndSearch(); }}
+              className="flex-1 min-w-0 border border-gray-300 rounded-md px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            <Button variant="outline" onClick={parseAndSearch} disabled={parsing || !nlText.trim()} className="flex-shrink-0">
+              {parsing ? 'AI解釈中…' : 'AIで検索'}
+            </Button>
           </div>
-          <Button variant="outline" onClick={parseAndSearch} disabled={parsing || !nlText.trim()}>
-            {parsing ? 'AI解釈中…' : 'AIで検索'}
-          </Button>
+          <p className="text-[11px] text-gray-400 mt-1">メール本文を貼り付けると、AIがスキル・単価等を抽出して検索（Ctrl/⌘+Enterでも実行）。対象で「探す側（案件/技術者）」を選んでください。</p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[220px]">
