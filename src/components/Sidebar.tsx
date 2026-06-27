@@ -170,6 +170,7 @@ export default function Sidebar() {
         { label: '配信テンプレ',     path: '/settings/delivery-templates', icon: '📝', sesOnly: true },
         { label: '請求書発行元設定', path: '/settings/invoice-issuer', icon: '🏢', sesOnly: true },
         { label: '日次レポート配信先', path: '/settings/report-recipients', icon: '📊', sesOnly: true },
+        { label: 'スキル辞書', path: '/settings/skill-dictionary', icon: '📚', sesOnly: true },
         { label: '不具合・要望を送る', path: '/settings/feedback', icon: '💬' },
       ],
     },
