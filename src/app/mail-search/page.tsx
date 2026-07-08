@@ -134,6 +134,7 @@ function ResultColumn({ title, kind, res, loading, page, setPage, verdicts, judg
 
 export default function MailSearchPage() {
   const [skill, setSkill]       = useState('');
+  const [skillMode, setSkillMode] = useState<'or' | 'and'>('or');  // スキル複数語の結合: OR(いずれか)/AND(すべて)
   const [keyword, setKeyword]   = useState('');
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
@@ -208,7 +209,7 @@ export default function MailSearchPage() {
         return;
       }
       const params = new URLSearchParams({ kind, sort, category, page: String(page) });
-      if (c.skill.trim())    params.set('skill', c.skill.trim());
+      if (c.skill.trim()) { params.set('skill', c.skill.trim()); params.set('skill_mode', skillMode); }
       if (c.keyword.trim())  params.set('keyword', c.keyword.trim());
       if (c.priceMin.trim()) params.set('price_min', c.priceMin.trim());
       if (c.priceMax.trim()) params.set('price_max', c.priceMax.trim());
@@ -219,7 +220,7 @@ export default function MailSearchPage() {
         judgeMany((res.data.data ?? []).slice(0, 10));
       }
     } finally { setLoading(false); }
-  }, [skill, keyword, priceMin, priceMax, sort, category, favMode, judgeMany]);
+  }, [skill, skillMode, keyword, priceMin, priceMax, sort, category, favMode, judgeMany]);
 
   const runWith = useCallback((crit: Crit) => {
     setSearched(true);
@@ -281,7 +282,7 @@ export default function MailSearchPage() {
   useEffect(() => {
     if (searched || favMode) runSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, category, sort, favMode]);
+  }, [target, category, sort, favMode, skillMode]);
 
   // AI判定で使う「探している条件」テキスト（自然文があれば優先）
   const queryIntent = nlText.trim() || [
@@ -328,7 +329,22 @@ export default function MailSearchPage() {
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[220px]">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">スキル（空白区切りで複数）</label>
+            <div className="flex items-center gap-2 mb-1">
+              <label className="text-xs font-semibold text-gray-700">スキル（空白区切りで複数）</label>
+              <div className="inline-flex rounded-md border border-gray-200 overflow-hidden" role="group" aria-label="スキル複数語の結合方式">
+                <button type="button" onClick={() => setSkillMode('or')}
+                  aria-pressed={skillMode === 'or'}
+                  className={`px-2 py-0.5 text-[11px] font-medium ${skillMode === 'or' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+                  OR検索
+                </button>
+                <button type="button" onClick={() => setSkillMode('and')}
+                  aria-pressed={skillMode === 'and'}
+                  className={`px-2 py-0.5 text-[11px] font-medium border-l border-gray-200 ${skillMode === 'and' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+                  AND検索
+                </button>
+              </div>
+              <span className="text-[10px] text-gray-400">{skillMode === 'or' ? 'いずれかを含む' : 'すべて含む'}</span>
+            </div>
             <Input value={skill} onChange={e => setSkill(e.target.value)} placeholder="例: Java AWS"
               onKeyDown={e => { if (e.key === 'Enter') runSearch(); }} />
           </div>
