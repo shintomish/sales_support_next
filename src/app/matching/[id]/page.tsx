@@ -21,26 +21,36 @@ import { useAuthStore } from '@/store/authStore'
 function extractSenderNameFromBody(body: string | null | undefined): string | null {
   if (!body) return null
   // 日本人氏名で許容する文字: 漢字・ひらがな・カタカナ・全角空白・半角スペース
-  // 区切り文字 (、。の/と/で/が/より など) や改行で終端
   const nameChars = '[ぁ-んァ-ヶー一-龥々〆〤A-Za-z\\s　]'
+  // 氏名の開始は「区切り位置」に限定する。これが無いと文末の説明文
+  // (例:「…話し方をされる性格でございます」) の途中から名前を拾ってしまう。
+  const boundary = '(?:^|[\\n\\r。、，,！!？?・：:「『（(／/\\s　])'
   const patterns: RegExp[] = [
     // 「[会社名]の YY と申します/でございます」 (会社名が前にあるパターン優先)
-    new RegExp(`(?:株式会社|有限会社|合同会社|合資会社|（株）|\\(株\\)|㈱)[^\\s\\n、。の]{1,30}の\\s*(${nameChars}{2,15})\\s*(?:と申します|でございます)`),
-    // 「YY と申します」 (会社情報なし)
-    new RegExp(`(${nameChars}{2,15})\\s*と申します`),
-    // 「YY でございます」
-    new RegExp(`(${nameChars}{2,15})\\s*でございます`),
+    new RegExp(`(?:株式会社|有限会社|合同会社|合資会社|（株）|\\(株\\)|㈱)[^\\s\\n、。の]{1,30}の\\s*(${nameChars}{2,10})\\s*(?:と申します|でございます|と申し上げます)`),
+    // 「YY と申します／でございます」 (会社情報なし・区切り位置から)
+    new RegExp(`${boundary}(${nameChars}{2,10})\\s*(?:と申します|でございます)`),
   ]
   for (const re of patterns) {
     const m = body.match(re)
     if (m && m[1]) {
       const name = m[1].trim().replace(/\s+/g, ' ')
-      // 「営業」「弊社」など一般語は除外
-      if (/^(営業|弊社|当社|担当|担当者)$/.test(name)) continue
-      if (name.length >= 2) return name
+      if (!isLikelyPersonName(name)) continue
+      return name
     }
   }
   return null
+}
+
+// 氏名らしさの判定（説明文の切れ端を弾く）。
+function isLikelyPersonName(name: string): boolean {
+  if (name.length < 2 || name.length > 10) return false
+  // 「営業」「弊社」など一般語は除外
+  if (/^(営業|弊社|当社|担当|担当者|私|小生)$/.test(name)) return false
+  // 助詞 (を/に/へ/が) や動詞活用・説明語を含む＝氏名ではなく説明文の切れ端
+  if (/[をにへが]/.test(name)) return false
+  if (/(され|でき|です|ます|ない|なる|いる|ある|する|った|こと|性格|人物|方$)/.test(name)) return false
+  return true
 }
 
 // PMS の構造化フィールドから「【案件情報】◇〜」ブロックを組み立てる
