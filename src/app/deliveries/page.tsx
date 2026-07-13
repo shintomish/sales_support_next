@@ -276,14 +276,20 @@ function buildSignature(tpl: EmailBodyTemplate | null): string {
 /_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
 }
 
-/** <送信者>等を署名設定から置換し、末尾に署名ブロックを追記する */
-function applyTemplate(base: string, tpl: EmailBodyTemplate | null): string {
+/**
+ * <送信者>等を署名設定から置換する。
+ * appendSig=true（既定）のときのみ末尾に署名ブロックを追記する。
+ * 保存済みの配信テンプレは本文に署名を内包しているため appendSig=false で呼ぶこと。
+ */
+function applyTemplate(base: string, tpl: EmailBodyTemplate | null, appendSig = true): string {
   let body = base
     .replace(/<送信者>/g,      tpl?.name   ?? '<送信者>')
     .replace(/<送信者アドレス>/g, tpl?.email  ?? '<送信者アドレス>')
     .replace(/<送信者TEL>/g,   tpl?.mobile ?? '<送信者TEL>')
-  const sig = buildSignature(tpl)
-  if (sig) body += '\n' + sig
+  if (appendSig) {
+    const sig = buildSignature(tpl)
+    if (sig) body += '\n' + sig
+  }
   return body
 }
 
@@ -832,7 +838,8 @@ export default function DeliveriesPage() {
     setSendForm(f => ({
       ...f,
       subject: tpl.subject ?? f.subject,
-      body:    tpl.body_text ? applyTemplate(tpl.body_text, emailTemplate) : f.body,
+      // 保存済み配信テンプレは本文に署名を内包しているため署名は追記しない（二重署名防止）
+      body:    tpl.body_text ? applyTemplate(tpl.body_text, emailTemplate, false) : f.body,
     }))
   }
 
