@@ -107,7 +107,7 @@ function ResultColumn({ title, kind, res, loading, page, setPage, verdicts, judg
         <h2 className="text-sm font-bold text-gray-700">{title}</h2>
         <span className="text-xs text-gray-400">{res ? (onlyOk ? `${rows.length} / ${res.total} 件` : `${res.total} 件`) : ''}</span>
       </div>
-      <div className="flex-1 space-y-2 overflow-y-auto">
+      <div className="flex-1 min-h-[70vh] space-y-2 overflow-y-auto">
         {loading ? (
           <p className="text-xs text-gray-400 py-6 text-center">検索中...</p>
         ) : !res || rows.length === 0 ? (
@@ -305,7 +305,7 @@ export default function MailSearchPage() {
   }, [queryIntent, projectRes, engineerRes, judgeMany]);
 
   return (
-    <div className="h-full flex flex-col p-6 max-w-7xl mx-auto w-full">
+    <div className="min-h-full flex flex-col p-6 max-w-7xl mx-auto w-full">
       <div className="flex-shrink-0 mb-4">
         <h1 className="text-2xl font-bold text-gray-800">検索マッチング</h1>
         <p className="text-xs text-gray-400 mt-1">スキル・単価で案件/技術者を横断検索（案件メール・技術者メール・登録案件・登録技術者）。スコアで足切りしません</p>
