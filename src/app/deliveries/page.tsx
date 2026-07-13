@@ -817,7 +817,16 @@ export default function DeliveriesPage() {
   // （テンプレ本文には署名を書かない運用。<%Name%> は送信時にバックエンドが宛先名へ置換）。
   const handleTemplateSelect = (id: string) => {
     setSelectedTemplateId(id)
-    if (!id) return
+    // 「テンプレを選択しない」→ 件名/本文を配信種別のデフォルトテンプレへ戻す
+    if (!id) {
+      const base = deliveryType === 'project' ? TEMPLATE_PROJECT : TEMPLATE_ENGINEER
+      setSendForm(f => ({
+        ...f,
+        subject: deliveryType === 'project' ? '【案件ご紹介】' : '【技術者ご紹介】',
+        body: applyTemplate(base, emailTemplate),
+      }))
+      return
+    }
     const tpl = deliveryTemplates.find(t => String(t.id) === id)
     if (!tpl) return
     setSendForm(f => ({

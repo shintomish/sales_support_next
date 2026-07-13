@@ -12,6 +12,8 @@ type Group = { canonical: string; aliases: Alias[] };
 export default function SkillDictionaryPage() {
   const user = useAuthStore(s => s.user);
   const isAdmin = user?.role === 'super_admin' || user?.role === 'tenant_admin';
+  // 追加は認証済みの全ユーザー可。削除・改名（既存エントリの破壊的変更）は管理者のみ。
+  const canAdd = !!user;
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,13 +98,13 @@ export default function SkillDictionaryPage() {
       <h1 className="text-2xl font-bold text-gray-800">スキル辞書（同義語・名寄せ）</h1>
       <p className="text-xs text-gray-500 mt-1">
         表記揺れ・別名を「正規名」でまとめると、検索とスコア照合で同じものとして扱われます（例: Java / JAVA / ジャバ、社内SE / 情シス）。
-        全テナント共通のグローバル設定です。{isAdmin ? '' : '（編集は管理者のみ）'}
+        全テナント共通のグローバル設定です。{isAdmin ? '' : '（追加は誰でも可能・削除/改名は管理者のみ）'}
       </p>
 
       {err && <div className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{err}</div>}
 
-      {/* 新規グループ追加（管理者） */}
-      {isAdmin && (
+      {/* 新規グループ追加（認証済みユーザー） */}
+      {canAdd && (
         <div className="mt-4 bg-white border border-gray-200 rounded-lg p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-2">＋ 新しい正規名を追加</h2>
           <div className="flex flex-wrap items-end gap-2">
@@ -155,7 +157,7 @@ export default function SkillDictionaryPage() {
                     )}
                   </span>
                 ))}
-                {isAdmin && (
+                {canAdd && (
                   <span className="inline-flex items-center gap-1">
                     <input value={aliasInput[g.canonical] ?? ''} onChange={e => setAliasInput(prev => ({ ...prev, [g.canonical]: e.target.value }))}
                       placeholder="別名を追加" className="text-[12px] border border-gray-200 rounded px-1.5 py-0.5 w-28 focus:outline-none focus:ring-1 focus:ring-blue-400"
