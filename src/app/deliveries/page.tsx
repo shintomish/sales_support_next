@@ -301,7 +301,7 @@ type Tab = 'addresses' | 'campaigns' | 'threads' | 'replies' | 'send'
 // そのまま今回の一斉配信の宛先に含まれる（送信は「有効な配信先全員」が対象）。
 type ActiveRecipient = { id: number; email: string; name: string | null }
 
-function ActiveRecipientPanel({ sourceEmail, onChanged }: { sourceEmail: string; onChanged: () => void }) {
+function ActiveRecipientPanel({ sourceEmail, onChanged, onPickEmail }: { sourceEmail: string; onChanged: () => void; onPickEmail: (email: string) => void }) {
   const [list, setList] = useState<ActiveRecipient[]>([])
   const [activeCount, setActiveCount] = useState<number | null>(null)
   const [search, setSearch] = useState('')
@@ -355,7 +355,7 @@ function ActiveRecipientPanel({ sourceEmail, onChanged }: { sourceEmail: string;
         <h3 className="text-sm font-semibold text-gray-700">有効な配信先</h3>
         <span className="text-xs text-gray-400">{activeCount != null ? `${activeCount} 件` : ''}</span>
       </div>
-      <p className="text-[11px] text-gray-400 mb-2">この一覧の全員に送信されます。{sourceDomain ? '入手元と同ドメインの宛先を強調表示中。' : ''}</p>
+      <p className="text-[11px] text-gray-400 mb-2">この一覧の全員に送信されます。行をクリックすると左の「入手元アドレス」に設定します。{sourceDomain ? '入手元と同ドメインの宛先を強調表示中。' : ''}</p>
 
       <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔎 名前・メールで絞り込み"
         className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs mb-2 focus:outline-none focus:ring-2 focus:ring-blue-300" />
@@ -366,13 +366,15 @@ function ActiveRecipientPanel({ sourceEmail, onChanged }: { sourceEmail: string;
         ) : list.length === 0 ? (
           <p className="text-xs text-gray-400 text-center py-6">{search ? '該当なし' : '有効な配信先がありません'}</p>
         ) : list.map(a => (
-          <div key={a.id} className={`px-2 py-1.5 text-xs ${sameDomain(a.email) ? 'bg-amber-50' : ''}`}>
+          <button key={a.id} type="button" onClick={() => onPickEmail(a.email)}
+            title="クリックで入手元アドレスに設定"
+            className={`block w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 ${sameDomain(a.email) ? 'bg-amber-50' : ''}`}>
             <div className="flex items-center gap-1">
               <span className="text-gray-800 truncate">{a.name || '（名前なし）'}</span>
               {sameDomain(a.email) && <span className="flex-shrink-0 text-[10px] text-amber-700 bg-amber-100 rounded px-1">入手元と同ドメイン</span>}
             </div>
             <div className="text-gray-500 truncate">{a.email}</div>
-          </div>
+          </button>
         ))}
       </div>
       {activeCount != null && activeCount > list.length && !search && (
@@ -2558,7 +2560,8 @@ export default function DeliveriesPage() {
           </div>
           </div>
           {/* 右横：有効な配信先リスト + 追加宛先 */}
-          <ActiveRecipientPanel sourceEmail={isLinked ? '' : sendForm.source_email} onChanged={fetchAddresses} />
+          <ActiveRecipientPanel sourceEmail={isLinked ? '' : sendForm.source_email} onChanged={fetchAddresses}
+            onPickEmail={email => setSendForm(f => ({ ...f, source_email: email }))} />
         </div>
       )}
       {/* ── 編集モーダル ──────────────────────────────── */}
