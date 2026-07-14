@@ -371,7 +371,9 @@ function ActiveRecipientPanel({ sourceEmail, onChanged, onPickEmail }: { sourceE
             className={`block w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 ${sameDomain(a.email) ? 'bg-amber-50' : ''}`}>
             <div className="flex items-center gap-1">
               <span className="text-gray-800 truncate">{a.name || '（名前なし）'}</span>
-              {sameDomain(a.email) && <span className="flex-shrink-0 text-[10px] text-amber-700 bg-amber-100 rounded px-1">入手元と同ドメイン</span>}
+              {a.email.toLowerCase() === sourceEmail.trim().toLowerCase()
+                ? <span className="flex-shrink-0 text-[10px] text-blue-700 bg-blue-100 rounded px-1">入手元アドレスに反映</span>
+                : sameDomain(a.email) && <span className="flex-shrink-0 text-[10px] text-amber-700 bg-amber-100 rounded px-1">入手元と同ドメイン</span>}
             </div>
             <div className="text-gray-500 truncate">{a.email}</div>
           </button>
