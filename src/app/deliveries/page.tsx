@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react'
 import axios from '@/lib/axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import SortableHeader from '@/components/SortableHeader'
@@ -294,6 +294,110 @@ function applyTemplate(base: string, tpl: EmailBodyTemplate | null, appendSig = 
 }
 
 type Tab = 'addresses' | 'campaigns' | 'threads' | 'replies' | 'send'
+
+// ── 新規配信フォーム右横：有効な配信先リスト + 追加宛先入力 ──────────
+// 有効(is_active=true)な配信先の名前/メールを表示。source_email と同ドメインの
+// 宛先を強調。リストに無いアドレスを追加すると通常の有効配信先として登録され、
+// そのまま今回の一斉配信の宛先に含まれる（送信は「有効な配信先全員」が対象）。
+type ActiveRecipient = { id: number; email: string; name: string | null }
+
+function ActiveRecipientPanel({ sourceEmail, onChanged }: { sourceEmail: string; onChanged: () => void }) {
+  const [list, setList] = useState<ActiveRecipient[]>([])
+  const [activeCount, setActiveCount] = useState<number | null>(null)
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [newEmail, setNewEmail] = useState('')
+  const [newName, setNewName] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await axios.get('/api/v1/delivery-addresses', {
+        params: { is_active: true, search: search.trim() || undefined, per_page: 100, sort_by: 'name', sort_order: 'asc' },
+      })
+      setList(res.data.data ?? [])
+      setActiveCount(res.data.active_count ?? res.data.total ?? null)
+    } finally { setLoading(false) }
+  }, [search])
+  useEffect(() => { load() }, [load])
+
+  const sourceDomain = useMemo(() => {
+    const at = sourceEmail.lastIndexOf('@')
+    return at === -1 ? '' : sourceEmail.slice(at + 1).trim().toLowerCase()
+  }, [sourceEmail])
+  const sameDomain = (email: string) => {
+    if (!sourceDomain) return false
+    const at = email.lastIndexOf('@')
+    return at !== -1 && email.slice(at + 1).toLowerCase() === sourceDomain
+  }
+
+  const addAddr = async () => {
+    const email = newEmail.trim()
+    if (!email) return
+    setAdding(true); setMsg(null)
+    try {
+      await axios.post('/api/v1/delivery-addresses', { email, name: newName.trim() || null })
+      setNewEmail(''); setNewName('')
+      setMsg({ ok: true, text: `${email} を配信先に追加しました` })
+      await load()
+      onChanged()
+    } catch (e) {
+      const m = (e as ApiError)?.response?.data?.message
+      setMsg({ ok: false, text: m || '追加に失敗しました' })
+    } finally { setAdding(false) }
+  }
+
+  return (
+    <div className="w-full lg:w-80 flex-shrink-0 bg-white border border-gray-200 rounded-lg p-4 flex flex-col self-stretch">
+      <div className="flex items-baseline justify-between mb-2">
+        <h3 className="text-sm font-semibold text-gray-700">有効な配信先</h3>
+        <span className="text-xs text-gray-400">{activeCount != null ? `${activeCount} 件` : ''}</span>
+      </div>
+      <p className="text-[11px] text-gray-400 mb-2">この一覧の全員に送信されます。{sourceDomain ? '入手元と同ドメインの宛先を強調表示中。' : ''}</p>
+
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔎 名前・メールで絞り込み"
+        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs mb-2 focus:outline-none focus:ring-2 focus:ring-blue-300" />
+
+      <div className="flex-1 min-h-[240px] max-h-[52vh] overflow-y-auto border border-gray-100 rounded divide-y divide-gray-100">
+        {loading ? (
+          <p className="text-xs text-gray-400 text-center py-6">読み込み中…</p>
+        ) : list.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-6">{search ? '該当なし' : '有効な配信先がありません'}</p>
+        ) : list.map(a => (
+          <div key={a.id} className={`px-2 py-1.5 text-xs ${sameDomain(a.email) ? 'bg-amber-50' : ''}`}>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-800 truncate">{a.name || '（名前なし）'}</span>
+              {sameDomain(a.email) && <span className="flex-shrink-0 text-[10px] text-amber-700 bg-amber-100 rounded px-1">入手元と同ドメイン</span>}
+            </div>
+            <div className="text-gray-500 truncate">{a.email}</div>
+          </div>
+        ))}
+      </div>
+      {activeCount != null && activeCount > list.length && !search && (
+        <p className="text-[10px] text-gray-400 mt-1">先頭 {list.length} 件を表示（絞り込みで全件検索できます）</p>
+      )}
+
+      {/* 追加宛先 */}
+      <div className="mt-3 pt-3 border-t border-gray-100">
+        <h4 className="text-xs font-semibold text-gray-700 mb-1">＋ 配信先を追加</h4>
+        <p className="text-[11px] text-gray-400 mb-2">一覧に無いアドレスを追加すると、有効な配信先として登録され今回の配信に含まれます。</p>
+        <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="メールアドレス"
+          onKeyDown={e => { if (e.key === 'Enter') addAddr() }}
+          className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs mb-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300" />
+        <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="名前（任意）"
+          onKeyDown={e => { if (e.key === 'Enter') addAddr() }}
+          className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs mb-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300" />
+        <button onClick={addAddr} disabled={adding || !newEmail.trim()}
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-medium px-3 py-1.5 rounded">
+          {adding ? '追加中…' : '配信先に追加'}
+        </button>
+        {msg && <p className={`text-[11px] mt-1.5 ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>}
+      </div>
+    </div>
+  )
+}
 
 // ── メインコンポーネント ──────────────────────────────────
 
@@ -618,7 +722,8 @@ export default function DeliveriesPage() {
   }, [addrSearch, addrPage, addrSortBy, addrSortOrder])
 
   useEffect(() => {
-    if (tab === 'addresses') fetchAddresses()
+    // send タブでも有効件数(active_count)を送信ボタンに出すため取得する
+    if (tab === 'addresses' || tab === 'send') fetchAddresses()
   }, [tab, fetchAddresses])
 
   // send タブを開いた時に active_count を取得 (confirm 表示用)。
@@ -2079,7 +2184,8 @@ export default function DeliveriesPage() {
 
       {/* ── 新規配信タブ ────────────────────────────────── */}
       {tab === 'send' && (
-        <div className="max-w-2xl overflow-hidden">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          <div className="w-full lg:max-w-2xl min-w-0">
           {sendResult && (
             <div className={`mb-4 px-4 py-3 rounded text-sm ${
               sendResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
@@ -2450,6 +2556,9 @@ export default function DeliveriesPage() {
               </span>
             </div>
           </div>
+          </div>
+          {/* 右横：有効な配信先リスト + 追加宛先 */}
+          <ActiveRecipientPanel sourceEmail={isLinked ? '' : sendForm.source_email} onChanged={fetchAddresses} />
         </div>
       )}
       {/* ── 編集モーダル ──────────────────────────────── */}
