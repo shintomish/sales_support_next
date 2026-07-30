@@ -26,8 +26,13 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
   未着手: { bg: '#F1F5F9', color: '#475569' },
 };
 
-const isOverdue = (due: string | null, status: string) =>
-  !!due && new Date(due) < new Date() && status !== '完了';
+// 期限は日付単位で比較する（当日期限を JST 午前9時以降に誤って「超過」としないため）
+const isOverdue = (due: string | null, status: string) => {
+  if (!due) return false;
+  const n = new Date();
+  const todayStr = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+  return due.slice(0, 10) < todayStr && status !== '完了';
+};
 
 const Em = () => <span className="text-gray-300">—</span>;
 
