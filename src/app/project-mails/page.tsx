@@ -1917,8 +1917,33 @@ function ScoreReasonChip({ reason }: { reason: string }) {
       </span>
     )
   }
+  // key / key:value 形式のコードを日本語ラベルに変換して表示
+  const colonIdx = reason.indexOf(':')
+  const key = colonIdx < 0 ? reason : reason.slice(0, colonIdx)
+  const value = colonIdx < 0 ? '' : reason.slice(colonIdx + 1)
+  const REASON_LABELS: Record<string, string> = {
+    project_a:      '案件確度A',
+    project_b:      '案件確度B',
+    lang:           '言語',
+    lang2:          '言語',
+    infra:          'インフラ',
+    db:             'DB',
+    price_concrete: '単価が具体的',
+    location:       '勤務地',
+    process:        '工程',
+    timing:         '稼働時期',
+    penalty_vague:  '⚠ 単価が曖昧',
+    penalty_chain:  '⚠ 高次商流',
+    excluded:       '除外',
+  }
+  const label = REASON_LABELS[key] ?? key
+  const isPenalty = key.startsWith('penalty_') || key === 'excluded'
   return (
-    <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">{reason}</span>
+    <span className={`text-xs px-2 py-0.5 rounded-full ${
+      isPenalty ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-500'
+    }`}>
+      {label}{value ? `：${value}` : ''}
+    </span>
   )
 }
 
