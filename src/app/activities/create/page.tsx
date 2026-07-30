@@ -28,7 +28,11 @@ const textareaCls = 'w-full border border-gray-200 rounded-md px-3 py-2 text-sm 
 export default function ActivityCreatePage() {
   const [form, setForm] = useState<Record<string, string>>({
     type: '訪問',
-    activity_date: new Date().toISOString().split('T')[0],
+    // ローカル日付を使う（toISOString は UTC のため JST 早朝は前日になってしまう）
+    activity_date: (() => {
+      const n = new Date();
+      return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+    })(),
   });
   const [content, setContent]     = useState('');
   const [customers, setCustomers] = useState<Customer[]>([]);

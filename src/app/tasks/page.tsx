@@ -39,13 +39,15 @@ const DUE_FILTERS = [
 
 const selectCls = 'border border-gray-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
 
-const isOverdue = (due: string | null, status: string) =>
-  !!due && new Date(due) < new Date() && status !== '完了';
-const isToday = (due: string | null) => {
-  if (!due) return false;
-  const d = new Date(due), n = new Date();
-  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+// 期限は日付単位で比較する（new Date(due) は日付文字列を UTC 0時扱いするため、
+// 時刻込み比較だと当日期限のタスクが JST 午前9時以降に誤って「超過」になる）
+const todayStr = () => {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
 };
+const isOverdue = (due: string | null, status: string) =>
+  !!due && due.slice(0, 10) < todayStr() && status !== '完了';
+const isToday = (due: string | null) => !!due && due.slice(0, 10) === todayStr();
 
 // ヘッダー・ボディで幅を揃えるcolgroup定義
 const ColGroup = () => (
