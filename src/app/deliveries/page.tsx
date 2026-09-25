@@ -2125,7 +2125,7 @@ export default function DeliveriesPage() {
                               </div>
                               <p className="text-sm font-semibold text-gray-800 mb-1">{m.subject}</p>
                               <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans break-words">
-                                {m.type === 'sent' ? (m.body ?? '') : (m.body_text ?? '')}
+                                {m.type === 'sent' ? (m.body ?? '') : (m.body_text || '（本文なし）')}
                               </pre>
                               {m.type === 'received' && m.attachments && m.attachments.length > 0 && (
                                 <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-2">
