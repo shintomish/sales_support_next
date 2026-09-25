@@ -121,6 +121,9 @@ export default function EmailsPage() {
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null)
   const [replyCompose, setReplyCompose] = useState<ReplyComposeState | null>(null)
   const [replyBody, setReplyBody] = useState('')
+  const [replyFiles, setReplyFiles] = useState<File[]>([])
+  const [replyDropOver, setReplyDropOver] = useState(false)
+  const replyFileInputRef = useRef<HTMLInputElement>(null)
   const [replySending, setReplySending] = useState(false)
   const [replyError, setReplyError] = useState<string | null>(null)
   const [replySuccess, setReplySuccess] = useState(false)
@@ -151,6 +154,7 @@ export default function EmailsPage() {
 
   // replyCompose が変わったらフォームをリセット（引用＋署名で初期化）
   useEffect(() => {
+    setReplyFiles([])
     setReplyError(null)
     setReplySuccess(false)
   }, [replyCompose])
@@ -165,7 +169,10 @@ export default function EmailsPage() {
       if (replyCompose.toName) form.append('to_name', replyCompose.toName)
       form.append('subject', replyCompose.subject)
       form.append('body', replyBody)
-      await axios.post(`/api/v1/emails/${replyCompose.emailId}/reply`, form)
+      for (const file of replyFiles) form.append('attachments[]', file)
+      await axios.post(`/api/v1/emails/${replyCompose.emailId}/reply`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
       setReplySuccess(true)
       setTimeout(() => setReplyCompose(null), 1500)
     } catch (e: unknown) {
@@ -680,6 +687,49 @@ export default function EmailsPage() {
                     onChange={e => setReplyBody(e.target.value)}
                     disabled={replySending || replySuccess}
                   />
+                  {/* 添付ファイル (D&D 対応) */}
+                  <div
+                    onDragOver={e => { e.preventDefault(); e.stopPropagation(); if (!replyDropOver) setReplyDropOver(true) }}
+                    onDragEnter={e => { e.preventDefault(); e.stopPropagation(); setReplyDropOver(true) }}
+                    onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setReplyDropOver(false) }}
+                    onDrop={e => {
+                      e.preventDefault(); e.stopPropagation(); setReplyDropOver(false)
+                      if (e.dataTransfer?.files?.length) setReplyFiles(f => [...f, ...Array.from(e.dataTransfer.files)])
+                    }}
+                    className={`mt-2 space-y-1.5 rounded border-2 border-dashed p-2 transition-colors ${
+                      replyDropOver ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500">
+                        添付ファイル ({replyFiles.length})
+                        <span className="ml-2 text-gray-400">— ここにドロップ</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => replyFileInputRef.current?.click()}
+                        className="text-xs text-blue-600 hover:underline"
+                      >+ 追加</button>
+                      <input
+                        ref={replyFileInputRef}
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={e => { if (e.target.files) setReplyFiles(f => [...f, ...Array.from(e.target.files!)]); if (e.target) e.target.value = '' }}
+                      />
+                    </div>
+                    {replyFiles.length > 0 && (
+                      <ul className="space-y-1">
+                        {replyFiles.map((file, i) => (
+                          <li key={i} className="flex items-center justify-between text-xs bg-white border border-gray-200 rounded px-2 py-1">
+                            <span className="truncate">{file.name}（{file.size >= 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)}MB` : `${Math.round(file.size / 1024)}KB`}）</span>
+                            <button type="button" onClick={() => setReplyFiles(f => f.filter((_, j) => j !== i))} className="flex-shrink-0 text-red-500 hover:text-red-700 ml-2">×</button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
                   {replyError && <p className="text-xs text-red-600 mt-1">{replyError}</p>}
                   {replySuccess && <p className="text-xs text-green-600 mt-1">送信しました</p>}
                   <div className="flex justify-end mt-2">
