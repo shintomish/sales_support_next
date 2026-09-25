@@ -62,11 +62,53 @@ const CATEGORY_BADGE: Record<string, { label: string; cls: string }> = {
 
 // ── 型定義 (返信コンポーズ) ──────────────────────────────
 
+type EmailBodyTemplate = {
+  name: string
+  name_en: string | null
+  department: string | null
+  position: string | null
+  email: string | null
+  mobile: string | null
+  body_text?: string | null
+}
+
 type ReplyComposeState = {
   emailId: number
   to: string
   toName: string | null
   subject: string
+}
+
+function buildSignature(tpl: EmailBodyTemplate | null): string {
+  if (!tpl) return ''
+  if (tpl.body_text) {
+    const idx = tpl.body_text.indexOf('（本文）')
+    if (idx >= 0) return tpl.body_text.slice(idx + '（本文）'.length).replace(/^\s*\n/, '')
+  }
+  return `_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+　　株式会社アイゼン・ソリューション
+　${tpl.department ?? ''}
+　${tpl.position ?? ''}
+　${tpl.name}${tpl.name_en ? `（${tpl.name_en}）` : ''}
+
+　〒332-0017
+　埼玉県川口市栄町3-12-11 コスモ川口栄町2F
+　Tel：048-253-3922　Fax：048-271-9355
+
+　E-Mail：${tpl.email ?? ''}
+　Mobile：${tpl.mobile ?? ''}
+
+　URL:https://www.aizen-sol.co.jp
+_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
+}
+
+function buildReplyBody(recipientName: string, originalBody: string, tpl: EmailBodyTemplate | null): string {
+  const greeting = recipientName ? `${recipientName}様\n\n\n` : '\n\n'
+  const quoted = originalBody
+    ? originalBody.replace(/\r\n/g, '\n').split('\n').map(l => `> ${l}`).join('\n')
+    : ''
+  const sig = buildSignature(tpl)
+  return `${greeting}${quoted}${sig ? `\n\n${sig}` : ''}`
 }
 
 // ── メインコンポーネント ──────────────────────────────────
@@ -82,6 +124,7 @@ export default function EmailsPage() {
   const [replySending, setReplySending] = useState(false)
   const [replyError, setReplyError] = useState<string | null>(null)
   const [replySuccess, setReplySuccess] = useState(false)
+  const [emailTemplate, setEmailTemplate] = useState<EmailBodyTemplate | null>(null)
   const [search, setSearch] = useState('')           // 入力欄の値 (未確定)
   const [appliedSearch, setAppliedSearch] = useState('') // 実際に API に投げる値 (Enter/🔍 で確定)
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -99,9 +142,15 @@ export default function EmailsPage() {
   const fetchEmailsRef = useRef<() => void>(() => {})
 
   // 起動時の URL パラメータ処理（メール直リンク）
-  // replyCompose が変わったらフォームをリセット
+  // 署名テンプレ取得（初回のみ）
   useEffect(() => {
-    setReplyBody('')
+    axios.get('/api/v1/email-body-templates/me')
+      .then(res => { if (res.data) setEmailTemplate(res.data) })
+      .catch(() => {})
+  }, [])
+
+  // replyCompose が変わったらフォームをリセット（引用＋署名で初期化）
+  useEffect(() => {
     setReplyError(null)
     setReplySuccess(false)
   }, [replyCompose])
@@ -523,12 +572,19 @@ export default function EmailsPage() {
                   )}
                   <button
                     title="このメールに返信"
-                    onClick={() => setReplyCompose({
-                      emailId: selectedEmail.id,
-                      to: selectedEmail.from_address,
-                      toName: selectedEmail.from_name,
-                      subject: selectedEmail.subject?.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail.subject ?? ''}`,
-                    })}
+                    onClick={() => {
+                      setReplyCompose({
+                        emailId: selectedEmail.id,
+                        to: selectedEmail.from_address,
+                        toName: selectedEmail.from_name,
+                        subject: selectedEmail.subject?.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail.subject ?? ''}`,
+                      })
+                      setReplyBody(buildReplyBody(
+                        selectedEmail.from_name ?? '',
+                        selectedEmail.body_text ?? '',
+                        emailTemplate,
+                      ))
+                    }}
                     className="flex-shrink-0 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
                   >↩ 返信</button>
                   <button
