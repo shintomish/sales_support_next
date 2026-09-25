@@ -60,6 +60,15 @@ const CATEGORY_BADGE: Record<string, { label: string; cls: string }> = {
   unknown:  { label: '不明',   cls: 'bg-gray-100 text-gray-500' },
 }
 
+// ── 型定義 (返信コンポーズ) ──────────────────────────────
+
+type ReplyComposeState = {
+  emailId: number
+  to: string
+  toName: string | null
+  subject: string
+}
+
 // ── メインコンポーネント ──────────────────────────────────
 
 export default function EmailsPage() {
@@ -68,6 +77,11 @@ export default function EmailsPage() {
   const split = useResizableSplit('emailsView:leftPct')
   const [emails, setEmails] = useState<PaginatedEmails | null>(null)
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null)
+  const [replyCompose, setReplyCompose] = useState<ReplyComposeState | null>(null)
+  const [replyBody, setReplyBody] = useState('')
+  const [replySending, setReplySending] = useState(false)
+  const [replyError, setReplyError] = useState<string | null>(null)
+  const [replySuccess, setReplySuccess] = useState(false)
   const [search, setSearch] = useState('')           // 入力欄の値 (未確定)
   const [appliedSearch, setAppliedSearch] = useState('') // 実際に API に投げる値 (Enter/🔍 で確定)
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -85,6 +99,34 @@ export default function EmailsPage() {
   const fetchEmailsRef = useRef<() => void>(() => {})
 
   // 起動時の URL パラメータ処理（メール直リンク）
+  // replyCompose が変わったらフォームをリセット
+  useEffect(() => {
+    setReplyBody('')
+    setReplyError(null)
+    setReplySuccess(false)
+  }, [replyCompose])
+
+  const handleReplySend = async () => {
+    if (!replyCompose) return
+    setReplySending(true)
+    setReplyError(null)
+    try {
+      const form = new FormData()
+      form.append('to', replyCompose.to)
+      if (replyCompose.toName) form.append('to_name', replyCompose.toName)
+      form.append('subject', replyCompose.subject)
+      form.append('body', replyBody)
+      await axios.post(`/api/v1/emails/${replyCompose.emailId}/reply`, form)
+      setReplySuccess(true)
+      setTimeout(() => setReplyCompose(null), 1500)
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } }
+      setReplyError(err.response?.data?.message ?? '送信に失敗しました')
+    } finally {
+      setReplySending(false)
+    }
+  }
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const emailId = params.get('email_id')
@@ -480,6 +522,16 @@ export default function EmailsPage() {
                     </span>
                   )}
                   <button
+                    title="このメールに返信"
+                    onClick={() => setReplyCompose({
+                      emailId: selectedEmail.id,
+                      to: selectedEmail.from_address,
+                      toName: selectedEmail.from_name,
+                      subject: selectedEmail.subject?.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail.subject ?? ''}`,
+                    })}
+                    className="flex-shrink-0 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >↩ 返信</button>
+                  <button
                     title="このメールを削除"
                     onClick={async () => {
                       if (!confirm(`「${selectedEmail.subject || '(件名なし)'}」を削除しますか？`)) return;
@@ -550,6 +602,41 @@ export default function EmailsPage() {
                   </pre>
                 )}
               </div>
+
+              {/* 返信コンポーズ */}
+              {replyCompose && replyCompose.emailId === selectedEmail.id && (
+                <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-semibold text-blue-800">↩ 返信</span>
+                    <button onClick={() => setReplyCompose(null)} className="text-xs text-gray-500 hover:text-gray-700">✕ キャンセル</button>
+                  </div>
+                  <div className="text-xs text-gray-600 mb-2">
+                    <span className="text-gray-400">宛先:</span> {replyCompose.toName ? `${replyCompose.toName} <${replyCompose.to}>` : replyCompose.to}
+                  </div>
+                  <div className="text-xs text-gray-600 mb-3">
+                    <span className="text-gray-400">件名:</span> {replyCompose.subject}
+                  </div>
+                  <textarea
+                    className="w-full text-sm border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                    rows={8}
+                    placeholder="本文を入力してください"
+                    value={replyBody}
+                    onChange={e => setReplyBody(e.target.value)}
+                    disabled={replySending || replySuccess}
+                  />
+                  {replyError && <p className="text-xs text-red-600 mt-1">{replyError}</p>}
+                  {replySuccess && <p className="text-xs text-green-600 mt-1">送信しました</p>}
+                  <div className="flex justify-end mt-2">
+                    <button
+                      onClick={handleReplySend}
+                      disabled={replySending || replySuccess || !replyBody.trim()}
+                      className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {replySending ? '送信中...' : '送信'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
