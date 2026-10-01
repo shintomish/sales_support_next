@@ -201,38 +201,37 @@ export default function MailSearchPage() {
 
   const judgeOne = useCallback((r: Row) => judgeMany([r], true), [judgeMany]);
 
-  const fetchKind = useCallback(async (kind: Kind, page: number, crit?: Crit) => {
+  const fetchKind = useCallback(async (kind: Kind, page: number, crit?: Crit, overrideSort?: Sort) => {
     const c = crit ?? { skill, keyword, priceMin, priceMax };
+    const s = overrideSort ?? sort;
     const setLoading = kind === 'project' ? setLoadingP : setLoadingE;
     const setRes = kind === 'project' ? setProjectRes : setEngineerRes;
     setLoading(true);
     try {
       if (favMode) {
-        // ★お気に入りのみ: 検索条件は無視してお気に入り一覧を取得
         const res = await apiClient.get<{ data: Row[]; total: number }>(`/api/v1/favorites?kind=${kind}`);
         setRes({ data: res.data.data ?? [], total: res.data.total ?? 0, current_page: 1, last_page: 1 });
         return;
       }
-      const params = new URLSearchParams({ kind, sort, category, page: String(page) });
+      const params = new URLSearchParams({ kind, sort: s, category, page: String(page) });
       if (c.skill.trim()) { params.set('skill', c.skill.trim()); params.set('skill_mode', skillMode); }
       if (c.keyword.trim())  params.set('keyword', c.keyword.trim());
       if (c.priceMin.trim()) params.set('price_min', c.priceMin.trim());
       if (c.priceMax.trim()) params.set('price_max', c.priceMax.trim());
       const res = await apiClient.get<Res>(`/api/v1/mail-search?${params}`);
       setRes(res.data);
-      // 上位を自動AI判定（条件がある時のみ・キャッシュ優先なので再検索は安価）
       if (queryIntentRef.current.trim() !== '') {
         judgeMany(res.data.data ?? []);
       }
     } finally { setLoading(false); }
   }, [skill, skillMode, keyword, priceMin, priceMax, sort, category, favMode, judgeMany]);
 
-  const runWith = useCallback((crit: Crit, overrideTarget?: Target) => {
+  const runWith = useCallback((crit: Crit, overrideTarget?: Target, overrideSort?: Sort) => {
     const t = overrideTarget ?? target;
     setSearched(true);
     setProjectPage(1); setEngineerPage(1);
-    if (t !== 'engineer') fetchKind('project', 1, crit); else setProjectRes(null);
-    if (t !== 'project')  fetchKind('engineer', 1, crit); else setEngineerRes(null);
+    if (t !== 'engineer') fetchKind('project', 1, crit, overrideSort); else setProjectRes(null);
+    if (t !== 'project')  fetchKind('engineer', 1, crit, overrideSort); else setEngineerRes(null);
   }, [target, fetchKind]);
 
   const runSearch = useCallback(() => runWith(buildCrit()), [runWith, buildCrit]);
@@ -265,9 +264,9 @@ export default function MailSearchPage() {
         crit.keyword  = '';
         setPriceMin(''); setPriceMax(''); setKeyword('');
       }
-      // AI検索はスコア順をデフォルト
-      if (sort !== 'score_desc') setSort('score_desc');
-      runWith(crit, newTarget);
+      // AI検索はスコア順をデフォルト（state更新の非同期を避けて overrideSort で即時反映）
+      setSort('score_desc');
+      runWith(crit, newTarget, 'score_desc');
     } catch {
       alert('AI解釈に失敗しました。条件を直接入力してください。');
     } finally { setParsing(false); }
