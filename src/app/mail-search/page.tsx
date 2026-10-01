@@ -258,6 +258,12 @@ export default function MailSearchPage() {
         d.detected_kind === 'project' ? 'engineer' :
         d.detected_kind === 'engineer' ? 'project' : undefined;
       if (newTarget) setTarget(newTarget);
+      // 案件メール→技術者検索: 案件の予算を技術者単価のハードフィルタにしない（ほぼ全滅するため）
+      if (d.detected_kind === 'project') {
+        crit.priceMin = '';
+        crit.priceMax = '';
+        setPriceMin(''); setPriceMax('');
+      }
       runWith(crit, newTarget);
     } catch {
       alert('AI解釈に失敗しました。条件を直接入力してください。');
