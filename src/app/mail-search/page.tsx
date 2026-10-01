@@ -273,13 +273,23 @@ export default function MailSearchPage() {
       // 「技術者単価 <= 案件予算」= 案件が払える範囲の技術者を抽出
       // keyword（勤務地）は除外（全滅防止）
       if (d.detected_kind === 'project') {
+        // 案件メール→技術者検索: 技術者単価 <= 案件予算。勤務地キーワードは除外
         crit.priceMin = '';
         crit.keyword  = '';
         setPriceMin(''); setKeyword('');
         setPriceMax(crit.priceMax);
-        setExcludeUnknownPrice(true);  // 案件予算指定時は単価不明の技術者を除外
+        setExcludeUnknownPrice(true);
+      } else if (d.detected_kind === 'engineer') {
+        // 技術者メール→案件検索: 案件予算 >= 技術者単価。人名・勤務地キーワードは除外
+        // price_min のみ使用（技術者の希望単価下限）、price_max は不要
+        crit.priceMax = '';
+        crit.keyword  = '';
+        setKeyword(''); setPriceMax('');
+        setPriceMin(crit.priceMin || crit.priceMax); // min優先、なければmax
+        crit.priceMin = crit.priceMin || crit.priceMax;
+        setExcludeUnknownPrice(false); // 単価不明の案件は含める（スキル見合い）
       } else {
-        setExcludeUnknownPrice(false); // 技術者メール→案件検索は単価不明を含める
+        setExcludeUnknownPrice(false);
       }
       // AI判定条件をスキル中心の簡潔な文に設定（全文だと超厳格判定になるため）
       judgeIntentRef.current = [
