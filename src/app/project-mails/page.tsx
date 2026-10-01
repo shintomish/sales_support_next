@@ -107,9 +107,12 @@ function buildSignature(tpl: EmailBodyTemplate | null): string {
 _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
 }
 
-function buildReplyBody(recipientName: string, _originalBody: string, tpl: EmailBodyTemplate | null): string {
+function buildReplyBody(recipientName: string, originalBody: string, tpl: EmailBodyTemplate | null): string {
   const greeting = recipientName ? `${recipientName} 様` : '●● 様'
-  return buildEmailBody(greeting, '', tpl)
+  const quoted = originalBody
+    ? originalBody.replace(/\r\n/g, '\n').split('\n').map(l => `> ${l}`).join('\n')
+    : ''
+  return buildEmailBody(greeting, quoted, tpl)
 }
 
 // ── 定数 ─────────────────────────────────────────────────
