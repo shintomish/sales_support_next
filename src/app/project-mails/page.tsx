@@ -9,7 +9,7 @@ import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
 import ScoreBreakdown from '@/components/ScoreBreakdown'
 import { renderMailBody } from '@/components/mailBody'
-import { buildEmailBody } from '@/lib/mailBody'
+import { buildEmailBody, type EmailBodyTemplate } from '@/lib/mailBody'
 import { ResizeHandle } from '@/components/ResizeHandle'
 import { useResizableSplit } from '@/hooks/useResizableSplit'
 import { useFavorites } from '@/lib/useFavorites'
@@ -83,15 +83,6 @@ type ThreadItem = {
   status?: string
 }
 
-type EmailBodyTemplate = {
-  name: string
-  name_en: string | null
-  department: string | null
-  position: string | null
-  email: string | null
-  mobile: string | null
-  body_text?: string | null
-}
 
 function buildSignature(tpl: EmailBodyTemplate | null): string {
   if (!tpl) return ''
