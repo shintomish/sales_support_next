@@ -226,7 +226,7 @@ export default function MailSearchPage() {
       setRes(res.data);
       // 上位を自動AI判定（条件がある時のみ・キャッシュ優先なので再検索は安価）
       if (autoJudgeRef.current && queryIntentRef.current.trim() !== '') {
-        judgeMany((res.data.data ?? []).slice(0, 10));
+        judgeMany(res.data.data ?? []);
       }
     } finally { setLoading(false); }
   }, [skill, skillMode, keyword, priceMin, priceMax, sort, category, favMode, judgeMany]);
@@ -440,7 +440,7 @@ export default function MailSearchPage() {
             </label>
             <label className="flex items-center gap-1.5 text-gray-700 cursor-pointer">
               <input type="checkbox" checked={autoJudge} onChange={e => setAutoJudge(e.target.checked)} />
-              検索後に上位10件を自動判定
+              検索後に全件を自動判定
             </label>
             <span className="text-xs text-gray-400">◯=よく合う / △=一部・情報不足 / ×=合わない（AI・参考）</span>
           </div>
