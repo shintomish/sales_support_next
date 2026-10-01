@@ -215,13 +215,10 @@ function buildSignature(tpl: EmailBodyTemplate | null): string {
 _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
 }
 
-function buildReplyBody(recipientName: string, originalBody: string, tpl: EmailBodyTemplate | null): string {
-  const greeting = recipientName ? `${recipientName}様\n\n\n` : ''
-  const quoted = originalBody
-    ? originalBody.replace(/\r\n/g, '\n').split('\n').map(l => `> ${l}`).join('\n')
-    : ''
-  const sig = buildSignature(tpl)
-  return `${greeting}${quoted}${sig ? `\n\n${sig}` : ''}`
+function buildReplyBody(recipientName: string, _originalBody: string, tpl: EmailBodyTemplate | null): string {
+  const greeting = recipientName ? `${recipientName} 様` : '●● 様'
+  // buildEmailBody と同じテンプレート適用（（本文）は空で返信内容をユーザーが入力）
+  return buildEmailBody(greeting, '', tpl)
 }
 
 // ── 定数 ─────────────────────────────────────────────────

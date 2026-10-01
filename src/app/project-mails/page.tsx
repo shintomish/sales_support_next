@@ -9,6 +9,7 @@ import { useStaleResponseGuard } from '@/hooks/useStaleResponseGuard'
 import EmailHtmlFrame from '@/components/EmailHtmlFrame'
 import ScoreBreakdown from '@/components/ScoreBreakdown'
 import { renderMailBody } from '@/components/mailBody'
+import { buildEmailBody } from '@/lib/mailBody'
 import { ResizeHandle } from '@/components/ResizeHandle'
 import { useResizableSplit } from '@/hooks/useResizableSplit'
 import { useFavorites } from '@/lib/useFavorites'
@@ -115,13 +116,9 @@ function buildSignature(tpl: EmailBodyTemplate | null): string {
 _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/`
 }
 
-function buildReplyBody(recipientName: string, originalBody: string, tpl: EmailBodyTemplate | null): string {
-  const greeting = recipientName ? `${recipientName}様\n\n\n` : ''
-  const quoted = originalBody
-    ? originalBody.replace(/\r\n/g, '\n').split('\n').map(l => `> ${l}`).join('\n')
-    : ''
-  const sig = buildSignature(tpl)
-  return `${greeting}${quoted}${sig ? `\n\n${sig}` : ''}`
+function buildReplyBody(recipientName: string, _originalBody: string, tpl: EmailBodyTemplate | null): string {
+  const greeting = recipientName ? `${recipientName} 様` : '●● 様'
+  return buildEmailBody(greeting, '', tpl)
 }
 
 // ── 定数 ─────────────────────────────────────────────────
