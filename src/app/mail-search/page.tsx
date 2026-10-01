@@ -156,9 +156,7 @@ export default function MailSearchPage() {
   const [favMode, setFavMode]   = useState(false);  // ★お気に入りのみ表示
   const [verdicts, setVerdicts]       = useState<Record<string, Verdict>>({}); // "source:id" -> 判定
   const [judgingKeys, setJudgingKeys] = useState<Set<string>>(new Set());      // 判定中の "source:id"
-  const [bulkJudging, setBulkJudging] = useState(false);
-  const [onlyOk, setOnlyOk]           = useState(false);  // ◯のみ表示
-  const [autoJudge, setAutoJudge]     = useState(true);   // 検索後に上位を自動AI判定
+  const [onlyOk, setOnlyOk] = useState(false);  // ◯のみ表示
 
   const [projectRes, setProjectRes]   = useState<Res | null>(null);
   const [engineerRes, setEngineerRes] = useState<Res | null>(null);
@@ -170,9 +168,7 @@ export default function MailSearchPage() {
 
   // AI判定の「探している条件」を ref で保持（判定実行時に最新値を読む・依存配列の揺れを避ける）
   const queryIntentRef = useRef('');
-  const autoJudgeRef   = useRef(autoJudge);
-  autoJudgeRef.current = autoJudge;
-  const verdictsRef    = useRef<Record<string, Verdict>>({});
+  const verdictsRef = useRef<Record<string, Verdict>>({});
   verdictsRef.current  = verdicts;
 
   // 検索条件を明示的に渡せるようにする（自然文AI解釈の直後など state 反映待ちを避けるため）
@@ -225,7 +221,7 @@ export default function MailSearchPage() {
       const res = await apiClient.get<Res>(`/api/v1/mail-search?${params}`);
       setRes(res.data);
       // 上位を自動AI判定（条件がある時のみ・キャッシュ優先なので再検索は安価）
-      if (autoJudgeRef.current && queryIntentRef.current.trim() !== '') {
+      if (queryIntentRef.current.trim() !== '') {
         judgeMany(res.data.data ?? []);
       }
     } finally { setLoading(false); }
@@ -317,17 +313,6 @@ export default function MailSearchPage() {
   ].filter(Boolean).join(' ');
   queryIntentRef.current = queryIntent;
 
-  // 表示中の候補をまとめてAI判定（列ごとに送信。1列≤50件、サーバ側は未判定のみ最大30件/回）
-  const judgeVisible = useCallback(async () => {
-    if (queryIntent.trim() === '') { alert('AI判定には検索条件（スキル/単価/自然文 等）が必要です。'); return; }
-    setBulkJudging(true);
-    try {
-      await Promise.all([
-        projectRes?.data?.length ? judgeMany(projectRes.data) : Promise.resolve(),
-        engineerRes?.data?.length ? judgeMany(engineerRes.data) : Promise.resolve(),
-      ]);
-    } finally { setBulkJudging(false); }
-  }, [queryIntent, projectRes, engineerRes, judgeMany]);
 
   return (
     <div className="h-full flex flex-col p-6 max-w-7xl mx-auto w-full overflow-x-hidden">
@@ -430,17 +415,9 @@ export default function MailSearchPage() {
         <div className="flex-1 min-h-0 flex flex-col">
           {/* AIツールバー */}
           <div className="flex-shrink-0 flex flex-wrap items-center gap-3 mb-2 text-sm">
-            <button onClick={judgeVisible} disabled={bulkJudging || favMode}
-              className="px-3 py-1 rounded-md border border-violet-300 text-violet-700 hover:bg-violet-50 disabled:opacity-50 font-medium">
-              {bulkJudging ? '🤖 一括判定中…' : '🤖 表示中をAI判定'}
-            </button>
             <label className="flex items-center gap-1.5 text-gray-700 cursor-pointer">
               <input type="checkbox" checked={onlyOk} onChange={e => setOnlyOk(e.target.checked)} />
               ◯のみ表示
-            </label>
-            <label className="flex items-center gap-1.5 text-gray-700 cursor-pointer">
-              <input type="checkbox" checked={autoJudge} onChange={e => setAutoJudge(e.target.checked)} />
-              検索後に全件を自動判定
             </label>
             <span className="text-xs text-gray-400">◯=よく合う / △=一部・情報不足 / ×=合わない（AI・参考）</span>
           </div>
