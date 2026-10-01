@@ -298,9 +298,10 @@ export default function MailSearchPage() {
           : d.detected_kind === 'engineer' ? '技術者向け案件を探しています' : '',
       ].filter(Boolean).join(' / ');
 
-      // AI検索はスコア順をデフォルト（state更新の非同期を避けて overrideSort で即時反映）
-      setSort('score_desc');
-      runWith(crit, newTarget, 'score_desc');
+      // 案件メール→技術者はスコア順、技術者メール→案件はスキル一致数順（合う案件を上位に）
+      const aiSort: Sort = d.detected_kind === 'engineer' ? 'skill_match' : 'score_desc';
+      setSort(aiSort);
+      runWith(crit, newTarget, aiSort);
     } catch {
       alert('AI解釈に失敗しました。条件を直接入力してください。');
     } finally { setParsing(false); }
