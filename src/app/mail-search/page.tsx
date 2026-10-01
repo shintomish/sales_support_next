@@ -292,8 +292,10 @@ export default function MailSearchPage() {
         setExcludeUnknownPrice(false);
       }
       // AI判定条件をスキル中心の簡潔な文に設定（全文だと超厳格判定になるため）
+      // AI判定条件: スキルは先頭4つに絞る（全スキル列挙だと「全部合わないと×」になる）
+      const topSkills = crit.skill.trim().split(/\s+/).slice(0, 4).join(' ');
       judgeIntentRef.current = [
-        crit.skill ? `スキル: ${crit.skill}` : '',
+        topSkills ? `スキル: ${topSkills}` : '',
         d.detected_kind === 'project' ? '案件向け技術者を探しています'
           : d.detected_kind === 'engineer' ? '技術者向け案件を探しています' : '',
       ].filter(Boolean).join(' / ');
