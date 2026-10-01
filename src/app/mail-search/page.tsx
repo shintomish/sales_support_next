@@ -27,7 +27,7 @@ interface Res { data: Row[]; total: number; current_page: number; last_page: num
 type Kind = 'project' | 'engineer';
 type Target = 'both' | 'project' | 'engineer';
 type Category = 'all' | 'mail' | 'self' | 'bp';
-type Sort = 'price_asc' | 'price_desc' | 'recent' | 'skill_match';
+type Sort = 'price_asc' | 'price_desc' | 'recent' | 'skill_match' | 'score_desc';
 
 const priceText = (min: number | null, max: number | null) => {
   if (min == null && max == null) return '単価不明';
@@ -258,12 +258,15 @@ export default function MailSearchPage() {
         d.detected_kind === 'project' ? 'engineer' :
         d.detected_kind === 'engineer' ? 'project' : undefined;
       if (newTarget) setTarget(newTarget);
-      // 案件メール→技術者検索: 案件の予算を技術者単価のハードフィルタにしない（ほぼ全滅するため）
+      // 案件メール→技術者検索: 案件の予算・勤務地を技術者フィルタに使わない（ほぼ全滅するため）
       if (d.detected_kind === 'project') {
         crit.priceMin = '';
         crit.priceMax = '';
-        setPriceMin(''); setPriceMax('');
+        crit.keyword  = '';
+        setPriceMin(''); setPriceMax(''); setKeyword('');
       }
+      // AI検索はスコア順をデフォルト
+      if (sort !== 'score_desc') setSort('score_desc');
       runWith(crit, newTarget);
     } catch {
       alert('AI解釈に失敗しました。条件を直接入力してください。');
@@ -403,6 +406,7 @@ export default function MailSearchPage() {
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">並び替え</label>
             <select value={sort} onChange={e => setSort(e.target.value as Sort)} className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white">
+              <option value="score_desc">スコア順</option>
               <option value="price_asc">単価 昇順</option>
               <option value="price_desc">単価 降順</option>
               <option value="recent">新着</option>
