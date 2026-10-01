@@ -227,11 +227,12 @@ export default function MailSearchPage() {
     } finally { setLoading(false); }
   }, [skill, skillMode, keyword, priceMin, priceMax, sort, category, favMode, judgeMany]);
 
-  const runWith = useCallback((crit: Crit) => {
+  const runWith = useCallback((crit: Crit, overrideTarget?: Target) => {
+    const t = overrideTarget ?? target;
     setSearched(true);
     setProjectPage(1); setEngineerPage(1);
-    if (target !== 'engineer') fetchKind('project', 1, crit); else setProjectRes(null);
-    if (target !== 'project')  fetchKind('engineer', 1, crit); else setEngineerRes(null);
+    if (t !== 'engineer') fetchKind('project', 1, crit); else setProjectRes(null);
+    if (t !== 'project')  fetchKind('engineer', 1, crit); else setEngineerRes(null);
   }, [target, fetchKind]);
 
   const runSearch = useCallback(() => runWith(buildCrit()), [runWith, buildCrit]);
@@ -252,9 +253,12 @@ export default function MailSearchPage() {
       };
       setSkill(crit.skill); setKeyword(crit.keyword); setPriceMin(crit.priceMin); setPriceMax(crit.priceMax);
       // 案件メールなら技術者のみ・技術者メールなら案件のみ に自動切替
-      if (d.detected_kind === 'project') setTarget('engineer');
-      else if (d.detected_kind === 'engineer') setTarget('project');
-      runWith(crit);
+      // setTarget は非同期なので overrideTarget で即時反映
+      const newTarget: Target | undefined =
+        d.detected_kind === 'project' ? 'engineer' :
+        d.detected_kind === 'engineer' ? 'project' : undefined;
+      if (newTarget) setTarget(newTarget);
+      runWith(crit, newTarget);
     } catch {
       alert('AI解釈に失敗しました。条件を直接入力してください。');
     } finally { setParsing(false); }
