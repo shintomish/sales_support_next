@@ -252,11 +252,13 @@ export default function MailSearchPage() {
       const res = await apiClient.post<{ skills: string[]; price_min: number | null; price_max: number | null; keyword: string | null; detected_kind: 'project' | 'engineer' | null }>(
         '/api/v1/mail-search/parse', { text: nlText.trim() });
       const d = res.data;
+      // AIが円単位（800000）で返すことがあるため万単位に正規化
+      const toMan = (v: number | null) => v == null ? null : v > 9999 ? Math.round(v / 10000) : v;
       const crit: Crit = {
         skill: (d.skills ?? []).join(' '),
         keyword: d.keyword ?? '',
-        priceMin: d.price_min != null ? String(d.price_min) : '',
-        priceMax: d.price_max != null ? String(d.price_max) : '',
+        priceMin: toMan(d.price_min) != null ? String(toMan(d.price_min)) : '',
+        priceMax: toMan(d.price_max) != null ? String(toMan(d.price_max)) : '',
       };
       setSkill(crit.skill); setKeyword(crit.keyword); setPriceMin(crit.priceMin); setPriceMax(crit.priceMax);
       // 案件メールなら技術者のみ・技術者メールなら案件のみ に自動切替
@@ -265,12 +267,15 @@ export default function MailSearchPage() {
         d.detected_kind === 'project' ? 'engineer' :
         d.detected_kind === 'engineer' ? 'project' : undefined;
       if (newTarget) setTarget(newTarget);
-      // 案件メール→技術者検索: 案件の予算・勤務地を技術者フィルタに使わない（ほぼ全滅するため）
+      // 案件メール→技術者検索: 案件予算を price_max（技術者単価の上限）として使用
+      // 「技術者単価 <= 案件予算」= 案件が払える範囲の技術者を抽出
+      // keyword（勤務地）は除外（全滅防止）
       if (d.detected_kind === 'project') {
         crit.priceMin = '';
-        crit.priceMax = '';
         crit.keyword  = '';
-        setPriceMin(''); setPriceMax(''); setKeyword('');
+        setPriceMin(''); setKeyword('');
+        // price_max はそのまま維持（技術者単価 <= 案件予算）
+        setPriceMax(crit.priceMax);
       }
       // AI判定条件をスキル中心の簡潔な文に設定（全文だと超厳格判定になるため）
       judgeIntentRef.current = [
