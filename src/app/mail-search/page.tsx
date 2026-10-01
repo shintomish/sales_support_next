@@ -272,6 +272,14 @@ export default function MailSearchPage() {
         crit.keyword  = '';
         setPriceMin(''); setPriceMax(''); setKeyword('');
       }
+      // AI判定の「探している条件」を全文ではなくスキル中心の簡潔な文に上書き
+      // （全文だと「Java5年以上・浜松町・RDB全種類」で厳しすぎて全件△/×になるため）
+      const judgeIntent = [
+        crit.skill ? `スキル: ${crit.skill}` : '',
+        d.detected_kind === 'project' ? '案件向け技術者を探しています' : d.detected_kind === 'engineer' ? '技術者向け案件を探しています' : '',
+      ].filter(Boolean).join(' / ');
+      if (judgeIntent) queryIntentRef.current = judgeIntent;
+
       // AI検索はスコア順をデフォルト（state更新の非同期を避けて overrideSort で即時反映）
       setSort('score_desc');
       runWith(crit, newTarget, 'score_desc');
