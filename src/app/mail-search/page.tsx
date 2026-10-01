@@ -110,17 +110,25 @@ function ResultColumn({ title, kind, res, loading, page, setPage, verdicts, judg
   favIds: Set<string>; onToggleFav: (source: string, id: number) => void;
 }) {
   const rows = (res?.data ?? []).filter(r => !onlyOk || verdicts[`${r.source}:${r.id}`]?.verdict === '◯');
+  const isJudging = judgingKeys.size > 0;
   return (
     <div className="flex-1 min-w-0 flex flex-col">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-bold text-gray-700">{title}</h2>
-        <span className="text-xs text-gray-400">{res ? (onlyOk ? `${rows.length} / ${res.total} 件` : `${res.total} 件`) : ''}</span>
+        <span className="text-xs text-gray-400">
+          {isJudging && <span className="text-violet-500 mr-2">🤖 AI判定中…</span>}
+          {res ? (onlyOk ? `${rows.length} / ${res.total} 件` : `${res.total} 件`) : ''}
+        </span>
       </div>
       <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
         {loading ? (
           <p className="text-xs text-gray-400 py-6 text-center">検索中...</p>
         ) : !res || rows.length === 0 ? (
-          <p className="text-xs text-gray-400 py-6 text-center">{onlyOk && res && res.data.length > 0 ? '◯判定の候補はありません' : '該当なし'}</p>
+          <p className="text-xs text-gray-400 py-6 text-center">
+            {onlyOk && isJudging ? '🤖 AI判定中… 完了後に◯が表示されます'
+              : onlyOk && res && res.data.length > 0 ? '◯判定の候補はありません'
+              : '該当なし'}
+          </p>
         ) : rows.map(r => {
           const k = `${r.source}:${r.id}`;
           return (
