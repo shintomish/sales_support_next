@@ -67,7 +67,7 @@ function ResultCard({ r, verdict, judging, onJudge, isFav, onToggleFav }: {
       <div className="mt-0.5 text-xs text-gray-500 flex flex-wrap gap-x-3">
         {r.sub && <span className="truncate">{r.sub}</span>}
         {r.location && <span>📍{r.location}</span>}
-        {r.date && <span>{fmtDate(r.date)}</span>}
+        {r.date && <span>受信 {fmtDate(r.date)}</span>}
       </div>
       {r.skills.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1">
@@ -236,7 +236,7 @@ export default function MailSearchPage() {
     if (!nlText.trim()) return;
     setParsing(true);
     try {
-      const res = await apiClient.post<{ skills: string[]; price_min: number | null; price_max: number | null; keyword: string | null }>(
+      const res = await apiClient.post<{ skills: string[]; price_min: number | null; price_max: number | null; keyword: string | null; detected_kind: 'project' | 'engineer' | null }>(
         '/api/v1/mail-search/parse', { text: nlText.trim() });
       const d = res.data;
       const crit: Crit = {
@@ -246,6 +246,9 @@ export default function MailSearchPage() {
         priceMax: d.price_max != null ? String(d.price_max) : '',
       };
       setSkill(crit.skill); setKeyword(crit.keyword); setPriceMin(crit.priceMin); setPriceMax(crit.priceMax);
+      // 案件メールなら技術者のみ・技術者メールなら案件のみ に自動切替
+      if (d.detected_kind === 'project') setTarget('engineer');
+      else if (d.detected_kind === 'engineer') setTarget('project');
       runWith(crit);
     } catch {
       alert('AI解釈に失敗しました。条件を直接入力してください。');
