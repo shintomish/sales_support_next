@@ -272,9 +272,12 @@ export default function MailSearchPage() {
         crit.keyword  = '';
         setPriceMin(''); setPriceMax(''); setKeyword('');
       }
-      // テキストエリアをクリア → queryIntentRef がスキルフィールドの値を使うようになる
-      // （全文のままだと「Java5年以上・浜松町・RDB全種類」で厳しすぎて全件△/×になる）
-      setNlText('');
+      // AI判定条件をスキル中心の簡潔な文に設定（全文だと超厳格判定になるため）
+      judgeIntentRef.current = [
+        crit.skill ? `スキル: ${crit.skill}` : '',
+        d.detected_kind === 'project' ? '案件向け技術者を探しています'
+          : d.detected_kind === 'engineer' ? '技術者向け案件を探しています' : '',
+      ].filter(Boolean).join(' / ');
 
       // AI検索はスコア順をデフォルト（state更新の非同期を避けて overrideSort で即時反映）
       setSort('score_desc');
@@ -316,8 +319,11 @@ export default function MailSearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target, category, sort, favMode, skillMode]);
 
-  // AI判定で使う「探している条件」テキスト（自然文があれば優先）
-  const queryIntent = nlText.trim() || [
+  // AI判定で使う「探している条件」テキスト
+  // parseAndSearch 後は judgeIntentRef に設定した簡潔な文を優先（全文だと厳しすぎるため）
+  // 手動入力時は nlText または スキルフィールドから構築
+  const judgeIntentRef = useRef('');
+  const queryIntent = judgeIntentRef.current || nlText.trim() || [
     skill.trim() ? `スキル:${skill.trim()}` : '',
     (priceMin.trim() || priceMax.trim()) ? `単価:${priceMin || ''}〜${priceMax || ''}万` : '',
     keyword.trim(),
