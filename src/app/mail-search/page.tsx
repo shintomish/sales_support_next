@@ -165,6 +165,7 @@ export default function MailSearchPage() {
   const [verdicts, setVerdicts]       = useState<Record<string, Verdict>>({}); // "source:id" -> 判定
   const [judgingKeys, setJudgingKeys] = useState<Set<string>>(new Set());      // 判定中の "source:id"
   const [onlyOk, setOnlyOk] = useState(false);  // ◯のみ表示
+  const [excludeUnknownPrice, setExcludeUnknownPrice] = useState(false); // 単価不明を除外
 
   const [projectRes, setProjectRes]   = useState<Res | null>(null);
   const [engineerRes, setEngineerRes] = useState<Res | null>(null);
@@ -226,6 +227,7 @@ export default function MailSearchPage() {
       if (c.keyword.trim())  params.set('keyword', c.keyword.trim());
       if (c.priceMin.trim()) params.set('price_min', c.priceMin.trim());
       if (c.priceMax.trim()) params.set('price_max', c.priceMax.trim());
+      if (excludeUnknownPrice) params.set('exclude_unknown_price', '1');
       const res = await apiClient.get<Res>(`/api/v1/mail-search?${params}`);
       setRes(res.data);
       if (queryIntentRef.current.trim() !== '') {
@@ -274,8 +276,10 @@ export default function MailSearchPage() {
         crit.priceMin = '';
         crit.keyword  = '';
         setPriceMin(''); setKeyword('');
-        // price_max はそのまま維持（技術者単価 <= 案件予算）
         setPriceMax(crit.priceMax);
+        setExcludeUnknownPrice(true);  // 案件予算指定時は単価不明の技術者を除外
+      } else {
+        setExcludeUnknownPrice(false); // 技術者メール→案件検索は単価不明を含める
       }
       // AI判定条件をスキル中心の簡潔な文に設定（全文だと超厳格判定になるため）
       judgeIntentRef.current = [
