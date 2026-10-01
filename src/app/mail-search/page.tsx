@@ -35,7 +35,12 @@ const priceText = (min: number | null, max: number | null) => {
   if (max != null) return `〜${max}万`;
   return `${min}万〜`;
 };
-const fmtDate = (s: string | null) => (s ? s.slice(0, 10) : '');
+const fmtDate = (s: string | null) => {
+  if (!s) return '';
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s.slice(0, 10);
+  return d.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+};
 const badgeColor = (s: Source) =>
   s === 'project_mail' ? 'bg-blue-100 text-blue-700'
   : s === 'public_project' ? 'bg-indigo-100 text-indigo-700'
