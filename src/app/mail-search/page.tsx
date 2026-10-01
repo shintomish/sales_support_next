@@ -19,6 +19,8 @@ interface Row {
   unit_price_min: number | null;
   unit_price_max: number | null;
   location: string | null;
+  score: number | null;
+  sender: string | null;
   date: string | null;
   detail_url: string;
 }
@@ -71,7 +73,9 @@ function ResultCard({ r, verdict, judging, onJudge, isFav, onToggleFav }: {
       </div>
       <div className="mt-0.5 text-xs text-gray-500 flex flex-wrap gap-x-3">
         {r.sub && <span className="truncate">{r.sub}</span>}
+        {r.sender && <span className="truncate text-gray-400">送信: {r.sender}</span>}
         {r.location && <span>📍{r.location}</span>}
+        {r.score != null && <span className="text-violet-600 font-medium">スコア {r.score}</span>}
         {r.date && <span>受信 {fmtDate(r.date)}</span>}
       </div>
       {r.skills.length > 0 && (
