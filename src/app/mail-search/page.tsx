@@ -88,9 +88,9 @@ function ResultCard({ r, verdict, judging, onJudge, isFav, onToggleFav }: {
           })}
         </div>
       )}
-      <div className="mt-2 flex items-center justify-end gap-2">
+      <div className="mt-2 flex items-center justify-end gap-2 min-w-0">
         {verdict && (
-          <span className={`text-[11px] px-1.5 py-0.5 rounded font-semibold ${vColor(verdict.verdict)}`} title={verdict.reason}>
+          <span className={`text-[11px] px-1.5 py-0.5 rounded font-semibold flex-1 min-w-0 truncate ${vColor(verdict.verdict)}`} title={verdict.reason}>
             {verdict.verdict} {verdict.reason}
           </span>
         )}
