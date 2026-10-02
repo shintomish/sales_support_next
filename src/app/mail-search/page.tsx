@@ -158,6 +158,7 @@ export default function MailSearchPage() {
   const [sort, setSort]         = useState<Sort>('price_asc');
   const [target, setTarget]     = useState<Target>('both');
   const [category, setCategory] = useState<Category>('all');
+  const [formCollapsed, setFormCollapsed] = useState(false); // 検索後フォームを折りたたむ
   const [nlText, setNlText]     = useState('');     // 自然文検索（AI解釈）
   const [parsing, setParsing]   = useState(false);
   const [favIds, setFavIds]     = useState<Set<string>>(new Set());  // "source:id"
@@ -240,6 +241,7 @@ export default function MailSearchPage() {
   const runWith = useCallback((crit: Crit, overrideTarget?: Target, overrideSort?: Sort) => {
     const t = overrideTarget ?? target;
     setSearched(true);
+    setFormCollapsed(true);
     setProjectPage(1); setEngineerPage(1);
     if (t !== 'engineer') fetchKind('project', 1, crit, overrideSort); else setProjectRes(null);
     if (t !== 'project')  fetchKind('engineer', 1, crit, overrideSort); else setEngineerRes(null);
@@ -362,7 +364,15 @@ export default function MailSearchPage() {
       </div>
 
       {/* 検索フォーム */}
-      <div className="flex-shrink-0 bg-white p-4 rounded-lg border border-gray-200 mb-4">
+      <div className="flex-shrink-0 bg-white rounded-lg border border-gray-200 mb-2">
+        {/* 折りたたみヘッダー */}
+        <button onClick={() => setFormCollapsed(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-2 text-xs text-gray-500 hover:bg-gray-50">
+          <span className="font-semibold text-gray-700">🔎 検索条件</span>
+          <span>{formCollapsed ? '▼ 展開' : '▲ 折りたたむ'}</span>
+        </button>
+      </div>
+      <div className={`flex-shrink-0 bg-white px-4 pb-4 rounded-b-lg border border-t-0 border-gray-200 mb-2 ${formCollapsed ? 'hidden' : ''}`}>
         {/* 自然文 / メール貼り付け で AI 検索 */}
         <div className="mb-3 pb-3 border-b border-gray-100">
           <label className="block text-xs font-semibold text-gray-700 mb-1">🤖 自然文 / メール貼り付けでAI検索</label>
