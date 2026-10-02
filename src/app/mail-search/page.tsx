@@ -165,7 +165,8 @@ export default function MailSearchPage() {
   const [verdicts, setVerdicts]       = useState<Record<string, Verdict>>({}); // "source:id" -> 判定
   const [judgingKeys, setJudgingKeys] = useState<Set<string>>(new Set());      // 判定中の "source:id"
   const [onlyOk, setOnlyOk] = useState(false);  // ◯のみ表示
-  const [excludeUnknownPrice, setExcludeUnknownPrice] = useState(false); // 単価不明を除外
+  // 単価不明を除外するフラグ。fetchKind の closure で即時参照できるよう ref で管理
+  const excludeUnknownPriceRef = useRef(false);
 
   const [projectRes, setProjectRes]   = useState<Res | null>(null);
   const [engineerRes, setEngineerRes] = useState<Res | null>(null);
@@ -227,7 +228,7 @@ export default function MailSearchPage() {
       if (c.keyword.trim())  params.set('keyword', c.keyword.trim());
       if (c.priceMin.trim()) params.set('price_min', c.priceMin.trim());
       if (c.priceMax.trim()) params.set('price_max', c.priceMax.trim());
-      if (excludeUnknownPrice) params.set('exclude_unknown_price', '1');
+      if (excludeUnknownPriceRef.current) params.set('exclude_unknown_price', '1');
       const res = await apiClient.get<Res>(`/api/v1/mail-search?${params}`);
       setRes(res.data);
       if (queryIntentRef.current.trim() !== '') {
@@ -278,7 +279,7 @@ export default function MailSearchPage() {
         crit.keyword  = '';
         setPriceMin(''); setKeyword('');
         setPriceMax(crit.priceMax);
-        setExcludeUnknownPrice(true);
+        excludeUnknownPriceRef.current = true;
       } else if (d.detected_kind === 'engineer') {
         // 技術者メール→案件検索: 案件予算 >= 技術者単価。人名・勤務地キーワードは除外
         // price_min のみ使用（技術者の希望単価下限）、price_max は不要
@@ -287,9 +288,9 @@ export default function MailSearchPage() {
         setKeyword(''); setPriceMax('');
         setPriceMin(crit.priceMin || crit.priceMax); // min優先、なければmax
         crit.priceMin = crit.priceMin || crit.priceMax;
-        setExcludeUnknownPrice(false); // 単価不明の案件は含める（スキル見合い）
+        excludeUnknownPriceRef.current = false; // 単価不明の案件は含める（スキル見合い）
       } else {
-        setExcludeUnknownPrice(false);
+        excludeUnknownPriceRef.current = false;
       }
       // AI判定条件をスキル中心の簡潔な文に設定（全文だと超厳格判定になるため）
       // AI判定条件: スキルは先頭4つに絞る（全スキル列挙だと「全部合わないと×」になる）
