@@ -241,13 +241,15 @@ export default function MailSearchPage() {
   const runWith = useCallback((crit: Crit, overrideTarget?: Target, overrideSort?: Sort) => {
     const t = overrideTarget ?? target;
     setSearched(true);
-    setFormCollapsed(true);
     setProjectPage(1); setEngineerPage(1);
     if (t !== 'engineer') fetchKind('project', 1, crit, overrideSort); else setProjectRes(null);
     if (t !== 'project')  fetchKind('engineer', 1, crit, overrideSort); else setEngineerRes(null);
   }, [target, fetchKind]);
 
-  const runSearch = useCallback(() => runWith(buildCrit()), [runWith, buildCrit]);
+  const runSearch = useCallback(() => {
+    setFormCollapsed(true);
+    runWith(buildCrit());
+  }, [runWith, buildCrit]);
 
   // 自然文 → AI解釈 → 各フィールドに反映して検索
   const parseAndSearch = useCallback(async () => {
@@ -306,6 +308,7 @@ export default function MailSearchPage() {
       // 案件メール→技術者はスコア順、技術者メール→案件はスキル一致数順（合う案件を上位に）
       const aiSort: Sort = d.detected_kind === 'engineer' ? 'skill_match' : 'score_desc';
       setSort(aiSort);
+      setFormCollapsed(true);
       runWith(crit, newTarget, aiSort);
     } catch {
       alert('AI解釈に失敗しました。条件を直接入力してください。');
