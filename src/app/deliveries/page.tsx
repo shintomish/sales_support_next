@@ -1191,9 +1191,12 @@ export default function DeliveriesPage() {
 
   // 紐づき案件/技術者を選んでいない時のみ、入手元アドレス欄を表示・送信する
   const isLinked = !!(sendForm.project_mail_id || sendForm.engineer_mail_source_id)
-  // 簡易メール形式チェック（バックエンドでも `email` ルールで検証）
+  // 簡易メール形式チェック（セミコロン区切りで複数アドレスを許容）
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  const sourceEmailInvalid = !isLinked && sendForm.source_email !== '' && !EMAIL_RE.test(sendForm.source_email)
+  const sourceEmailInvalid = !isLinked && sendForm.source_email !== '' && (() => {
+    const addrs = sendForm.source_email.split(/[;,\n]/).map(s => s.trim()).filter(s => s.length > 0)
+    return addrs.length === 0 || addrs.some(a => !EMAIL_RE.test(a))
+  })()
 
   const execSendBulk = async (excludeAddressIds: number[] = []) => {
     setSending(true)
@@ -2447,10 +2450,10 @@ export default function DeliveriesPage() {
                   </span>
                 </label>
                 <input
-                  type="email"
+                  type="text"
                   value={sendForm.source_email}
                   onChange={e => setSendForm(f => ({ ...f, source_email: e.target.value }))}
-                  placeholder="例: sales@example.co.jp"
+                  placeholder="例: sales@example.co.jp; info@example.co.jp"
                   className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
                     sourceEmailInvalid
                       ? 'border-red-400 focus:ring-red-300'
