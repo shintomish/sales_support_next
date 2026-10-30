@@ -2586,7 +2586,13 @@ export default function DeliveriesPage() {
           </div>
           {/* 右横：有効な配信先リスト + 追加宛先 */}
           <ActiveRecipientPanel sourceEmail={isLinked ? '' : sendForm.source_email} onChanged={fetchAddresses}
-            onPickEmail={email => setSendForm(f => ({ ...f, source_email: email }))} />
+            onPickEmail={email => setSendForm(f => {
+              const current = f.source_email.trim()
+              const existing = current ? current.split(/[;,\n]/).map(s => s.trim()).filter(s => s) : []
+              if (existing.includes(email)) return f
+              const next = existing.length > 0 ? existing.join('; ') + '; ' + email : email
+              return { ...f, source_email: next }
+            })} />
         </div>
       )}
       {/* ── 編集モーダル ──────────────────────────────── */}
