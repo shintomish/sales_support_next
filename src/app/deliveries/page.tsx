@@ -1052,17 +1052,37 @@ export default function DeliveriesPage() {
     if (!newForm.email) return
     setNewFormSaving(true)
     setNewFormError(null)
+
+    // セミコロン・改行区切りで複数アドレスをパース
+    const emails = newForm.email
+      .split(/[;\n]/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+
+    const isBulk = emails.length > 1
+    const errors: string[] = []
+
     try {
-      await axios.post('/api/v1/delivery-addresses', {
-        email:      newForm.email,
-        name:       newForm.name || null,
-        occupation: newForm.occupation || null,
-      })
-      setShowNewModal(false)
-      setNewForm({ email: '', name: '', occupation: '' })
+      for (const email of emails) {
+        try {
+          await axios.post('/api/v1/delivery-addresses', {
+            email,
+            name:       isBulk ? null : (newForm.name || null),
+            occupation: isBulk ? null : (newForm.occupation || null),
+          })
+        } catch (err: unknown) {
+          const msg = (err as ApiError).response?.data?.message ?? email
+          errors.push(msg)
+        }
+      }
+
+      if (errors.length > 0) {
+        setNewFormError(`以下のアドレスの登録に失敗しました:\n${errors.join('\n')}`)
+      } else {
+        setShowNewModal(false)
+        setNewForm({ email: '', name: '', occupation: '' })
+      }
       fetchAddresses()
-    } catch (err: unknown) {
-      setNewFormError((err as ApiError).response?.data?.message ?? 'エラーが発生しました。')
     } finally {
       setNewFormSaving(false)
     }
@@ -2709,41 +2729,54 @@ export default function DeliveriesPage() {
               </div>
             )}
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  メールアドレス <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={newForm.email}
-                  onChange={e => setNewForm(f => ({ ...f, email: e.target.value }))}
-                  placeholder="example@company.co.jp"
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
-                <input
-                  type="text"
-                  value={newForm.name}
-                  onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="山田 太郎"
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">職種</label>
-                <input
-                  type="text"
-                  value={newForm.occupation}
-                  onChange={e => setNewForm(f => ({ ...f, occupation: e.target.value }))}
-                  placeholder="営業担当"
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                />
-              </div>
-            </div>
+            {(() => {
+              const emailCount = newForm.email.split(/[;\n]/).map(s => s.trim()).filter(s => s.length > 0).length
+              const isBulk = emailCount > 1
+              return (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      メールアドレス <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={newForm.email}
+                      onChange={e => setNewForm(f => ({ ...f, email: e.target.value }))}
+                      placeholder={'aa@aaa.com; bb@bbb.net;\nまたは1行1アドレスで複数入力可'}
+                      rows={3}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+                      autoFocus
+                    />
+                    {isBulk && (
+                      <p className="text-xs text-blue-600 mt-1">{emailCount} 件のアドレスを一括登録します（名前・職種は空欄）</p>
+                    )}
+                  </div>
+                  {!isBulk && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
+                        <input
+                          type="text"
+                          value={newForm.name}
+                          onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))}
+                          placeholder="山田 太郎"
+                          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">職種</label>
+                        <input
+                          type="text"
+                          value={newForm.occupation}
+                          onChange={e => setNewForm(f => ({ ...f, occupation: e.target.value }))}
+                          placeholder="営業担当"
+                          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            })()}
 
             <div className="flex justify-end gap-3 mt-6">
               <button
@@ -2754,10 +2787,13 @@ export default function DeliveriesPage() {
               </button>
               <button
                 onClick={handleNewAddress}
-                disabled={newFormSaving || !newForm.email}
+                disabled={newFormSaving || !newForm.email.trim()}
                 className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
               >
-                {newFormSaving ? '登録中...' : '登録'}
+                {newFormSaving ? '登録中...' : (() => {
+                  const cnt = newForm.email.split(/[;\n]/).map(s => s.trim()).filter(s => s.length > 0).length
+                  return cnt > 1 ? `${cnt} 件を登録` : '登録'
+                })()}
               </button>
             </div>
           </div>
